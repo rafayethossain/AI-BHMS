@@ -1,0 +1,84 @@
+# ===== Secrets — NEVER commit =====
+.env
+.env.*
+*.env
+credentials.txt
+!*.env.example
+!.env.example
+
+# ===== Secrets inside backend =====
+backend/.env
+backend/.env.*
+
+# ===== PDF / document uploads =====
+*.pdf
+backend/media/
+media/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+.Python
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+.tox/
+.nox/
+
+# ===== Virtual environments =====
+venv/
+.venv/
+env/
+ENV/
+backend/venv/
+
+# ===== Django =====
+backend/db.sqlite3
+db.sqlite3
+db.sqlite3-journal
+backend/logs/
+logs/
+backend/staticfiles/
+staticfiles/
+backend/static/
+backend/media/
+
+# ===== Node / Frontend =====
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===== Celery =====
+celerybeat-schedule
+celerybeat.pid
+
+# ===== Generated / regenerable =====
+graphify-out/
+graphify-out-*/   # if any suffix variants exist
+
+# ===== IDE / OS =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===== Archives =====
+*.zip
+*.tar.gz
+*.7z

@@ -1,0 +1,1543 @@
+
+===== PAGE 1 =====
+GC Manual and Ways of Working. Version 1 
+1 
+ 
+Contents 
+GC installation ......................................................................................................................................... 4 
+How to Save information to the server/GC ........................................................................................ 4 
+∙ Tips .............................................................................................................................................. 5 
+∙ Design .......................................................................................................................................... 5 
+∙ Order ........................................................................................................................................... 5 
+GC Basics ................................................................................................................................................. 5 
+Printing .................................................................................................................................................... 8 
+Quick Print ........................................................................................................................................... 8 
+How GC Tables work ........................................................................................................................... 9 
+New Feature - if you right-click, you can select a report and go directly to that report for that 
+particular file. .................................................................................................................................... 11 
+What does * (Asterix) mean on some GC columns? ......................................................................... 12 
+What is a tick box for  ................................................................................................................... 12 
+BEFORE SAVING ................................................................................................................................ 12 
+Notes boxes........................................................................................................................................... 12 
+All Notes-Main Notes box ................................................................................................................. 13 
+FileShare ................................................................................................................................................ 13 
+Risk Assessment (Has Issue) .................................................................................................................. 14 
+Order current Risk Level ................................................................................................................... 14 
+Design Tab ............................................................................................................................................. 15 
+Creating a Style in GC ........................................................................................................................ 17 
+Designs .................................................................................................................................................. 19 
+Carmel Make Manual ........................................................................................................................ 19 
+∙ Design Sheet ......................................................................................................................... 19 
+∙ Samples Photo ...................................................................................................................... 19 
+∙ Sample Spec .......................................................................................................................... 19 
+Creating a New Specification ............................................................................................................ 21 
+Design Costings- ............................................................................................................................ 21 
+Job Request ....................................................................................................................................... 23 
+Other Photo .................................................................................................................................. 24 
+∙ File Share ............................................................................................................................... 25 
+∙ Orders ................................................................................................................................... 25 
+Development samples ...................................................................................................................... 25 
+Key areas ........................................................................................................................................... 25 
+
+
+===== PAGE 2 =====
+GC Manual and Ways of Working. Version 1 
+2 
+ 
+∙ New Designs must be reviewed before sending to pattern! If it's not going to be used, 
+thesStatus should be adjusted from 26 
+∙ Design and sales managers should then ensure the queue is prioritised daily to ensure the 
+correct samples are being made and any old requests are removed. ................................................. 26 
+∙ It is imperative that an accurate ratio is inputted into the costing page, otherwise it skews the 
+consumption of the order up considerably, resulting in losses being made. ....................................... 26 
+Order List ............................................................................................................................................... 26 
+Order list ............................................................................................................................................... 27 
+How To Raise an order? ........................................................................................................................ 27 
+Quick lead time orders .......................................................................................................................... 28 
+Mini Marker requests- (this will not go live until 2021) ................................................................... 28 
+Critical Sales procedures ....................................................................................................................... 29 
+Repeats ................................................................................................................................................. 29 
+Order Tracker-Future planning-new and potential orders ................................................................... 30 
+Stock fabrics .......................................................................................................................................... 30 
+The Order Tab ....................................................................................................................................... 30 
+Costing Tab (Costing Sheet) .................................................................................................................. 30 
+Filling in the Costing Sheet ............................................................................................................ 30 
+Changes to costs ........................................................................................................................... 31 
+Breakdown Tab ............................................................................................................................. 31 
+Fabric Tab .............................................................................................................................................. 32 
+Defect fabric/Shortages ................................................................................................................ 33 
+Fabric and Lining Tolerances ................................................................................................................. 34 
+Trims/Label Tabs ................................................................................................................................... 34 
+Critical areas .......................................................................................................................................... 35 
+Status ............................................................................................................................................ 35 
+Copying another label or trim sheet ............................................................................................. 35 
+Technical Tab .................................................................................................................................... 36 
+Carmel Make Manual ........................................................................................................................ 36 
+Sample Spec-Technical .................................................................................................................. 37 
+Dockets.............................................................................................................................................. 38 
+Job Queue ............................................................................................................................................. 38 
+Ways of working-Reporting Schedules ............................................................................................. 39 
+Booking Schedule .............................................................................................................................. 39 
+o Planning................................................................................................................................. 39 
+o Logistics ................................................................................................................................. 39 
+
+===== PAGE 3 =====
+GC Manual and Ways of Working. Version 1 
+3 
+ 
+o Accounts ................................................................................................................................ 39 
+o Gold seal ................................................................................................................................ 40 
+Fabric-Schedule ................................................................................................................................. 40 
+∙ Raising fabric orders - sales to raise the order. .................................................................... 40 
+o 2 critical areas are the lab dip or strike off and they MUST have approved dates to be 
+planned. ........................................................................................................................................ 40 
+o If it does not, it must have an agreed date that we can expect this to happen but should 
+then have an image or Pantone reference to work to. ................................................................ 40 
+▪ If the dip/strike-off is not approved by the agreed date a new onboard date and delivery 
+date must be agreed. .................................................................................................................... 40 
+o WE NEED TO ENSURE TECHNICAL HAS ENOUGH SAMPLING TO FIT! ................................... 40 
+∙ Lab dip and Bulk .................................................................................................................... 40 
+∙ Approved bulk - ..................................................................................................................... 40 
+∙ Onboard, and arrival dates ................................................................................................... 40 
+∙ Paperwork and actual clear dates. ........................................................................................ 40 
+∙ China office ........................................................................................................................... 40 
+Fabric Utilisation ............................................................................................................................... 41 
+Fabric, trims, customer tolerances ....................................................................................................... 42 
+Booking Schedule .................................................................................................................................. 42 
+o Planning is responsible for .................................................................................................... 42 
+o Logistics are responsible for ................................................................................................. 42 
+▪ Delivery Dates should not be moved out until ..................................................................... 42 
+Order manager .................................................................................................................................. 43 
+Critical Path Management ................................................................................................................ 43 
+Senior Team Status Updates ................................................................................................................. 43 
+QC App- Monday.com ........................................................................................................................... 44 
+Invoice approvals .................................................................................................................................. 44 
+Debits .................................................................................................................................................... 44 
+Reconciliation procedures .................................................................................................................... 44 
+Communication ..................................................................................................................................... 46 
+New Compliance Internal Audit Team. ................................................................................................. 47 
+ 
+ 
+ 
+ 
+
+===== PAGE 4 =====
+GC Manual and Ways of Working. Version 1 
+4 
+ 
+GC installation 
+http://ccl-soap.acuutechcloud.com:8889/Client/publish.htm 
+Copy the above link into your browser and follow the installation guide.  
+It will then ask if you want to choose to "not run" the program, click the underlined help text and 
+click proceed. 
+If there is an updated version, a pop up will appear and ask if you want to skip or proceed to install 
+the new version, ALWAYS select the option to proceed and DO NOT click the skip button. Once its 
+downloaded: 
+How to Save information to the server/GC 
+● All documents belong in one of 2 places. Either they have a design number, or they have a FN 
+number (which would include the style). 
+● To save ANYTHING which has a related style, it must be saved in the following way: 
+o In the K drive you will see highlighted below Designs (Garment Control). 
+o Every time a style is created GC will generate a unique style code, when it does this it 
+creates a folder structure in the K drive. 
+        
+You will see I have gone into the Design folder and I can either click through to my desired number 
+or search for it, in this example I have looked for the newest one. 
+So, you can see circled, is the folders and I am now able to go into 59701, which is a trouser but the 
+folder will not have the style identifier letter here. 
+You can then keep anything and everything to do with this style numbe here. Not on mail, not on 
+local drives or worse still personal computers. 
+ 
+● NOTE - you can create folders within the file structure outlined here and it MUST be 
+labelled in the same way. 
+ 
+
+
+===== PAGE 5 =====
+GC Manual and Ways of Working. Version 1 
+5 
+ 
+ 
+ 
+● Tips-  
+o Files should be named consistently. 
+o File names should be short but descriptive (<25 characters).  
+o Avoid special characters or spaces in a file name. 
+o Use capitals and underscores instead of periods or spaces or slashes. 
+o Use date format DD-MM-YY. 
+o Include a version number (v1). 
+o Documents!!!!! That are self explanatory!!!! 
+ 
+● Design 
+o Customer-Carmel department-brief description-date-Version- example: 
+▪ George-Sales-Inspiration Photo-03-05-20 
+▪ George-Design-sample photo-01-06-20 
+▪ George-Pattern-2nd fit-06-10-20-V1 
+▪ George-Pattenr-3rd fit- 10-10-20-V1 
+▪ George-Pattern-3rd fit- 10-10-20-V2 
+▪ George-Grader-prodcution patt-11-10-20 V1 (locked File) 
+▪ George-Technical-fit notes-16-06-20-V2 
+▪ George-Technical-fit notes-16-06-20-V2 
+● Anything that is critical and must not be amended  such as a production pattern, must be 
+locked when saved! 
+Anything saved that is specifically for a design MUST be held in this location and this location only! 
+● Order 
+o The same will apply to orders, the only difference here is the orders have a different 
+file structure where each tab will have its own Sharefile folder (Tab). However, 
+saving must be done in the same way. 
+o Customer-Carmel department-brief description-date-Version- example: 
+▪ Morrisons-Sales-sales price agreement-20-07-20-v1 
+▪ Morrison-Sales-fabric confirmation—20-07-07 
+▪ Morrison-Production-new price agreement-20-07-20 
+▪ Morrison-Director-OH agreement-20-08-20 
+▪ Morrison-Logistics-hit 1 paperwork-20-08-20 
+▪  
+GC Basics 
+● You can have more than one GC program open. 
+
+===== PAGE 6 =====
+GC Manual and Ways of Working. Version 1 
+6 
+ 
+o Once yo u have GC open, right-click on the 
+Icon, and then proceed to click on "Garment Control-1" and another program will load. 
+o Doing this then makes it useful to be using different reports or if you are doing 2 things 
+at once. You have as many open as you need. 
+▪  
+ 
+● Or you can "right click" on the Report window and select "New Report Manager", and the 
+system will open the report in another tab along the top. 
+. 
+● You are also able to right-click in the report and "Open in a Separate Window", to view or use 
+with ease. 
+
+
+===== PAGE 7 =====
+GC Manual and Ways of Working. Version 1 
+7 
+ 
+ 
+● To Search use the "Quick Search" options  
+ 
+● Right click to select which search criteria you would like to use or untick to remove the ones you 
+do not wish to use. 
+ 
+● In our example, I have chosen to add Design, Customer and Required dates to my search. 
+ 
+● To Search - input the information and click the magnifying glass  . 
+● To clear ALL your search criteria just hit the brush  to clear. 
+● PLEASE NOTE - if you use the search button it will use all the search boxes you have selected. 
+Therefore, if you are searching for a dress but have left a style as a coat, wich is a C in it, nothing 
+will come up as you obviously cannot search for a dress with a Coat code. 
+● ANOTHER option to search, is to type in one of the search fields. In our example, I know I want 
+to search for something more specific, so I don't need to use the search button.  
+o Type in what you are looking for, here we will search for a specific style. 
+
+
+===== PAGE 8 =====
+GC Manual and Ways of Working. Version 1 
+8 
+ 
+  
+o This time instead of hitting the search button we hit the enter key on the keyboard and 
+it will search ONLY in the search box that you typed in and will ignore all other 
+information in any of the other search boxes. 
+o You can hide the search bar, which will give you more space on the screen. 
+▪ Click the up arrow  to hide the search bar and the down arrow  to 
+unhide. 
+ 
+ 
+● Be aware that old items may be "Archived". If you cannot find what you are looking for 
+and it's an older item, please select "Include Archive" in your search
+ 
+ 
+ 
+ 
+ 
+ 
+
+
+===== PAGE 9 =====
+GC Manual and Ways of Working. Version 1 
+9 
+ 
+Printing 
+● Once you are in the area that you require to print, click the print button towards the top left 
+. Note - a print preview will come up and you can then print from here. 
+● If you want to print only a specific item and not the entire trim, label or fabric sheet you can 
+use the print tick box, to print specifics.  if no print boxes are ticked, it will default 
+and print ALL the Item or tabs. However, if any are ticked, it will only print that specific item 
+or tab. 
+ 
+Quick Print 
+o At the top left- hand side of the screen is the printer Icon . If you right click on 
+this and it will open 6 printing options. 
+ 
+o If you are in an order, it will print that file and the relevant section, so in this 
+example it will print the order you are in. 
+How GC Tables work 
+▪ All tables work the same throughout the system. 
+▪ To Show what options are available: 
+▪ Right Click: 
+● To "Select Order" there is an arrow that you can then go directly to the 
+area you want, such as the fabric area without waiting for the entire 
+order to load. 
+● On the spreadsheet to hide or unhide columns, you want to view. 
+● On the grid to Export to Excel. 
+▪ You can also click on the Excel button to export to Excel, and this can be found 
+towards the top left highlighted in yellow here: 
+ 
+▪ To alter the Has issue/Risk assessment colour grading and select "Risk 
+Assessment." 
+
+
+===== PAGE 10 =====
+GC Manual and Ways of Working. Version 1 
+10 
+ 
+ 
+ 
+● Above you will note some red-underlined areas. 
+o At the top right, the 1st one shows you how many rows are shown on the page, and 
+you can click on this to increase this or use "All" and then use the scroll bar on the 
+right-hand side.  
+ 
+o Or, you will notice at the bottom of the page there are page numbers, click next 
+arrow or the page number you wish to proceed to. 
+Grouping information 
+● At the top of the table you will notice below the "Drag Column header here to Group" 
+option: 
+ 
+ 
+In this example, after I have searched, I will group my spreadsheet by the customer, so, you drag and 
+drop the heading, in this example customer. You will then see below it is grouped, here we have 9 
+Dotti orders, and 2 Joules orders grouped, if I scroll up or down, I will see the other customer or 
+groupings.  
+
+
+===== PAGE 11 =====
+GC Manual and Ways of Working. Version 1 
+11 
+ 
+ 
+● You can also group more than one criteria. Below we have grouped customer, then added a 
+subgrouping, garment type but you could do any combination. 
+ 
+● You can revert any groupings back to normal by clicking on the x to remove the grouping.
+ 
+New Feature - if you right-click, you can select a report and go directly to that report 
+for that particular file. 
+Example: Here we are on the fabric report, and we have right-clicked on the FN, selected "Select 
+Report" and then gone to the booking Schedule. 
+
+
+===== PAGE 12 =====
+GC Manual and Ways of Working. Version 1 
+12 
+ 
+  
+I have gone directly from one report to another within the same FN.
+ 
+What does * (Asterix) mean on some GC columns? 
+● If you see an Asterix * on any report, it means you can edit directly onto the report. 
+● In the Design and Order tabs, you can create and manage the specific areas, and you can 
+then manage that process through the reporting tools. 
+What is a tick box for  
+● A tick box within an order or in a report is there as a verification process. So, if we put a date 
+in for an ETD dd/mm/yy with a corresponding tick box, this will mean an unticked box is 
+unverified information and therefore more of an estimate. Whereas a tick in the box would 
+indicate this information has been verified. This does not mean it won't or can't change, but 
+it means it has been confirmed and should happen as per the date. The box should not be 
+left unticked if the supplier has confirmed the dates. 
+ 
+ 
+ 
+
+
+===== PAGE 13 =====
+GC Manual and Ways of Working. Version 1 
+13 
+ 
+BEFORE SAVING 
+● Tab or click out of the last cell you updated then click save to ensure correct updated are 
+saved 
+Notes boxes 
+● At the bottom of most tabs (sections), there will be a notes box where you can write as 
+much information as you want. 
+● You should initial and date your comments for ease of reference. 
+o DJ, 17/07- notes are updated. 
+ 
+● There are summary notes boxes as well, such as in the reports. Example below: 
+   
+● These are summary notes and should be short and to the point. 
+ 
+All Notes-Main Notes box 
+o If you want to view all the main notes information in once place for a particular 
+order, go into the order, and there is a tab called "All Notes" which will then 
+display it all on one page making it easier to reference.  
+
+
+===== PAGE 14 =====
+GC Manual and Ways of Working. Version 1 
+14 
+ 
+ 
+ 
+FileShare 
+● Every Design has a folder for it as described (How to Save information to the server/GC) as 
+well as every section within each order. 
+● You can also access the same folder from within GC. 
+o In the specific style towards the end at the bottom will be its Sharefile page. This is 
+the same as the folders above, just a different way to view it. So, the information is 
+exactly the same, whether you go into it through the folder method or the GC 
+method. 
+ 
+o Here is where anything to do with the style should be saved. Please ensure it is 
+saved in the correct format, as described at the start of this document. 
+Risk Assessment (Has Issue) 
+● The key to this is if there is a chance of the area, or item, or issues costing additional money 
+that has not been planned for it should be made to be red.  
+  
+● Please note, when the Risk Assessment has been sent to excel, it does not bring the colour 
+but will be represented on the excel sheet as a number: 
+0. No colour  
+
+
+===== PAGE 15 =====
+GC Manual and Ways of Working. Version 1 
+15 
+ 
+1. Green- 
+2. Amber - This should be used if the item is "In Work" or should be ok based on the dates 
+etc. 
+3. Yellow - This is an additional colour which can be used as an indicator or flag to make 
+people aware of something. 
+4. Red - Major concerns/issue, this can be due to dates, quality issues or any other major 
+concerns. 
+● BE AWARE, the most critical risk will dictate the overall colour rating when viewed in the Order 
+List view. 
+Order current Risk Level 
+● There are four crucial areas: 
+▪ Fabric Risk 
+▪ Trims Risk 
+▪ Label Risk and 
+▪ Tech Risk 
+▪ Design Risk 
+● When you pull up an order on the Order list, you can review where the issue is. As in our 
+example, the overall order risk level is Amber, which should mean there are no issues 
+and we are on track. But if you look specifically at those four areas you can see our 
+potential issue could be the fabric because all the other areas are 1-Green 
+ 
+ 
+ 
+ 
+Design Tab 
+● As a default, when you search, it will use the images stored in GC. 
+ 
+ 
+● You can see: 
+o The style number (unique to the style). 
+
+
+===== PAGE 16 =====
+GC Manual and Ways of Working. Version 1 
+16 
+ 
+o In brackets you can see the style it was created from. If it's blank, it's been created 
+as a new style unrelated to any other specific style numbers. 
+o Orders - if it has a zero, there are no related orders to that style; however, if there is, 
+you will see a number there such as in the below example. 
+o If you right-click on the image, you can either select the style or go to the orders tab, 
+and it will show you a list of File Numbers that relate to that style. You can click on 
+the FN to proceed to the FN details. 
+ 
+ 
+● If you have saved a photo as the range plan image, you can tick the "Show with Range 
+Photo" and instead of the sketch, it will show the picture. Below, the 1st style has nothing 
+set as the range photo, so it shows the main sketch and the second image is showing the 
+range photo because it has a photo set as the range image. 
+ 
+● You can look through the designs which have been sold by clicking on the  “Show only with 
+Orders”  
+o This will then exclude designs which have not been sold or visa versa you can show 
+only design which do not have a File number against it. 
+● If you wanted to see the data without the images, click the "View by Lists or Images" button. 
+
+
+===== PAGE 17 =====
+GC Manual and Ways of Working. Version 1 
+17 
+ 
+ 
+ 
+ 
+ 
+● GC will show the searched items as a list format, but don't forget to click the search button 
+again to refresh the page. 
+ 
+ 
+ 
+ 
+ 
+Creating a Style in GC 
+● Once you are on the Design List tab , Click on the Plus Icon on the top left of 
+the screen       
+● A new Design window will appear. 
+
+
+===== PAGE 18 =====
+GC Manual and Ways of Working. Version 1 
+18 
+ 
+  
+● Select the "garment type" you want to create from the drop-down list. 
+● You can then add a style reference by clicking the plus symbol, and once you have found the 
+style you want to base the new style on, click it. It will highlight blue and then hit the save 
+button. 
+ 
+● If it's not based on another style, leave blank. 
+● Next, you need to select the relationship to that style.
+. 
+● If you are using a particular block, once again click the plus symbol and search.  
+● Add your description and hit the tick to create. 
+o  If you are basing it on a previous style, you can choose whether you include the 
+annotations and or notes from the style you are basing it only ticking or un-ticking 
+the "include" box.  
+
+
+===== PAGE 19 =====
+GC Manual and Ways of Working. Version 1 
+19 
+ 
+ 
+● To insert a Text Box, at the top of the screen select the insert text button and type in the 
+text box what you want to add. 
+ 
+● Then select the part of the sketch you want to attach it to. 
+o PLEASE NOTE if you want to add the annotation around the sketch, place it on the 
+sketch first and then move it to the required section, otherwise it will not paste. 
+ 
+● To add an image, you can just drag and drop or click on the camera. 
+● If you have multiple images, you need to ensure that one of them is "Set as Main Design 
+Image". 
+● If you right-click on the image the below menu will appear where you can resize the image, 
+set the design or range image, copy to clipboard or delete as an alternative to the eraser. 
+ 
+● The cream area below is what you will see on the printout, anything in the grey area will not 
+show in the printout. 
+
+
+===== PAGE 20 =====
+GC Manual and Ways of Working. Version 1 
+20 
+ 
+● Further notes can be added in the notes section. 
+o Any notes here, if highlighted, it will open up a text editing box, where you can bold 
+or highlight, etc. 
+ 
+ 
+Designs  
+ 
+ Carmel Make Manual 
+● PLEASE ENSURE THESE STANDARDS AND PROCESSES ARE FOLLOWED! 
+● Design Sheet  
+o Details must be filled in correctly. The issuer and designer must be filled in. 
+o Block reference should always be filled in - No reference here usually indicates it's 
+being made as a completely new pattern! 
+● Samples Photo 
+o Any photos in addition to the main design sheet can be cut and pasted here. 
+● Sample Spec 
+o The Dev Spec which should have the key measurements input.  
+ 
+ 
+
+
+===== PAGE 21 =====
+GC Manual and Ways of Working. Version 1 
+21 
+ 
+ 
+ 
+● To the right you will see a notes box where you input the relevant fit information, as per the 
+below example. 
+ 
+● Next to the notes tab, you will see the images tab and here you can input fit images with 
+annotations IF necessary. 
+ 
+ 
+● You can create as many fit specifications as needed, just click on the new button and relabel 
+as necessary to the correct fit number and date. 
+● Please ensure you tick the selected specification to ensure the correct one is used. 
+ 
+ 
+
+
+===== PAGE 22 =====
+GC Manual and Ways of Working. Version 1 
+22 
+ 
+ 
+Creating a New Specification 
+● Click New. 
+● The "New Specification" window will open up. 
+ 
+o You then have the options to copy from the base or development sheet or the one 
+that has been selected, as in this case, it would be the 2nd fit. 
+o You can choose to include or not include the schedule from the previous 
+specification. 
+● Lastly, you also can copy specification, from another style number altogether. 
+o You will need to input the full style number, including the letter at the end and hit 
+the save button.  Please note that it will copy over the 
+specification on the style that is selected, . Please ensure the sheet 
+you want to copy is selected before copying it over. 
+Design Costings- 
+● Go into the relevant style number. 
+● Go into the coting tab  
+● When you do the 1st costing it will naturally be the first costing: 
+ 
+● You may cost the item as many times as you need, as long as you ensure you select the 
+relevant one. 
+● There is a notes box which is free text. 
+● You should select the current costing sheet you want to use by ticking the box. 
+● While all costings should be full size, if you do require a single size costing, please ensure its 
+stated. 
+
+
+===== PAGE 23 =====
+GC Manual and Ways of Working. Version 1 
+23 
+ 
+ 
+● A sing size watermark will show over the image, as this should not be used for production 
+purposes. 
+● It is important to state the sizes and ratio each time you request a costing update. 
+● Only tick the confirmed box, once you have this confirmed with the customer.  
+ 
+● As with the old method, you will need to ensure the size/width column is filled in.  
+● It is important that the costing schedule should be built as accurately as possible as this will 
+be pulled through to the FN costing sheet when its created. 
+ 
+ 
+ 
+● If it's a patterned fabric, there are 4 additional options to have the costing done accurately. 
+
+
+===== PAGE 24 =====
+GC Manual and Ways of Working. Version 1 
+24 
+ 
+ 
+These columns or any columns can be hidden or unhidden by right-clicking on the grid and ticking or 
+unticking the box. 
+ 
+● NOTE, if a pattern amendment is being requested, going forward, you MUST request a new 
+costing the same time. 
+  
+Job Request 
+o Patterns, samples and 3D’s are requested through the “Job Request" tab. 
+o In the drop-down box, you can select a single job or multiple jobs, such as:  
+ 
+o New Pattern and Technical sample. 
+o Then select the date you require it by. 
+o If you know the work location, which you should, select where it is to be made. 
+o Verify the customer and department. 
+o Some samples require multiple samples otherwise the "No of Garments" should be 1. 
+o Finally, you can allocate it to a specific person if known. Otherwise, the team in charge 
+will assign it later. 
+o Any additional notes should be input here. 
+o Then click "Add to Job Request" and it will be added to the relevant departments queue: 
+Pattern sample room, costing team. 
+
+
+===== PAGE 25 =====
+GC Manual and Ways of Working. Version 1 
+25 
+ 
+ 
+● You can see the history of what has been done with this style previously. 
+Other Photo 
+o Simply speaking this is where all sketches and photos can be viewed in one place. 
+o Double click on any image to bring up a larger view. 
+ 
+● File Share 
+o As described above, this is a virtual folder (cloud folder) where everything is stored. 
+● Orders 
+o You can see a full list of orders made for the particular style. 
+ 
+Development samples 
+Key areas 
+o The Designer and Issuer MUST be correct when issuing. 
+o Block reference where applicable and season should be filled in to analyse data 
+correctly. 
+o Designs will be checked if no blocks are being used, so you must ensure the correct block 
+is used. 
+o There must be a constant review by Sales and Design Directors. 
+▪ This can be done several ways, one of which is using the images on the Design 
+list.  
+▪ Example: WC 27/07-02/08 85 styles were created, here is an extract, this is just 
+an example for explanation purposes. 
+
+
+===== PAGE 26 =====
+GC Manual and Ways of Working. Version 1 
+26 
+ 
+▪ The trouser does not have a block reference, you can see this due to no 
+information being in between the brackets. You can also see if any orders are 
+against a style. If you right click on the style it will list the file numbers attached 
+to the style number. 
+  
+ 
+● New Designs must be reviewed before sending to pattern! If it's not going to be used, thesStatus 
+should be adjusted from new to rejected, closed or archived once the Design has been 
+generated, all patterns, samples and costing must be requested through the Job Queue. (Job 
+Queue.link) 
+● Design and sales managers should then ensure the queue is prioritised daily to ensure the 
+correct samples are being made and any old requests are removed. 
+● It is imperative that an accurate ratio is inputted into the costing page, otherwise it skews the 
+consumption of the order up considerably, resulting in losses being made. 
+ 
+Order List -   
+
+
+===== PAGE 27 =====
+GC Manual and Ways of Working. Version 1 
+27 
+ 
+● This area is where you can load and view all orders. 
+● FN (File Number). 
+▪ without a letter means it's a Vietnamese order. 
+▪ SL - Sri Lanka(15799-SL). 
+▪ R - Romania (15081-R). 
+● If you were to filter or to search a subfield, you could just search R, and it would only bring up 
+Romanian orders. Or SL, would bring up only Sri Lankan orders. 
+● Origin - Indicates which office the order is going through for financial reasons. 
+▪ UK - Indicates the order is being processed through the UK business and will be denoted 
+in our accounts as GBP. 
+▪ EU - Indicates the order is being processed through the Dublin business and as a result, 
+the accounts see this as Euro. 
+● Original and actual completion dates can be amended on this table for ease. 
+● You can also view the overall risk of the order by selecting the columns for Fabric, Labels, Trims 
+or Technical. 
+▪ Remember the overall risk rating will be the highest risk. 
+ 
+▪ I have selected a completion date range, and I can see two examples above. The 1st one 
+has a risk rating of green and should be ok. 
+▪ The second order we can see the fabric is green 1-low risk. Trims again is green and has 
+a low risk, and the tech pack is also a low risk and is green with a low risk rating. 
+▪ HOWEVER - we can see fabric has a red 4 risk rating and it is high, which at this point of 
+looking at the completion date is a major issue, has a high risk of going wrong and 
+costing additional money. 
+● You can amend the status here by right-clicking and scrolling to "Set Status" where you can 
+move it from Live to In Work, Delivered, Hold, Cancel or Archive, instead of going into the order. 
+● Right-click to select which columns you want or do not want as each user may have specific 
+needs. 
+ 
+Order list 
+● This is the area where you can view all files and pending orders. 
+How To Raise an order? 
+● Go into the Order List  
+● Click the "new" icon  and a new order template will appear. 
+● Proceed to fill in all available information apart from the completion dates as this is for 
+production purposes. 
+● Please note, once you input the full style number it will bring the main sketch from the 
+design sheet and populate the costing tab with the information from the design sheet. 
+o If the design sheet ends off wrong, the costing sheet will start off wrong. 
+
+
+===== PAGE 28 =====
+GC Manual and Ways of Working. Version 1 
+28 
+ 
+● Critical information, in order to be able to save: 
+o Costing tab - Make price, label and Contract Selling Price. Ensure you have selected 
+the relevant cost sheet by ticking the Select cost box. 
+o Breakdown tab - Hit number, colour, quantity and delivery date. 
+o Fabric Tab - Supplier, mill, description, colour, weight, cuttable width, composition, 
+order quantity, lab dip required and onboard date. 
+● Once the above is filled in, you can go to the status section and change it from New or 
+Available to Live and this will then issue an FN number. 
+o If you have missed a critical piece of information, the system will tell you where the 
+issue/s are at the bottom of the page, and you may need to come out and go back 
+into the style to issue the FN. 
+, 
+ 
+● Until an order is passed to the Production team, it will not be processed, even if it has been 
+given an FN.  
+● New FN's should not be raised to pre-order fabric without authorisation to do so. 
+● Completion dates: 
+o When sales raise the order, the default completion date for the order will be based 
+on the fabric arrival into the factory. (Completion date is the date ALL, trims, labels, 
+fabric, factory sealers and tech packs need to be IN the factory, in order for them to 
+be able to CUT and go into Production, PLEASE NOTE, this is not a cut date). 
+o Also, to note the completion date is not a date for things to be sent by, all the items 
+need to be IN BY this date, not sent by! 
+o Planning must take into consideration trims, labels and sealing when confirming a 
+completion date to ensure it's achievable or the order must be sent back! 
+● Sales must order and track (with technical) 5 meters of sampling (minimum) for technical.  
+● The Designer to review the costing sheet with Sales before the price is given to the customer. 
+● Basic sales checklist to be completed on the notes on the costing sheet. If this is not filled in 
+correctly, the order will be sent back. (Link to checklist SALES CHECK LIST ) 
+ 
+● Once the order is passed through to Production and approved, it will be passed over to the 
+Merch teams. 
+
+
+===== PAGE 29 =====
+GC Manual and Ways of Working. Version 1 
+29 
+ 
+Quick lead time orders 
+● Costing sheets to be marked in yellow by adjusting the risk setting. 
+o This will highlight on the order sheet as well as in all areas as a yellow quick lead 
+time order. 
+o BEFORE a quick lead time order is put through ALL parties from sales, buying teams, 
+customer and Carmel technical teams, as well as planning and merchandisers, must 
+agree on deadlines and ways of working. 
+● IT ONLY WORKS IF CARMEL AND CUSTOMERS ARE ALL CLEAR ON WHAT WE NEED TO DO TO 
+ACHIEVE DATES. 
+Mini Marker requests- (this will not go live until 2021) 
+● This should be requested via the Job Request. 
+● To add to the job queue; you can click on the top of the screen , on the "Make Request" 
+button to request the mini marker. If you are in the Design, this will be greyed out as you 
+need to use the job request tab at the bottom of the design sheet. 
+● The quick add job works in the same way the job request does (see job request link Job 
+Request ). 
+● If the sheet is not filled in correctly, it will result in the mini marker team sending the request 
+back to clarify information before they proceed. 
+Critical Sales procedures 
+● Sales confirmation sheet to be sent to the customer giving 48 hours to dispute any issues or 
+we will take as confirmation. A copy of the file can be found at the following link: Draft Sales 
+Confirmation as well as the T's & C's Sales_Confirmation to the buyer. This only applies to 
+customers who do not issue updated contracts, otherwise, a revised contract should be 
+issued. 
+ 
+Repeats 
+● All repeats to be put through with the original FN quoted. 
+● A repeat should be raised from its original order by going into the order and clicking the   
+Create a repeat order .  
+o You will then create a repeat or copy the order details over to a new style. 
+o  
+
+
+===== PAGE 30 =====
+GC Manual and Ways of Working. Version 1 
+30 
+ 
+● Each department MUST confirm on GC that it's a direct repeat. 
+o Technical must green GC and confirm it's a repeat of FN****. 
+o Trims should also confirm it's the same trims as well as FN ****. 
+● Even though the order is a repeat, it should be treated as a new order and follow the same 
+process, all this should mean is that it's quicker to process the order, but it ensures each 
+area is checked accordingly for any changes or issues. 
+● NO PROCESSES SHOULD BE LEFT OFF! 
+● DO NOT ASSUME IT'S A REPEAT, CHECK AND CONFIRM IT IS AND THAT EVERYTHING IS THE 
+SAME OR NOT! 
+● If the repeat has been raised in error, click the eraser to change or remove the incorrect file. 
+ 
+ 
+● If you copy information to split from an order, please make sure the rating is also carried over. 
+Order Tracker-Future planning-new and potential orders 
+● Weekly updates from sales on new and potential orders being worked on. 
+● Sales to be given capacity figures which must fall in line with sales targets, Head of planning 
+responsible for this. 
+● Sales stock reports to be circulated 1st Monday meeting of each month. 
+Stock fabrics 
+● Any stock fabric that is to be used is to be moved to its own NEW file number with a 
+description "stock fabric". Instead of a sketch, in its place, is to be a photo of the fabric 
+swatch or TBC. 
+o An accompanying file will be held with the physical. 
+● If and when fabric is used, the FN will either be converted into the order OR the fabric will be 
+reduced, detailing the file numbers and how many meters have been allocated from the 
+stock and the balance will be left so at any point in time we can see how many metres are 
+left. Note the completion dates should be blank. 
+● If it's a customer commitment, it must be correctly labelled as that customer otherwise the 
+customer should be TBC as well as the style number. 
+The Order Tab 
+● All details must be filled in on this page when an order is raised (apart from the actual comp 
+date). The Actual comp date will be adjusted by planning based on the reality of the 
+current status of an order. 
+o Actual status must be filled in once the factory has confirmed the date and should 
+only be blank if the factory has either not confirmed a date or the delivery date is 
+unachievable.  
+● The original comp date should be based on the fabric ETD. 
+● It is critical that the contract received date is inputted when the contracts are received. 
+
+
+===== PAGE 31 =====
+GC Manual and Ways of Working. Version 1 
+31 
+ 
+o If customers contract to delivery date is over five months raise a query with Finance 
+for approval.  
+ 
+Costing Tab (Costing Sheet) 
+Filling in the Costing Sheet 
+● Before a costing sheet is created, the Design sheet should be made to be correct as GC will 
+pull this data through to the new cost sheet. 
+● Every costing sheet MUST have an item description of Label and Making Price, or the costing 
+sheet will be unable to save. It cannot be abbreviated either. 
+ 
+● Every item on the costing sheet belongs to one of 8 categories.  
+o This information must be filled in for reconciliation purposes, so costs are associated 
+to the correct place. 
+●  There are five types of costing sheets that can be selected, and you must ensure the live 
+one is ticked as in the below example, we have chosen the Sri Lankan costing sheet. 
+ 
+Changes to costs 
+● If anything is a higher cost than what is on the cost sheet, it needs to be added. So, in the 
+case of a CM price being higher than what is costed at, a new row should be added as per 
+the below example where you can see we had an original make price of $2.70, but the 
+reality was there was an increase of 20c. The item description should include the word 
+"Additional" before the description which should be the same as its original description.
+ 
+o The same procedure will need to be followed for any other increases such as trims 
+prices or labels etc. 
+o If something has been left off the cost such as transport, reordering or anything else, 
+it should be added on here in the correct unit cost per garment. 
+o So, in the example of $500 extra being spent on boxes, this cost should be divided by 
+the number of units and input into the Costing sheet, once again with the word 
+"Additional" followed by the description (- Boxes). 
+o Followed by, approved by who and the date 
+● You will note there is a column called Dgn rating, and this is the rating pulled through from 
+the design sheet and is for reference only. The correct and approved rating should be input 
+into the rating column. 
+
+
+===== PAGE 32 =====
+GC Manual and Ways of Working. Version 1 
+32 
+ 
+● If you are doing a landed order, the exchange rate must be input so GC can convert the USD 
+costings int GBP. 
+● There is a quick link to the Design sheet towards the bottom of the page, which will take you 
+directly to the costing section of the design sheet . 
+Breakdown Tab 
+● Each hit should be unique. 
+o In our example below, you will see there are two hit ones, and that is because the 
+colour of the hit is different.  
+o If the hits were the same colour you can not have them labelled up both as hit 1, 
+they should be hit 1 and 2. The hit number in conjunction with the colour is what the 
+system uses to manage Production and bookings.  
+. 
+o Each hit should have a Purchase order (PO) and Customer style number. 
+o You must state if the hits are boxed or hanging. 
+o You will note a row called factory which should be blank unless the goods have been 
+transferred internally to another factory. 
+▪ However, the factory that the fabric has been shipped to in the fabric tab 
+must not be changed, as this is where customs will have it registered to. 
+● The original delivery date is input once when the order is raised, and it cannot be changed 
+after this point. If the date does need to be amended, it will be done using the "Delivery 
+date" column. 
+  
+ 
+● Default delivery type is by "Sea", but if the order is being aired in, this should be changed to 
+"air" or one of the other air options which notes who is paying for this option. It is 
+understood if its just "air", this is the customer paying for this as it would have been sold this 
+way. 
+ 
+Fabric Tab 
+● The 1st tab here is known as the "Prime" tab.  This tab is what we use to do to the initial 
+planning. You cannot delete this tab. 
+
+
+===== PAGE 33 =====
+GC Manual and Ways of Working. Version 1 
+33 
+ 
+● When orders have multiple colours, the "Orders Colour Ref"
+must be filled in. What this means is this fabric is assigned to which colour on the 
+breakdown. This is especially important if it's a contrast fabric but should be filled in 
+regardless. 
+● Select a supplier from the pre-approved drop-down list. Suppliers cannot be manually input 
+and need to go through Finance’s approval before it is added to the drop-down. 
+● Important - The description here must be a description, not just a code. For example, you 
+must not put the description as 10661, but rather Poly twill 10661. 
+● The most critical areas to get right here when raising an order are: 
+o Lab dip Required date 
+o On board date - which should be based on your lab dip date. 
+● It's essential for the smooth running of production and communication that:  
+o The lab dip actual date and notes are always up to date. 
+o The bulk notes and bulk approval date are always up to date and 
+o The onboard, ETA dates are up to date. 
+o 10 meters of bulk MUST be sent to production base at bulk approval stage for 
+technical samples - Technical and production are responsible for ensuring this! 
+o Two meters of bulk must also be sent to the sales office! 
+● Please note the factory allocation is confirmed here and as mentioned this is where the 
+fabric is sent and legally binding within the customs of that country. 
+● It is critical that the consumption (the final consumption), from production, is updated here 
+. This may be different from the sold consumption (rating) for the 
+costing sheet. 
+● In order to add another fabric tab for another hit of fabric, click "New" and a new tab will 
+open up. 
+o If it's a different fabric to the others, you will need to fill in this form, ensuring the 
+critical areas are correct. 
+o If it's the same fabric but a different colour, you can copy the tab you have already 
+completed to speed up the process but clicking on the "Copy From" button and 
+selecting which tab you want to copy. In the below example, we already had 3 fabric 
+tabs, so you select the most relevant option. Then click copy. 
+ 
+o It will then copy exactly from that tab, and you will now need to edit the information 
+now to make it correct. 
+● To delete a fabric tab click on the x as highlighted here.  
+Defect fabric/Shortages 
+● On the fabric Tab there is an area to record the total amount of fabric that is missing or 
+unusable. That should be debited, but it won't always be possible. 
+
+
+===== PAGE 34 =====
+GC Manual and Ways of Working. Version 1 
+34 
+ 
+ 
+● This same column will appear on the fabric schedule.  
+● There is a defect notes box where you can leave the breakdown, and within the main notes 
+section on the fabric tab, you can then put a simple and clear explanation. 
+● You must then keep any and all correspondence of the debits in the fabric section of the share 
+file as details above  (How to save information to the server/GC- click here to go to this section). 
+● Consumption - must be filled in no later than PP approval stage. 
+ 
+ 
+Fabric and Lining Tolerances 
+Primark/Penney’s 
+0,001 – 2,999 metres: +/- 5% Tolerance 
+3,001 – 4,999 metres: +/- 3% Tolerance 
+5000 metres +: +/- 2% Tolerance 
+ 
+Other Customers: 
+0,001 – 4,999 metres: +/- 5% Tolerance 
+5,000 – 9,999 metres: +/- 3% Tolerance 
+10,000 mts +: +/- 2% Tolerance 
+ 
+All Fur Orders     
++/- 2% Tolerance 
+The tolerance should be based on the quantity per colour/print and should be actioned on all orders.  
+We need to include the following statement in a covering e-mail when the order is sent to suppliers: 
+ 
+“Please note if you do have a situation where you have extra cloth please do not deliver it without 
+discussion, we will ask customers to take the extra fabric but many of our customers have zero 
+tolerance so any fabric delivered over what has been ordered is a direct loss for Carmel. Early 
+communication is more likely to lead to a positive outcome. Please DO NOT deliver over these 
+tolerances without prior approval or automatic debits will follow from the compliance team.”  
+ 
+
+
+===== PAGE 35 =====
+GC Manual and Ways of Working. Version 1 
+35 
+ 
+Trims/Label Tabs 
+● This will initially copy some basic information when the order is created, and now you need 
+to enter these tabs and fill in. 
+● There is a column called "Location on Garment"; This should be used if you need to specify 
+where the item should go. I.E. black on the under the collar of the beige garment, as an 
+example. 
+● "Supplier" once again is a drop-down list. If your supplier is not there, you will need to 
+contact your manager and GC for it to be added to the drop-down options. 
+● Its important to set these areas up correctly so they can be managed from the trims and 
+labels schedules. Note: You can edit items that have been created in the tabs, but you 
+cannot add missing items directly to the reports itself. 
+● The Items USD price must be updated.  
+● The price in GC MUST be the actual price form the invoice, it should be used as a check 
+against the supplier's invoice. 
+● Higher price - If the item is more than the cost priced it must be approved by management 
+and the costing sheet should be updated, please see (Changes to costs.) 
+● I an item is higher, it should be fille dout on the belo w format and mailes to the 
+merchandiser , sales person and Coplaince team. 
+o Example below  
+ 
+ 
+Trim 
+Description Target Actual Reason 
+Satin Lining $0.75 $1.70 Below minimum 
+Button $0.04 $0.07 Customer Increase Linage 
+o  
+ 
+Critical areas here are: 
+o "Quantity" which refers to the order quantity needed. 
+o "Delivered" which refers to the amount the supplier actually delivers. 
+o The date the actual order is placed with the supplier. 
+o ETA date, please remember at the point of raising the order its estimated, once the 
+supplier confirms the dates, the confirmed tick box should be ticked to indicate it is 
+no longer an estimated guess but rather a confirmed date for the goods to arrive in 
+the factory. 
+o The actual date should be filled in once the goods are in the factory. 
+Status 
+● This column has three options: 
+o TBC - Items with this status will appear on the Order Manager reports 
+o Completed - The status for the item should show as completed once the goods are 
+in the factory and nothing further needs to be done.  
+
+===== PAGE 36 =====
+GC Manual and Ways of Working. Version 1 
+36 
+ 
+▪ PLEASE NOTE if it states" Completed", the trims/label will not appear on the 
+Order manager report. 
+Copying another label or trim sheet 
+● On the Label tab, you will find an option to copy from a previous order label details. 
+● Click "Copy Labels from another order" and the copy labels tab will open. 
+● Type in the number you are looking for and hit the search button. 
+● It will then list out your option/s. Select the order you want to copy from. You can then 
+choose if you want to copy the detail, the wash care instructions. You can choose both or 
+one by ticking the box. 
+● Lastly, you will have the option to overwrite what is on the tab now or not. 
+● Then click the save button. 
+ 
+● Once the details are copied over, you must now amend accordingly as quantities etc may be 
+different. 
+● The same thing will apply to the trims tab; The only difference is you will only be able to 
+copy the detail and overwrite what's already there. 
+ 
+Technical Tab 
+Carmel Make Manual 
+● This is where you will keep track of the fits and the critical path. 
+● Firstly you will need to select the date the fit note is relevant to. 
+● Secondly, you will choose which fit number the notes refer to. 
+● Lastly, you will put a brief description of the specific fit such as in our below example: 
+ 
+● Notes are designed to be brief, more detailed notes can be inserted into the main notes that 
+are in the design technical area. 
+● You will note the 2nd and 3rd fit are showing multiple times in our example. This does not 
+mean its been 2nd fit 4 times. However, there are 4 entries relating to the 2nd fit. 
+● It is critical that this is always up to date, so orders can be planed correctly based on the 
+sealing updates. 
+● The actual technical details can be found by looking on the "View Spec" button which is 
+linked to the design area via the Carmel style number at the top of the tab. 
+
+
+===== PAGE 37 =====
+GC Manual and Ways of Working. Version 1 
+37 
+ 
+ 
+Sample Spec-Technical 
+● You will see from the above screenshot that there is fundamental information about the 
+style. 
+ 
+● Following on from this is the Fit specs and comments. 
+ 
+o There will always be a Dev Spec tab and at least one order tab but usually more. 
+o In this example, we can see the 1st fit spec sheet and notes and images. 
+o On the 3rd tab along, we can see the 2nd fit comments 
+o This time you will note it has a tick box, ticked, as this is where we are currently. 1st 
+fit is not ticked as this is not the tab that we are using any longer but its still there for 
+reference of what the details were. 
+o You can add further fit tabs on by clicking on the new tab. Once again you don't have 
+to re-type everything, and you can copy from: 
+▪ The tab which is ticked  
+▪ From another style (it will pick the ticked one on that sheet) . 
+Please note in this case you must search for the required style number with 
+the style letter code  added T, S, D, J etc. 
+
+
+===== PAGE 38 =====
+GC Manual and Ways of Working. Version 1 
+38 
+ 
+ 
+o Note you can adjust the tab description in the yellow box. 
+● Any significant changes must go back to sales and the costing sheet updated. 
+● Tech packs must be sent out with enough time for factory sealers to be made to hit the 
+required completion dates. This should be a minimum of 10 days before the completion 
+dates. 
+● Link to Carmel Technical and quality guidelines. 
+Dockets 
+● Contract (saved centrally) Price: Date Raised: Delivery Date.  
+● Any fabric over 200 meters that cannot be used after issuing of the final docket, the docket 
+must be sent to sales, Debbie and Palones , for sales to advise what to do with the extra 
+fabric, despite the fact whether we can make it for the delivery or not. 
+Job Queue 
+● All Job requests are managed by the "Job Queue." 
+● There are two ways to manage this. 
+● The original job queue which is not a dynamic table (not as per the other tables you will 
+encounter on GC)
+ 
+OR from the reporting tool, which is as per the dynamic tables. 
+ 
+Ways of working-Reporting Schedules 
+● If any of the columns have an Asterix *, this indicates you can edit directly on the report. 
+
+
+===== PAGE 39 =====
+GC Manual and Ways of Working. Version 1 
+39 
+ 
+Booking Schedule 
+● The Schedule must be kept up to date at all times, every Wednesday the team MUST ENSURE 
+that the following week is 100% sorted. Therefore nothing on the schedule has wrong dates and 
+any other information, the week after that should be updated will all bookings made.  
+● A copy of the up and coming week should be taken here and saved in excel format. 
+● You will have up until close of business Friday to submit a copy to the Directors who will 
+overview it on Monday. This final booking schedule should be compared to the copy saved from 
+the Wednesday to ascertain what deliveries are being missed and why. 
+o There is no reason for week one to have any queries on it at this point, and there is no 
+reason we should not be aware of the bookings due in week 2. 
+o Planning are responsible for amending the status from "Live" to "In Work", once 
+garments go into production.  
+▪ They are responsible for updating the ex-factory notes as this is the date the 
+factory will be working to, to ex to make the delivery date. 
+▪ The planner must ensure the cut qty box is filled in daily with the factory figures 
+as well as the garments ready column. (Garments ready are fully packed). 
+o Logistics are responsible for amending the status from "In Work" to "Delivered" once 
+the LAST HIT has gone. Also, the risk button (previously Has Issue button) needs to be 
+changed to cyan on the actual last hit that goes. This is a marker for a reconciliation of 
+the order to be done.  
+▪ They are also responsible for updating the booking reference.  This should never 
+be blank from 2 weeks before the delivery date. 
+▪ They must fill in the delivered column when goods leave. 
+ 
+o The delivery date should only be changed by the merchandiser who manages the 
+account or one of the Management team. No one else should amend the delivery date. 
+o Notes box is a general notes section pertaining to the individual hit. When updating 
+information, it should have your initials and date (DJ/ 03/07- then the note). Keep the 
+note as short as possible. IF the note becomes irrelevant it should be deleted. However, 
+if the note may still be relevant it can be left or transferred across to the main notes 
+section at the bottom of the breakdown section of the order. 
+o Accounts team will be responsible for ensuring the Invoiced, Fact Inv Qty and Fact Inv 
+Notes are filled. It must be done per hit to ensure we are paying the factory the right 
+amounts. Planners will initially sign off the factory invoice and hand over to accounts. 
+o Gold seal must ensure the GS notes are filled in as to when the sample has been sent to 
+the UK. 
+o The technical team in charge of that customer will ensure they fill in the GS approval 
+date by the customer. 
+
+
+===== PAGE 40 =====
+GC Manual and Ways of Working. Version 1 
+40 
+ 
+o Box or hanging- the merchandiser must put the method the goods are to be delivered to 
+the CUSTOMER, whether FOB or landed. Please note the delivery mechanism to the UK 
+if landed does not apply here, this is specifically for delivery into the customer. Note if it 
+says N/A it should be checked but should be hanging. 
+o Planners to update the Ex Factory Date once they have a date confirmed. They can then 
+fill in the Ex Fty Notes with any additional information. 
+o Booking reference to be managed by logistics but needs a minimum of 10 days before 
+del date… 
+ 
+Fabric-Schedule 
+● Raising fabric orders - sales to raise the order. 
+o 2 critical areas are the lab dip or strike off and they MUST have approved dates to be 
+planned. 
+o If it does not, it must have an agreed date that we can expect this to happen but should 
+then have an image or Pantone reference to work to. 
+▪ If the dip/strike-off is not approved by the agreed date a new onboard date and 
+delivery date must be agreed. 
+o WE NEED TO ENSURE TECHNICAL HAS ENOUGH SAMPLING TO FIT! 
+● Lab dip and Bulk - Sales and merchandisers are responsible for ensuring this is approved on 
+time. 
+● Approved bulk - Are then the planning teams responsible for chasing and updating the fabric 
+schedule. 
+● Onboard, and arrival dates  
+o This is maintained by sales up to the dip/strike-off approval.  
+o Sales must adjust the date if it changes AND  let planning know as it needs to be 
+deplaned. FAILURE TO DO SO MAY MEAN YOUR ORDER RUNS LATE! 
+o Once the dip is approved, the merchandising team are responsible for maintaining these 
+dates up to bulk approval. 
+o From bulk approval, the planning teams are then responsible for maintaining the 
+onboard and arrival dates. 
+● Paperwork and actual clear dates. 
+o Logistic teams then manage the paperwork and clearance dates. 
+o Tolerances - Once the paperwork has been uploaded, merchandising are made aware so 
+the dockets can be amended to accommodate for the over or under shipments of fabric. 
+● China office – Are responsible for managing the schedule and aiding sales, merchandisers and 
+planning staff keep the schedule up to date. 
+Fabric Risk setting 
+o This will start off as no colour. 
+o Once bulk and dates are approved, it will become amber. 
+o Once the goods have cleared into the factory or have been at least CONFIRMED, it will 
+then be made to be green. 
+o IF at any point there is a major delivery issue due to dates, quality or anything else, it 
+should be changed to a RED risk. 
+
+===== PAGE 41 =====
+GC Manual and Ways of Working. Version 1 
+41 
+ 
+Fabric issue in the factory 
+o The factory is to perform the necessary checks and use the below link to fill the form 
+which is then submitted to the Carmel fabric team. 
+▪ https://forms.Monday.com/forms/6843e9c6d5da0f0f32d96768476a73
+92  
+Preview of the from 
+ 
+ 
+ 
+ 
+o Without this form, the factory cannot claim these issues back and maybe debited for 
+shortages. It is, therefore, their responsibility to supply the necessary information. 
+o Warning Template to Factory Annex ##### 
+Fabric Utilisation 
+● Identify at docket stage excess fabric to explore options to utilise.  
+● Final rating vs actual rating. 
+● Local fabric team to manage and monitor mills on a quarterly basis with performance. 
+Critical Fabric Information - This is critical to always be updated!!! 
+● Lab dip approval date. 
+● Bulk approval dates. 
+● ETD dates. 
+● Weekly Fabric updates form part of the Monday STSU Meeting example of this report 
+C:\Users\darrenj\Downloads\Fabric Update 03.08.20.xlsx 
+Fabric, trims, customer tolerances  
+● Link to Production Policy Production Policy 2020-ratings etc. 
+● Link to Fabric Standard Operating Procedure Fabric SOP. 
+
+
+===== PAGE 42 =====
+GC Manual and Ways of Working. Version 1 
+42 
+ 
+Fabric Policy Carmel Clothing:  
+● Cannot delivery over or under 3% or, 
+● 2% if the order is over 10,000m.  
+● 2% for kidswear orders.  
+● For under-deliveries, over 3% trimmings should be debited immediately. 
+● Shortages and defects cannot be more than 2% in total.  
+● 5% for anything with elastane  
+Booking Schedule 
+o Planning is responsible for changing the Status from Live to In Work once the goods go 
+into work. 
+o Logistics are responsible for changing the Status from In Work to Delivered once the 
+last hit is delivered. At this point, this should trigger a final hit reconciliation.  
+o The delivery date is only to be changed once the date has been officially agreed. 
+▪ Delivery Dates should not be moved out until the customer has agreed on a 
+new date. HOWEVER, if its an ongoing issue, when the month is finished it 
+should be moved to the 1st of the following month. 
+o Booking Ref is managed by logistics. This must be filled in 14 days minimum before the 
+actual date. 
+o Ex FTY Notes is managed by planning and must be filled in a minimum of 14 days before 
+the ex-date with clear information of the order being on time or what is needed. 
+o Notes, this is to be used by any other departments, anyone who leaves a note must put 
+the initial and date and is responsible for removing the notes if they are no longer 
+relevant. 
+o New columns called "Snapshot" where you can select preselected working to keep the 
+status of the schedule the same through the business: 
+  
+o This can be used in conjunction with the notes to give consistency to the schedule. 
+ 
+Order manager  
+● Is an overall summary of the order. 
+● Depending on what you search for can be very useful to overview a customer. 
+● It will display in completion date order. 
+
+
+===== PAGE 43 =====
+GC Manual and Ways of Working. Version 1 
+43 
+ 
+● It will fit on average 2 orders per page, so print double-sided. 
+● The below extract from a report we can see there are no real areas of concern: 
+o Its sealed and seal pack has been sent 
+o Fabric is already in the factory. 
+o We can see some history in the fabric but in this case its not relevant. 
+o The trims and labels also look to be on schedule to achieve the actual completion 
+date. 
+ 
+● However, the below order has many potential issues at the time of looking at it: 
+ 
+ 
+ 
+Critical Path Management 
+● Production Managers review daily using the order manager to manage customer critical paths 
+with planning and technical teams. 
+● Any issue must be raised as soon as possible but a minimum 14 days before HOD. 
+● Customer critical paths sent by account merchandisers weekly in conjunction with UK 
+production Managers and information in IPS.  
+ 
+ 
+Senior Team Status Updates 
+● Design report weekly update. Example Design Report 15.07.20 
+o Not Sold analysis 
+▪ An update of this will be done quarterly of which styles (by samples) has not yet 
+been sold.  
+▪ This can be done via the Job Queue by simply searching a time period by design 
+and sample completed and then removing any that have a file against it. As in 
+the below example, you can see there is an extract from 08/19 of samples made.  
+
+
+===== PAGE 44 =====
+GC Manual and Ways of Working. Version 1 
+44 
+ 
+▪ You can see which styles have one or more file numbers against it and which do 
+not.  
+● 444 customer or development samples were made of which 359 do date 
+(as of Aug 2020) have not been sold. 
+QC App- Monday.com 
+● The Qc teams work via the Monday.com app, from the PP stage all the way through to final 
+AQL. 
+● Weekly AQL reports are discussed via the Monday STSU meetings, an example of report AQL 
+Pass rate. 
+ 
+Invoice approvals 
+● Fabric and trimmings:  
+● Quantity – Date – Price must match the information on GC.  
+● Over-tolerance fabric quantities should have debit raised corresponding.  
+● New updates coming on auto approvals between GC and the accounts 
+package and we will review in later updates. 
+● See Booking Schedule (link accounts - Booking Schedule) 
+Debits 
+● Factory and supplier debits MUST be raised as soon as the issue is confirmed. 
+o It should be noted that it's a pro forma debit and will be formally issued once details 
+have all been confirmed. 
+o Debits must be sent out formally from the compliance mail address and cc the actual 
+person raising the debit as well as the necessary teams. 
+▪   
+● Once raised, it will be managed by the senior finance team. 
+ 
+ 
+ 
+ 
+Reconciliation procedures 
+● Weekly reports linked to final hits. 
+ 
+Each production base will have staff in charge of: 
+1) Shipping Paperwork: 
+o Shipped quantity is inputted in GC on receipt of paperwork.  
+o Compare what's been ordered with what has been shipped.  
+o If fabric shipped is more than 5% or 2% (Primark and Penney's) and immediate debit 
+should be raised and we ask the supplier to pick up the fabric.  Please use the 
+compliance email address, if you need help with this, please Mail IT to sort it out. You 
+will CC yourself when raising it. 
+
+===== PAGE 45 =====
+GC Manual and Ways of Working. Version 1 
+45 
+ 
+o  
+▪  
+▪  
+o If the fabric is less the mill should be debited for trimmings.  
+ 
+2) Shipping Paperwork Vs Ordered Quantity: 
+● Compare the shipped quantity and costing to establish how many garments can be 
+produced.  
+● An analysis takes place from the sales costing to final production costing – to raise any 
+queries as appropriate.  
+● STOP & THINK  - a judgement needs to be made as follows: 
+o How can we utilise every meter of fabric shipped? This is the key: 
+o If we can't automatically deliver the increase in garments – notify sales to seek 
+customer agreement. (Send docket showing what we have and how much extra 
+fabric we can use or need to.) 
+o Have we got enough trims? 
+● The aim is to try and cut and delivery every meter we can, and therefore sales need to 
+be chased directly, CC'ing Robby and Corry. 
+ 
+Fabric in factory 
+● The factory has a final docket based on shipped quantity.  
+● If there is a problem with the fabric, the factory must identify this immediately in 
+relation to shortages or defects – See tolerances attached. 
+● If the factory does not notify us using the fabric issue form then they take responsibility 
+for any short shipped garments. 
+● Amended docket must show the new figures. 
+ 
+3) Final Hit Reconciliation  
+o When the final hits are delivered – Quantity against docket – Anything over 20 units 
+that is short must be debited unless reasons are evident.  
+ 
+MONTHLY REPORTS  
+● Within 10 days of the following month a fabric utilisation and final hit report must be 
+sent to Directors.  
+Please ensure any damaged or unusable meters are input into ###  
+ 
+ 
+ 
+Communication 
+Do not be an E-mail warrior, use Teams. 
+NB - Any communication should be done after the job request via Teams. 
+
+===== PAGE 46 =====
+GC Manual and Ways of Working. Version 1 
+46 
+ 
+● There is already a team called Mini-Markers VN and within this you can create sub groups 
+for your customer by right clicking on the … to the right of the title as per the below image: 
+ 
+● Choose to add Channels (Teams) you can create your customer, then right-click on the 
+customer and choose to add members. 
+I have added one myself now (Primark) as an example, which then will look like the below: 
+ 
+● General, will go to the group as general comments, but if its customer-specific it should be 
+done via your customer that you add. 
+ 
+● If you need help adding teams and people to the teams, please mail  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+New Compliance Internal Audit Team.  
+The audit team who will report directly to myself - I would be grateful if you could give them your 
+full support.   
+● Cami Ghitori  
+● Vlad Allen 
+● Maria Radu 
+
+
+===== PAGE 47 =====
+GC Manual and Ways of Working. Version 1 
+47 
+ 
+● Alina Hinterreiter 
+ 
+Many of these measures are already being undertaken by the teams, so much as this will be 
+clarifying and re-iterating existing rules and ensuring they are adhered to. There are some changes 
+to tolerances we allow, and we will go through these in more detail. Most of the information will be 
+available to the team through GC, and so only orders that don't meet efficiency rates will require 
+further explanations/information's.  
+ 
+We currently have to review all orders from the 1st July 2020, and so there will be some backlog to 
+clear up, and from Monday 24th August this will be undertaken on a weekly basis. To outline the key 
+elements of the review will be as follows:  
+ 
+● Fabric paperwork - over and under tolerance review.  
+● Mini-Marker Efficiency Rates (which should be above 85%). 
+● Docket and Final Cut Docket Review. 
+● Fabric Utilisation Rate and review of any unused fabric.  
+● Factory Invoice to Delivered and Cut Review.  
+● Fabric Rating Queries . 
+● Recon costed vs actual in terms of trimmings, CMT and fabric.  
+● Final Hits Monitoring and Debiting of Shortages.  
+ 
+ 
+ 
+ 
+ 
+ 
+Summary: 
+Once you have read and had your training sessions, please sign and return the signed pages to via e-
+mail. 
+ 
+ 
+ 
+Garment Control and ways of working. 
+ 
+Please be aware that if your area of responsibility becomes out of dates, you will be issued two 
+warnings. On the 3rd warning, you may be asked to leave. 
+Please make your Manager aware of any issues that may cause you to fall behind. 
+
+===== PAGE 48 =====
+GC Manual and Ways of Working. Version 1 
+48 
+ 
+ 
+ 
+I confirm I have read and understand how to update the areas I have been given responsibility over 
+within Garment Control. 
+Name: 
+ 
+Job Title: 
+ 
+Signature: 
+ 
+ 
+ 
+ 
+ 
+ 

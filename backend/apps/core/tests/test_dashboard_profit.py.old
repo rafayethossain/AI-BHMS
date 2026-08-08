@@ -1,0 +1,25 @@
+import os, sys
+_backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, _backend_dir)
+os.chdir(_backend_dir)
+os.environ['DJANGO_SETTINGS_MODULE'] = 'config.settings.development'
+import django
+django.setup()
+
+from django.contrib.auth import get_user_model
+from rest_framework.test import APIRequestFactory, force_authenticate
+from apps.tenants.models import Tenant
+from apps.core.views import DashboardSummaryView
+
+User = get_user_model()
+tenant = Tenant.objects.filter(is_active=True).first()
+user = User.objects.filter(tenant=tenant).first()
+factory = APIRequestFactory()
+request = factory.get('/')
+force_authenticate(request, user=user)
+request.tenant = tenant
+view = DashboardSummaryView.as_view()
+resp = view(request)
+fin = resp.data['financials']
+print('profit_by_buyer:', fin.get('profit_by_buyer'))
+print('profit_by_factory:', fin.get('profit_by_factory'))
