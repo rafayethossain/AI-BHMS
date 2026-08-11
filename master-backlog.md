@@ -1,8 +1,10 @@
 ﻿# Master Backlog — BHMS (Buying House Management System)
 
-> **Purpose**: Single consolidated backlog for BHMS. Merges the original 116-story product backlog with the BHMS requirement sequence (formerly tracked as "GC gaps" — now fully BHMS requirements). Any agent starting work MUST read this first, then follow the cross-references.
+> **Purpose**: Single consolidated backlog for BHMS. Merges the original 116-story product backlog with the BHMS requirement sequence (formerly tracked as "GC gaps" — now fully BHMS requirements) and the Part 3 feature sequence (Style Tech-Pack Import & Processing). Any agent starting work MUST read this first, then follow the cross-references.
 > **Last merged**: 2026-07-31 (backlog.md + master-backlog.md consolidated into this file)
 > **Reframed**: 2026-08-03 — GC gap framing retired; all items are BHMS requirements (`RQ-###` IDs, workflow-ordered in Part 2)
+> **Part 3 added**: 2026-08-10 — Style Tech-Pack Import & Processing (RQ-036 → RQ-042, P0, TDD roadmap)
+> **Part 3 complete**: 2026-08-11 — all 7 requirements delivered (7/7, 100%), 123 backend tests + tsc/oxlint/build gates
 
 ## Document Map
 
@@ -3721,6 +3723,297 @@ Original 116-story backlog across 14 epics. Every requirement's live status and 
 - Tests: `test_design_image.py` (16) + `TestSeedDesignImages` (3) — full suite 556 passed, 0 failures
 - Frontend: `DesignImage` type + merchApi methods + StyleDetailPage "Design Images" tab (upload/set-main/delete/preview) + StylesListPage thumbnails (list + grid via `main_image`)
 - tsc clean, vite build succeeded
+
+---
+
+---
+
+## Part 3: Feature Sequence — Style Tech-Pack Import & Processing (RQ-036 → RQ-042)
+
+> **Added**: 2026-08-10 · **Priority**: P0 (next active feature stream)
+> **Business need**: Buyer style documents arrive as PDFs. BHMS must extract the PDF to a two-sheet Excel (matching the buyer's workbook), allow a merchandiser to correct/complete it manually, then import the corrected Excel as Style + Tech-Pack + BOM data. Tech-pack progress is tracked as the task advances.
+> **Source artifacts** (do NOT delete — they are the golden fixtures):
+> - `PDF Extract/Sample style doc.pdf` — "CCL DESIGN SHEET", 1 page (header fields + BOM table)
+> - `PDF Extract/Extracted_2026-07-13 .xlsx` — two sheets: `Design Infromation` (14 header fields) + `BOM` (8 columns)
+> **Libraries** (free, pure-Python, Python 3.14-safe; registered in `version-manifest.json` §document_processing + `backend/requirements.txt`): `pdfplumber` (PDF text/tables), `openpyxl` (XLSX read/write).
+> **Hard constraint**: zero breaking changes. Net-new models + additive nullable fields only; the canonical test baseline (**1126 green**) must stay green after every requirement.
+
+### Feature Flow (whole-product view)
+
+```
+Buyer sends style PDF
+        ↓
+[1] Upload PDF     →  POST /merchandising/styles/techpack/extract/     (pdfplumber)
+        ↓
+[2] Extract        →  Design Infromation (14 fields) + BOM (8 cols) → JSON preview
+        ↓
+[3] Download Excel →  GET /merchandising/styles/techpack/{id}/excel/  (openpyxl — matches sample workbook)
+        ↓   (manual correction/typing in Excel — accuracy)
+[4] Upload Excel   →  POST /merchandising/styles/techpack/import/     (openpyxl read + validate)
+        ↓
+[5] Persist        →  Style (source PDF attached to existing `tech_pack` field) + StyleItems + BOM v1 + BOMItems
+        ↓
+[6] Track          →  StyleTechPack.status: draft → extracted → in_progress → completed
+        ↓
+[7] Consume        →  StyleDetailPage tech-pack panel → FileOpening → Costing → existing lifecycle
+```
+
+### Integration Points (connect the dots)
+
+| Existing artifact | Connection |
+|-------------------|-----------|
+| `merchandising.Style` | Created/updated on import; `style_number` unique per tenant — existing style is updated, not duplicated |
+| `merchandising.StyleVersion` | Import creates StyleVersion v1 (revision note = source PDF name) |
+| `merchandising.StyleItem` | Material template rows created from the BOM sheet (category, item_name, consumption, vendor) |
+| `merchandising.BOM` + `BOMItem` | BOM v1 created per style; `BOMItem` gains additive fields `location`, `colour`, `width_size`, `match` (RQ-041) |
+| `setup.Buyer` / `setup.Vendor` / `setup.UOM` | Name lookups on import — same tolerant pattern as `PurchaseOrderViewSet.bulk_import` (list available options on miss) |
+| `bulk_import` action pattern | Multipart file-upload actions live on the viewset, `MultiPartParser`, `merchandising:create`/`:edit` permission guards |
+| Frontend `merchApi` + `StylesListPage`/`StyleDetailPage` | New TechPack wizard route, API client methods, tech-pack progress panel on style detail |
+
+### Legend (same as Part 2)
+| Symbol | Meaning |
+|--------|---------|
+| ✅ 100% | Fully implemented, tested, seeded |
+| ⚡ In Progress | Implementation in current sprint |
+| ⏳ Pending | Planned, not started |
+| ❌ Not Started | No story assigned |
+
+### RQ ↔ Traceability (7 requirements)
+
+| RQ-ID | Requirement | Priority | Workflow Stage |
+|-------|-------------|----------|----------------|
+| RQ-036 | Style Tech-Pack PDF Extraction Service (CCL Design Sheet) | P0 | 1 — Extraction Foundations |
+| RQ-037 | Tech-Pack Excel Generation Service (two-sheet .xlsx) | P0 | 1 — Extraction Foundations |
+| RQ-038 | Tech-Pack Excel Import Service (validate → Style/BOM payload) | P0 | 1 — Extraction Foundations |
+| RQ-039 | StyleTechPack model + progress lifecycle | P0 | 2 — Persistence & API |
+| RQ-040 | Tech-Pack Processing API (extract / excel / import) | P0 | 2 — Persistence & API |
+| RQ-041 | BOMItem additive fields (location / colour / width_size / match) | P0 | 2 — Persistence & API |
+| RQ-042 | Frontend Tech-Pack Import wizard + style detail progress panel | P0 | 3 — Frontend |
+
+---
+
+### Stage 1: Extraction Foundations (RQ-036 → RQ-038) 3/3 ✅ 100%
+
+| Item | Requirement | Backlog Story | PRD Ref | Status | Tests | Seed Data | Lessons |
+|------|-------------|---------------|---------|--------|-------|-----------|---------|
+| RQ-036 | PDF Extraction Service | — | §6.1.1 Design | ✅ Done (2026-08-10) | 34 (was ~20) | Golden fixture = `PDF Extract/Sample style doc.pdf` | RQ-036 — pdfplumber header + table parse |
+| RQ-037 | Excel Generation Service | — | §6.1.1 Design | ✅ Done (2026-08-10) | 16 (was ~15) | Golden fixture = `PDF Extract/Extracted_2026-07-13 .xlsx` | RQ-037 — openpyxl two-sheet export |
+| RQ-038 | Excel Import Service | — | §6.1.1 Design | ✅ Done (2026-08-10) | 18 (was ~18) | Build workbook in test via RQ-037 | RQ-038 — tolerant Excel row parse |
+
+**Stage 1 total**: 3 items, 68 tests ✅
+
+---
+
+### Stage 2: Persistence & API (RQ-039 → RQ-041) 3/3 ✅ 100%
+
+| Item | Requirement | Backlog Story | PRD Ref | Status | Tests | Seed Data | Lessons |
+|------|-------------|---------------|---------|--------|-------|-----------|---------|
+| RQ-039 | StyleTechPack model + lifecycle | — | §6.1.1 Design | ✅ Done (2026-08-10) | 19 (was ~14) | 2 tech-packs (draft + completed) via seed | RQ-039 — progress state machine |
+| RQ-040 | Tech-Pack Processing API | — | §6.1.1 Design | ✅ Done (2026-08-11) | 28 (was ~22 planned) | Multipart upload fixtures | RQ-040 — viewset actions, no new URLs |
+| RQ-041 | BOMItem additive fields | — | §6.3.5 Trims | ✅ Done (2026-08-11) | 8 | Extend BOM seed rows | RQ-041 — additive nullable columns |
+
+**Stage 2 total**: 3 items, 55 tests ✅
+
+---
+
+### Stage 3: Frontend (RQ-042) 1/1 ✅ 100%
+
+| Item | Requirement | Backlog Story | PRD Ref | Status | Tests | Seed Data | Lessons |
+|------|-------------|---------------|---------|--------|-------|-----------|---------|
+| RQ-042 | Tech-Pack Import wizard + progress panel | — | §6.1.1 Design | ✅ Done (2026-08-11) | tsc clean, oxlint 0, vite build | Uses RQ-039 seeds | RQ-042 — 3-step wizard + detail panel |
+
+---
+
+## Overall Progress (Part 3)
+
+| Stage | Items | Complete | In Progress | Pending |
+|-------|-------|----------|-------------|---------|
+| 1 — Extraction Foundations | 3 | 3 | 0 | 0 |
+| 2 — Persistence & API | 3 | 3 | 0 | 0 |
+| 3 — Frontend | 1 | 1 | 0 | 0 |
+| **Total** | **7** | **7 (100%)** | **0** | **0** |
+
+> **Part 3 is complete** — the tech-pack import & processing stream (RQ-036 → RQ-042) is fully delivered: 123 backend tests across the 6 techpack files (34 PDF / 16 Excel-gen / 18 Excel-import / 19 model / 28 API / 8 BOMItem), plus the frontend wizard + detail-panel gates (tsc / oxlint / vite build).
+> **Next action**: close the last 3 product-backlog gaps so the backlog reaches 100% — US-016 (Session Management, Must Have — auth/security), US-084 (Line Performance, backend endpoint exists but no dedicated page/permission-mapping/tests), US-108 (Inventory Reports, can build on the existing `fabric.FabricInventory`/`FabricBooking` models — GAP_ANALYSIS.md is stale on this point). Full-suite regression gate: `python -m pytest tests` (latest green baseline **1150 + Part 3 additions**, minus 7 pre-existing monitoring-API failures) must stay green after each RQ.
+
+---
+
+## Part 3 Detailed Specifications (TDD)
+
+### RQ-036 — Style Tech-Pack PDF Extraction Service (CCL Design Sheet) ✅ Done (2026-08-10)
+
+**Intent**: parse a buyer style PDF into a structured, validated DTO — the header fields + the BOM table — exactly matching the sample workbook's values (see `PDF Extract/Sample style doc.pdf` ↔ `Extracted_2026-07-13 .xlsx`).
+
+**TDD (red → green)** — net-new `backend/tests/unit/test_techpack_pdf.py` (~20):
+- Header extraction: `issue_date` (`22/Mar/2022` → `2022-03-22`), `block` (`59073T`), `based_on` (`59073T`), `customer` (`DOTTI`), `style_number` (`67741T`), `size` (`10`), `designer` (`Emmi.Huynh`), `pattern_cutter` (`HAI`), `issuer` (`Clone`), `cloth_code` (`SANDWASH LINEN LXeKn-g5t2h9`), `length` (`0`), `description` (`565235 LB LIZZIE WIDE LEG PANT`)
+- Note/instruction block reconstruction (multi-line, unordered text → ordered note string; golden = the note column value)
+- BOM table extraction: 6 rows, columns `type / description_code / location / supplier / colour / width_size / qty / match`
+  - Row 1 → `Cloth / SANDWASH LINEN XK-529 / MAIN / ALICE- / BLACK / 132 CM / 1.67`
+  - Row 2 → `Trims / BUTTON 4 HOLES FV9757 / W/B / FOURSEASONS / BROWN / 24 LN / 2`
+  - Row 3 → `Trims / NYLON ZIPPER / FRONT FLY / YKK / DTM / #3/17 CM / 1`
+  - Row 4 → `Trims / ELASTIC BAND P701 / BACK WAIST / KT TRIMS / BLACK / 5 CM / 0.47`
+  - Row 5 → `Interfacing / FUSING 2012 / AS PER PATTERN / THANH PHONG / BLACK / 150 CM / 0.12`
+  - Row 6 → `Lining / POLY COTTON / POCKET BAG / DOAN KET / DTM / 145 CM / 0.16`
+- Error handling: non-PDF input, empty page, missing table (no crash → structured warnings), multi-page docs (first page only, documented)
+- Determinism: same PDF → identical DTO every run
+
+**Backend design**:
+- `apps/merchandising/techpack/__init__.py` + `apps/merchandising/techpack/pdf_parser.py`
+- `@dataclass TechPackBOMRow` and `@dataclass TechPackDesignInfo` (frozen, with `to_dict()`)
+- `class StyleTechPackParser` with `parse(pdf_bytes | file) -> TechPackDocument` (header via pdfplumber `extract_text` keyword scan; BOM via `extract_table`/`find_tables` with header `Type/Description-Code/Location/Supplier/Colour/W-Size/Qty/Match`)
+- Pure functions only — no Django model dependency (unit-testable without DB)
+- ruff-clean; `import type` discipline not applicable (Python)
+
+**Acceptance criteria**: `parse()` returns the golden values above for the sample PDF; bad input raises `ValueError` or returns `errors` list, never crashes; no existing code touched.
+
+---
+
+### RQ-037 — Tech-Pack Excel Generation Service (two-sheet .xlsx) ✅ Done (2026-08-10)
+
+**Intent**: serialize a `TechPackDocument` into the exact two-sheet workbook layout of the sample (`Design Infromation` + `BOM`) so the merchandiser can edit it in Excel and re-upload.
+
+**TDD (red → green)** — net-new `backend/tests/unit/test_techpack_excel.py` (~15):
+- Two sheets, exact titles `Design Infromation` and `BOM`
+- Sheet 1 header row matches sample exactly (`Issue Date / Block / Based On / Customer / Style Number / Size / Designer / Pattern Cutter / Issuer / Cloth Code / Length / Sketch / Description / Note`) — preserve sample's `Design Infromation` spelling for compatibility
+- Sheet 2 header row matches sample (`Type / Description/ Code / Location / Supplier / Colour / Width/Size / Qty / Match`) — `Match` column present but empty in sample
+- Date cells written as real dates (openpyxl `datetime`), qty as numbers
+- Round-trip: RQ-037 output → openpyxl read → equals the RQ-036 DTO
+- Bytes in-memory (`BytesIO`), no file-system writes in unit tests
+
+**Backend design**:
+- `apps/merchandising/techpack/excel_export.py` — `write_techpack_workbook(doc) -> BytesIO` via `openpyxl.Workbook`; named styles reusing the project dark-theme conventions where applicable
+- Row/cell formatting kept minimal (headers bold, column widths) — fidelity to sample layout first
+
+**Acceptance criteria**: generated workbook opens in Excel without repair prompts; sheet/header fidelity byte-compared to the sample structure; sample file itself stays untouched (golden fixture).
+
+---
+
+### RQ-038 — Tech-Pack Excel Import Service ✅ Done (2026-08-10)
+
+**Intent**: parse an uploaded (possibly hand-edited) Excel workbook back into a `TechPackDocument` payload, tolerating empty cells, reordered/renamed columns (substring match), and extra rows.
+
+**TDD (red → green)** — net-new `backend/tests/unit/test_techpack_excel_import.py` (18):
+- Valid workbook (built in-test by RQ-037) → correct DTO
+- Header row detection by keyword (e.g. `style` in "Style Number"), not fixed position
+- Missing BOM sheet → structured error
+- Decimal/date coercion: `1.67` → Decimal, `22/Mar/2022` string → date
+- Empty `Match` column → empty string, not error
+- Duplicate style-number handling surfaced to caller (flag, not fail)
+
+**Backend design**:
+- `apps/merchandising/techpack/excel_import.py` — `parse_techpack_workbook(file) -> TechPackDocument` via `openpyxl.load_workbook(..., data_only=True)`; shared column-mapping helpers in `techpack/columns.py`
+- Keyword matching prefers the **longest** matching keyword per header cell — `issue` must not steal the `Issuer` column (`issue` ⊂ `issuer`); `desc` fallback added for renamed `Description` columns
+- Note cell preserves its line breaks (`_clean_note`), so the multi-line PDF note round-trips verbatim
+
+**Acceptance criteria**: the sample `Extracted_2026-07-13 .xlsx` parses losslessly into the RQ-036 DTO; robust to common user edits. ✅ all — 18 tests, lint clean, techpack + merchandising batch 75 passed.
+
+---
+
+### RQ-039 — StyleTechPack model + progress lifecycle ✅ Done (2026-08-10)
+
+**Intent**: persist each tech-pack processing task with its source PDF, extraction payload, generated Excel, and a progress state — the "updated as the task progresses" requirement.
+
+**TDD (red → green)** — net-new `backend/tests/unit/test_style_techpack.py` (19, was ~14):
+- Model defaults / `__str__`; per-tenant unique `techpack_number` (`TP-…`)
+- FK `style` nullable until import links it; `source_pdf`, `excel_file`, `extracted_data` (JSONField), `errors` (JSONField list)
+- Lifecycle `draft → extracted → in_progress → completed` with guarded transitions (`mark_extracted()`, `mark_in_progress()`, `complete()`, illegal transition → `ValueError`)
+- Tenancy: cross-tenant isolation
+
+**Backend design**:
+- Net-new `StyleTechPack(TenantModel)` in `apps/merchandising/models.py` + migration `0025_styletechpack.py`
+- Design-sheet fields stored normalized on the model (`issue_date`, `block`, `based_on`, `customer`, `style_number`, `size`, `designer`, `pattern_cutter`, `issuer`, `cloth_code`, `length`, `sketch`, `description`, `note`) — the raw JSON is kept in `extracted_data` for re-import/preview
+- `style` FK `SET_NULL` (keeps audit row if style deleted), `related_name="tech_packs"`; nested `Status` TextChoices (`draft/extracted/in_progress/completed`)
+- `next_techpack_number(tenant)` mirrors the `FileOpening.next_file_number` scan-max pattern (`TP-1001`, `TP-1002`, …)
+- Seeded via `seed_style_data.py` (1 draft + 1 completed tech-pack, linked to the first style); the seed clear-block now deletes `StyleTechPack` (FK is SET_NULL so it must be explicit)
+
+**Acceptance criteria**: zero changes to `Style`/`StyleVersion`/`BOM`; baseline tests green. ✅ all — 19 tests, ruff clean, merchandising+techpack regression 129 passed.
+
+---
+
+### RQ-040 — Tech-Pack Processing API ✅ Done (2026-08-11)
+
+**Intent**: the three endpoints that drive the flow — extract (PDF → JSON + saved StyleTechPack), download Excel, import (Excel → Style + StyleItems + BOM v1 + BOMItems).
+
+**TDD (red → green)** — net-new `backend/tests/unit/test_techpack_api.py` (~22), following `test_bulk_import.py` style (`APITestCase`, `force_authenticate`, `HTTP_X_TENANT_ID`):
+- `POST /merchandising/styles/techpack/extract/` (multipart `file` PDF) → 200 `{techpack, data, excel_download_url}`; no file → 400; non-PDF → 400
+- `GET /merchandising/styles/techpack/{id}/excel/` → `200` `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` download
+- `POST /merchandising/styles/techpack/import/` (multipart `file` xlsx) → creates `Style` (existing `style_number` updated, new created), `StyleVersion` v1, `StyleItems` from BOM rows, `BOM` v1 + `BOMItems`; attaches source PDF to `Style.tech_pack`; sets `StyleTechPack.status=completed`; returns created style id + counts
+- Buyer/Vendor/UOM name lookups tolerant (miss → row-level error with available names, matching `bulk_import`); transaction rollback on fatal error
+- Permission guards: `merchandising:view` / `:create` / `:edit` mapped per action; tenant isolation; 401 unauthenticated
+
+**Backend design**:
+- Actions on `StyleViewSet` (`extract_techpack`, `techpack_excel`, `import_techpack`), `parser_classes=[MultiPartParser]`, `required_permissions` extended
+- Import orchestration in `apps/merchandising/services.py` (or `techpack/import_service.py`): create/update Style (buyer lookup → `setup.Buyer`; description → `Style.description`; source PDF → `tech_pack`), create StyleVersion v1, create `StyleItem`s (category = BOM `type`, item_name = description/code, consumption = qty, vendor = supplier lookup), create BOM v1 (`unique_together` style_version+version) + `BOMItem`s (RQ-041 fields)
+- `excel_download_url` served via the same viewset action; generated Excel persisted to `StyleTechPack.excel_file` on extract
+
+**Acceptance criteria**: full happy path through the API creates a Style with line items + BOM; re-import of same style updates, never duplicates; all baseline tests green.
+
+---
+
+### RQ-041 — BOMItem additive fields ✅ Done (2026-08-11)
+
+**Intent**: carry the design-sheet BOM columns that the current `BOMItem` cannot express: `Location`, `Colour`, `Width/Size`, `Match`.
+
+**TDD (red → green)** — extend `backend/tests/unit/test_bom.py` (or net-new `test_bomitem_techpack.py`, ~8):
+- New nullable fields exist; default empty; serialized on `BOMItemSerializer`; admin columns updated
+- Import service populates them from the Excel (RQ-040 integration test asserts values)
+
+**Backend design**:
+- `BOMItem` += `location` (CharField blank), `colour` (CharField blank), `width_size` (CharField blank), `match` (CharField blank) — all nullable/blank, migration `0014_bomitem_techpack_fields.py` (next number after 0013/0024 in merchandising chain)
+- `BOMItemSerializer` exposes them read/write; `BOM` admin list display extended
+
+**Acceptance criteria**: purely additive — no existing BOM test changes meaningfully; baseline green.
+
+---
+
+### RQ-042 — Frontend Tech-Pack Import wizard ✅ Done (2026-08-11)
+
+**Intent**: the merchandiser-facing UI — upload PDF → review extraction → download Excel → upload corrected Excel → style created; plus a progress panel on `StyleDetailPage`.
+
+**TDD-equivalent gates**: `tsc` clean, `oxlint` 0 errors, `vite build` succeeds — same gates as every shipped RQ.
+
+**Frontend design**:
+- New route `/styles/techpack-import` + "Tech Pack Import" merchandising nav item; 3-step wizard component (`TechPackImportWizard`)
+  - Step 1 — drop/upload PDF (`merchApi.extractTechPack`) → show extracted JSON preview (design info cards + BOM table) + "Download Excel" button (`merchApi.downloadTechPackExcel` → blob save, matching existing CSV-export blob pattern)
+  - Step 2 — upload the edited `.xlsx` (`merchApi.importTechPack`) → show validation result
+  - Step 3 — success screen with created/updated style link + tech-pack number + status badge
+- `StyleDetailPage` gains a **Tech Pack** panel: source PDF download link, status badge, issue/designer/block info, BOM item count — reflects `StyleTechPack.status` so progress is visible as the task advances
+- `merchApi` + `client.ts` types (`StyleTechPack`, `TechPackExtraction`, `TechPackImportResult`); reuse `SearchableSelect` for buyer/vendor lookups only if the wizard adds manual entry
+- Follows Vite 8 Rolldown rule: type-only imports MUST use `import type { ... }`
+
+**Acceptance criteria**: wizard end-to-end with the two sample artifacts creates a style; progress panel reflects status; tsc/oxlint/build green.
+
+---
+
+## RQ-040 Done (Tech-Pack Processing API) ✅
+
+- TDD: net-new `tests/unit/test_techpack_api.py` (**28**) — red first (missing actions), green after implementing viewset actions; covers extract (multipart PDF → 200 `{techpack, data, excel_download_url}`, 400 no-file / non-PDF, draft→extracted status), excel download (GET blob `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), import (multipart xlsx → Style created-or-updated + StyleVersion v1 + StyleItems from BOM rows + BOM v1 + BOMItems + `Style.tech_pack` source PDF + status→completed; re-import of same `style_number` updates never duplicates; buyer/vendor/uom tolerant lookups; tenant isolation; 401 unauth; `merchandising:*` permission guards), plus the `upload-tech-pack` detail action and the **`GET /styles/{id}/tech_packs/`** list action (`merchandising:view`)
+- Backend: 4 actions on `StyleViewSet` — `upload-tech-pack` (detail, multipart `tech_pack`), `techpack/extract` (collection, pdfplumber parse + `StyleTechPack` create + excel persisted to `excel_file`), `techpack/excel` (collection GET `?techpack=<id>` blob), `techpack/import` (collection, orchestrated by `apps/merchandising/techpack/import_service.py`); `parser_classes=[MultiPartParser]`; `required_permissions` mapped per action; serializer exposes the full `StyleTechPack` shape (`id, techpack_number, style, status, source_pdf_url, excel_url, bom_items_count, issue_date, block, based_on, customer, style_number, size, designer, pattern_cutter, issuer, cloth_code, length, sketch, description, note, errors, warnings, created_at, updated_at`)
+- Acceptance: full happy path through the API creates a Style with line items + BOM; re-import updates the same style; baseline stays green ✅ — 28 tests, ruff clean (pre-existing views.py lines 2878/2986 untouched), merchandising+techpack regression **477 passed / 0 failures**
+
+---
+
+## RQ-041 Done (BOMItem additive fields) ✅
+
+- TDD: net-new `tests/unit/test_bomitem_techpack.py` (**8**) — new nullable fields exist, default empty, serialized read/write on `BOMItemSerializer`, populated by the RQ-040 import from the design-sheet BOM columns
+- Backend: `BOMItem` += `location` / `colour` / `width_size` / `match` (CharField, null/blank/default `""`, migration `0026_bomitem_techpack_fields`); `BOMItemSerializer` exposes them; BOM admin `list_display` extended; `techpack/import_service.py` populates them from the Excel rows
+- Acceptance: purely additive — no existing BOM test changed meaningfully ✅ — 8 tests, ruff clean, regression green
+
+---
+
+## RQ-042 Done (Frontend wizard + progress panel) ✅
+
+- `merchApi` + `client.ts`: `StyleTechPack`, `TechPackExtraction`, `TechPackImportResult`, `TechPackDocument` types + `extractTechPack` / `downloadTechPackExcel` (blob save) / `importTechPack` / `getStyleTechPacks` / `uploadTechPack` methods — multipart via `FormData` + `Content-Type: multipart/form-data` header (same convention as `createDesignImage`/`bulk_import`)
+- New route `/styles/techpack-import` + "Tech Pack Import" merchandising nav item; **TechPackImportWizardPage** 3-step wizard — Step 1 drop/upload PDF → extracted JSON preview (design-info cards + BOM table mirroring `TechPackDocument.to_dict()`) + Download Excel; Step 2 upload the edited `.xlsx` → validation result; Step 3 success screen with created/updated style link + tech-pack number + status badge
+- `StyleDetailPage` gains a **Tech Packs** tab/panel — status badge (draft/extracted/in_progress/completed), `techpack_number`, source PDF + workbook links, issue date / style number / designer / block grid, description/note, errors list, BOM-item count, and an "Import Tech Pack" link to the wizard
+- Follows the Vite 8 / Rolldown rule (type-only imports use `import type { ... }`) ✅ — tsc clean, oxlint 0 errors (pre-existing `exhaustive-deps` warnings only), vite build succeeded
+
+---
+
+## Part 3 Agent Handoff Order
+
+1. **RQ-036** PDF parser (pure functions, golden tests) → 2. **RQ-037** Excel writer (round-trip) → 3. **RQ-038** Excel reader → 4. **RQ-039** model + lifecycle → 5. **RQ-041** BOMItem fields → 6. **RQ-040** API (depends on 036-039+041) → 7. **RQ-042** frontend (depends on 040).
+> Regression gate after every RQ: `python -m pytest tests` (baseline 1126 green). Update `lessons-learned.md` per requirement.
 
 ---
 

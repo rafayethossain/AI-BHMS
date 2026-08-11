@@ -9,9 +9,11 @@ from decimal import Decimal, InvalidOperation
 from io import StringIO
 
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Count, Max, Q
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
+from django.urls import reverse
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
@@ -45,6 +47,7 @@ from .models import (
     StockFabricAllocation,
     Style,
     StyleItem,
+    StyleTechPack,
     StyleVersion,
     TAMilestone,
 )
@@ -66,11 +69,18 @@ from .serializers import (
     StockFabricAllocationSerializer,
     StyleItemSerializer,
     StyleSerializer,
+    StyleTechPackSerializer,
     StyleVersionSerializer,
     TAMilestoneSerializer,
     TASerializer,
 )
 from .services import NoCurrentFitSpecError, NoTrimItemsError, copy_fit_spec, copy_trim_items
+from .techpack.excel_export import write_techpack_workbook
+from .techpack.excel_import import parse_techpack_workbook
+from .techpack.import_service import import_style_from_techpack
+from .techpack.pdf_parser import StyleTechPackParser
+
+EXCEL_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 STYLE_TRANSITIONS = {
     "active": {"from": ["draft"], "label": "Activate"},
@@ -89,6 +99,16 @@ PO_TRANSITIONS = {
 }
 
 
+def _resolve_tenant_buyer(request, raw_buyer):
+    """Resolve a buyer id from request data against the request tenant."""
+    if raw_buyer is None or str(raw_buyer).strip() == "":
+        return None
+    try:
+        return Buyer.objects.get(tenant=request.tenant, id=raw_buyer)
+    except (Buyer.DoesNotExist, ValidationError, TypeError):
+        return None
+
+
 class StyleViewSet(viewsets.ModelViewSet):
     queryset = Style.objects.all()
     serializer_class = StyleSerializer
@@ -101,6 +121,10 @@ class StyleViewSet(viewsets.ModelViewSet):
         "list": "merchandising:view", "retrieve": "merchandising:view",
         "create": "merchandising:create", "update": "merchandising:edit",
         "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
+        "extract_techpack": "merchandising:create",
+        "techpack_excel": "merchandising:view",
+        "import_techpack": "merchandising:create",
+        "tech_packs": "merchandising:view",
     }
 
     def get_queryset(self):
@@ -162,6 +186,13 @@ class StyleViewSet(viewsets.ModelViewSet):
         serializer = DesignImageSerializer(images, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=["get"])
+    def tech_packs(self, request, pk=None):
+        style = self.get_object()
+        techpacks = StyleTechPack.objects.filter(tenant=request.tenant, style=style)
+        serializer = StyleTechPackSerializer(techpacks, many=True)
+        return Response(serializer.data)
+
     @action(detail=True, methods=["post"], url_path="upload-tech-pack")
     def upload_tech_pack(self, request, pk=None):
         style = self.get_object()
@@ -171,6 +202,141 @@ class StyleViewSet(viewsets.ModelViewSet):
         style.tech_pack = file
         style.save(update_fields=["tech_pack"])
         return Response({"tech_pack": style.tech_pack.url})
+
+    @action(detail=False, methods=["post"], url_path="techpack/extract")
+    def extract_techpack(self, request):
+        """Parse an uploaded buyer PDF into an editable tech-pack workbook (RQ-040).
+
+        Creates a ``StyleTechPack`` in ``extracted`` state holding the raw
+        extraction payload + normalized design-sheet fields, generates the
+        two-sheet Excel (RQ-037), and returns a download URL for it.
+        """
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
+        buyer = _resolve_tenant_buyer(request, request.data.get("buyer"))
+        if buyer is None:
+            return Response({"error": "A valid buyer is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            doc = StyleTechPackParser().parse(upload)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if doc.errors:
+            return Response({"error": "; ".join(doc.errors)}, status=status.HTTP_400_BAD_REQUEST)
+
+        techpack = StyleTechPack.objects.create(
+            tenant=request.tenant,
+            techpack_number=StyleTechPack.next_techpack_number(request.tenant),
+            source_pdf=upload,
+            created_by=request.user,
+        )
+        techpack.mark_extracted(doc.to_dict())
+        design = doc.design_info
+        for field in (
+            "issue_date", "block", "based_on", "customer", "style_number", "size",
+            "designer", "pattern_cutter", "issuer", "cloth_code", "length",
+            "sketch", "description", "note",
+        ):
+            setattr(techpack, field, getattr(design, field))
+        techpack.excel_file.save(
+            f"{techpack.techpack_number}.xlsx", ContentFile(write_techpack_workbook(doc).getvalue())
+        )
+        return Response(
+            {
+                "id": techpack.id,
+                "techpack_number": techpack.techpack_number,
+                "status": techpack.status,
+                "data": doc.to_dict(),
+                "excel_download_url": request.build_absolute_uri(
+                    reverse("style-techpack_excel") + f"?techpack={techpack.id}"
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["get"], url_path="techpack/excel", url_name="techpack_excel")
+    def techpack_excel(self, request):
+        """Download the generated workbook for a tech-pack (RQ-040)."""
+        try:
+            techpack = StyleTechPack.objects.get(
+                tenant=request.tenant, id=request.query_params.get("techpack")
+            )
+        except (StyleTechPack.DoesNotExist, ValidationError, TypeError):
+            return Response({"error": "Tech-pack not found"}, status=status.HTTP_404_NOT_FOUND)
+        if not techpack.excel_file:
+            return Response({"error": "No Excel generated yet"}, status=status.HTTP_404_NOT_FOUND)
+        return FileResponse(
+            techpack.excel_file.open("rb"),
+            content_type=EXCEL_MIME,
+            as_attachment=True,
+            filename=f"{techpack.techpack_number}.xlsx",
+        )
+
+    @action(detail=False, methods=["post"], url_path="techpack/import")
+    def import_techpack(self, request):
+        """Import a (possibly hand-edited) workbook into styles/BOM (RQ-040).
+
+        Creates or updates the Style, a new StyleVersion, StyleItems, and a BOM
+        with its BOMItems — all in one atomic transaction. An optional
+        ``techpack`` id links the import to its ``StyleTechPack`` and completes it.
+        """
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
+        buyer = _resolve_tenant_buyer(request, request.data.get("buyer"))
+        if buyer is None:
+            return Response({"error": "A valid buyer is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        techpack = None
+        techpack_id = request.data.get("techpack")
+        if techpack_id:
+            try:
+                techpack = StyleTechPack.objects.get(tenant=request.tenant, id=techpack_id)
+            except (StyleTechPack.DoesNotExist, ValidationError, TypeError):
+                return Response({"error": "Tech-pack not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            doc = parse_techpack_workbook(upload)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if doc.errors:
+            return Response({"error": "; ".join(doc.errors)}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                result = import_style_from_techpack(
+                    tenant=request.tenant, user=request.user, buyer=buyer,
+                    doc=doc, techpack=techpack,
+                )
+        except Exception:
+            return Response(
+                {"error": "Import failed — no changes were saved"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(
+            {
+                "style": {
+                    "id": result.style.id,
+                    "style_number": result.style.style_number,
+                    "name": result.style.name,
+                },
+                "style_version": {
+                    "id": result.style_version.id,
+                    "version_number": result.style_version.version_number,
+                },
+                "bom": {
+                    "id": result.bom.id,
+                    "name": result.bom.name,
+                    "version": result.bom.version,
+                },
+                "created": result.created,
+                "style_items_created": len(result.style_items),
+                "bom_items_created": len(result.bom_items),
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=["post"])
     def transition(self, request, pk=None):

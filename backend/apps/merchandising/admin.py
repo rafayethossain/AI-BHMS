@@ -18,6 +18,7 @@ from .models import (
     PurchaseOrder,
     PurchaseOrderItem,
     Style,
+    StyleTechPack,
     StyleVersion,
     TAMilestone,
 )
@@ -35,6 +36,13 @@ class StyleVersionAdmin(admin.ModelAdmin):
     list_display = ["style", "version_number", "status"]
     list_filter = ["status"]
     search_fields = ["style__style_number"]
+
+
+@admin.register(StyleTechPack)
+class StyleTechPackAdmin(admin.ModelAdmin):
+    list_display = ["techpack_number", "style", "style_number", "status", "issue_date", "created_at"]
+    list_filter = ["status"]
+    search_fields = ["techpack_number", "style_number", "style__style_number"]
 
 
 @admin.register(FileOpening)
@@ -94,7 +102,7 @@ class BOMAdmin(admin.ModelAdmin):
 
 @admin.register(BOMItem)
 class BOMItemAdmin(admin.ModelAdmin):
-    list_display = ["bom", "category", "item_name", "consumption", "unit_price", "ordered_qty", "status"]
+    list_display = ["bom", "category", "item_name", "consumption", "unit_price", "ordered_qty", "status", "location", "colour", "width_size", "match"]
     list_filter = ["status", "category"]
     search_fields = ["item_name"]
 

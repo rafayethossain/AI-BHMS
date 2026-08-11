@@ -15,6 +15,9 @@ backend/.env.*
 backend/media/
 media/
 
+# ===== Golden test fixtures (kept local only) =====
+PDF Extract/
+
 # ===== Python =====
 __pycache__/
 *.py[cod]

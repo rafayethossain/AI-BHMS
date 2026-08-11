@@ -25,6 +25,7 @@ const DROPDOWNS: DropdownConfig[] = [
       { label: 'Costings', path: '/costings' },
       { label: 'Fit Specs', path: '/fit-specs' },
       { label: 'Job Requests', path: '/jobs' },
+      { label: 'Tech Pack Import', path: '/styles/techpack-import' },
     ],
   },
   {

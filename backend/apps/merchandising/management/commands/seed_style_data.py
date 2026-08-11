@@ -9,12 +9,19 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.tenants.models import Tenant
-from apps.setup.models import Buyer, Brand, Factory, Vendor, ColorCode, Season, UOM
 from apps.merchandising.models import (
-    Style, StyleVersion, StyleItem, FileOpening, PurchaseOrder, PurchaseOrderItem,
-    BOM, BOMItem,
+    BOM,
+    BOMItem,
+    FileOpening,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    Style,
+    StyleItem,
+    StyleTechPack,
+    StyleVersion,
 )
+from apps.setup.models import UOM, Brand, Buyer, ColorCode, Factory, Season, Vendor
+from apps.tenants.models import Tenant
 
 
 class Command(BaseCommand):
@@ -41,6 +48,7 @@ class Command(BaseCommand):
             return
 
         # Clear existing merchandising data for fresh seed
+        StyleTechPack.objects.filter(tenant=tenant).delete()
         BOMItem.objects.filter(tenant=tenant).delete()
         BOM.objects.filter(tenant=tenant).delete()
         StyleItem.objects.filter(tenant=tenant).delete()
@@ -160,7 +168,7 @@ class Command(BaseCommand):
                     tenant=tenant, style=style, version_number=ver,
                     defaults={
                         "status": "approved" if ver < style.current_version else "active",
-                        "revision_notes": f"Initial release" if ver == 1 else f"Rev {ver} - updated specs",
+                        "revision_notes": "Initial release" if ver == 1 else f"Rev {ver} - updated specs",
                     },
                 )
                 created_versions.append(sv)
@@ -243,13 +251,13 @@ class Command(BaseCommand):
         self.stdout.write(f"  ✓ {len(created_fos)} file openings")
 
         # ── Purchase Orders (1-3 per file opening) ────────────────────
-        from apps.setup.models import Currency, PaymentTerms, DeliveryMode, Country
+        from apps.setup.models import Country, Currency, DeliveryMode, PaymentTerms
         usd = Currency.objects.filter(tenant=tenant, code="USD").first()
         tt30 = PaymentTerms.objects.filter(tenant=tenant, code="TT30").first()
         sea = DeliveryMode.objects.filter(tenant=tenant, code="SEA").first()
         gbr = Country.objects.filter(tenant=tenant, code="GBR").first()
         usa = Country.objects.filter(tenant=tenant, code="USA").first()
-        dest = random.choice([c for c in [gbr, usa] if c]) or None
+        dest = random.choice([c for c in [gbr, usa] if c]) if (gbr or usa) else None
 
         statuses = ["draft", "draft", "open", "confirmed", "in_production", "ready", "shipped"]
         created_pos = []
@@ -299,5 +307,58 @@ class Command(BaseCommand):
                         )
                 po_counter += 1
         self.stdout.write(f"  ✓ {len(created_pos)} purchase orders with items")
+
+        # ── Tech Packs (RQ-039: 1 draft + 1 completed for the tech-pack flow) ──
+        sample_extraction = {
+            "design_info": {
+                "issue_date": "2022-03-22",
+                "block": "59073T",
+                "based_on": "59073T",
+                "customer": "DOTTI",
+                "style_number": "67741T",
+                "size": "10",
+                "designer": "Emmi.Huynh",
+                "pattern_cutter": "HAI",
+                "issuer": "Clone",
+                "cloth_code": "SANDWASH LINEN",
+                "length": "0",
+                "sketch": "",
+                "description": "565235 LB LIZZIE WIDE LEG PANT",
+                "note": "BASED ON THE BLOCK OF 59073T",
+            },
+            "bom_rows": [
+                {"type": "Cloth", "description_code": "SANDWASH LINEN XK-529",
+                 "location": "MAIN", "supplier": "ALICE-", "colour": "BLACK",
+                 "width_size": "132 CM", "qty": 1.67, "match": ""},
+            ],
+            "errors": [],
+            "warnings": [],
+        }
+        draft_tp = StyleTechPack.objects.create(
+            tenant=tenant,
+            techpack_number=StyleTechPack.next_techpack_number(tenant),
+            status=StyleTechPack.Status.DRAFT,
+            extracted_data=sample_extraction,
+            issue_date="2022-03-22",
+            customer="DOTTI",
+            style_number="67741T",
+            designer="Emmi.Huynh",
+            description="565235 LB LIZZIE WIDE LEG PANT",
+        )
+        completed_tp = StyleTechPack.objects.create(
+            tenant=tenant,
+            techpack_number=StyleTechPack.next_techpack_number(tenant),
+            style=created_styles[0],
+            status=StyleTechPack.Status.COMPLETED,
+            extracted_data=sample_extraction,
+            issue_date="2022-03-22",
+            customer="DOTTI",
+            style_number=created_styles[0].style_number,
+            designer="Emmi.Huynh",
+            description=created_styles[0].name,
+        )
+        self.stdout.write(
+            f"  ✓ 2 tech packs ({draft_tp.techpack_number} draft, {completed_tp.techpack_number} completed)"
+        )
 
         self.stdout.write(self.style.SUCCESS("\n✅ Style demo data seeded! Refresh the browser to see all tabs populated."))

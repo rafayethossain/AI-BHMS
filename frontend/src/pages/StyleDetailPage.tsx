@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { merchApi, setupApi } from '../api/client';
-import type { Style, StyleVersion, StyleItem, FileOpening, PurchaseOrder, BOM, Vendor, UOM, DesignImage } from '../api/client';
+import type { Style, StyleVersion, StyleItem, FileOpening, PurchaseOrder, BOM, Vendor, UOM, DesignImage, StyleTechPack } from '../api/client';
 import api from '../api/client';
 import SearchableSelect from '../components/SearchableSelect';
 import { useToast } from '../contexts/ToastContext';
@@ -25,7 +25,14 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   archived: [],
 };
 
-type Tab = 'overview' | 'sketches' | 'versions' | 'file_openings' | 'purchase_orders' | 'items' | 'bom' | 'design_images';
+const TECH_PACK_STATUS_COLORS: Record<string, string> = {
+  draft: 'bg-surface-alt/20 text-muted',
+  extracted: 'bg-blue-500/20 text-badge-blue',
+  in_progress: 'bg-amber-500/20 text-badge-amber',
+  completed: 'bg-emerald-500/20 text-badge-emerald',
+};
+
+type Tab = 'overview' | 'sketches' | 'versions' | 'file_openings' | 'purchase_orders' | 'items' | 'bom' | 'design_images' | 'tech_packs';
 
 export default function StyleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +47,7 @@ export default function StyleDetailPage() {
   const [boms, setBoms] = useState<BOM[]>([]);
   const [styleItems, setStyleItems] = useState<StyleItem[]>([]);
   const [designImages, setDesignImages] = useState<DesignImage[]>([]);
+  const [techPacks, setTechPacks] = useState<StyleTechPack[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [previewDesignImage, setPreviewDesignImage] = useState<{ url: string; label: string } | null>(null);
   const [deleteImageId, setDeleteImageId] = useState<string | null>(null);
@@ -95,6 +103,9 @@ export default function StyleDetailPage() {
       } else if (tab === 'design_images') {
         const res = await merchApi.getStyleDesignImages(id);
         setDesignImages(res.data);
+      } else if (tab === 'tech_packs') {
+        const res = await merchApi.getStyleTechPacks(id);
+        setTechPacks(res.data);
       }
     } catch { toast('error', 'Failed to load tab data'); }
   };
@@ -267,6 +278,7 @@ export default function StyleDetailPage() {
     { key: 'items', label: 'Line Items', count: styleItems.length },
     { key: 'bom', label: 'BOM' },
     { key: 'design_images', label: 'Design Images', count: designImages.length },
+    { key: 'tech_packs', label: 'Tech Packs', count: techPacks.length },
   ];
 
   return (
@@ -583,6 +595,56 @@ export default function StyleDetailPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'tech_packs' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted">{techPacks.length} tech pack{techPacks.length !== 1 ? 's' : ''} &middot; upload a buyer PDF via the Tech Pack Import wizard</p>
+              <Link to="/styles/techpack-import" className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition-colors">+ Import Tech Pack</Link>
+            </div>
+            {techPacks.length === 0 ? (
+              <div className="bg-surface rounded-xl border border-border p-12 text-center">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-input mb-4">
+                  <svg className="w-7 h-7 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                </div>
+                <p className="text-heading text-sm font-medium mb-1">No tech packs for this style yet</p>
+                <p className="text-faint text-xs">Use the import wizard to turn a buyer PDF into a style + BOM.</p>
+              </div>
+            ) : (
+              techPacks.map((tp) => (
+                <div key={tp.id} className="bg-surface rounded-xl border border-border p-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-emerald-400">{tp.techpack_number}</span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${TECH_PACK_STATUS_COLORS[tp.status] || 'bg-surface-alt/20 text-muted'}`}>{tp.status}</span>
+                      {tp.bom_items_count > 0 && (
+                        <span className="px-2 py-1 bg-surface-alt rounded-full text-xs text-muted">{tp.bom_items_count} BOM items</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      {tp.source_pdf_url && <a href={tp.source_pdf_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300">Source PDF</a>}
+                      {tp.excel_url && <a href={tp.excel_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300">Workbook</a>}
+                    </div>
+                  </div>
+                  <dl className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Issue Date</dt><dd className="text-heading">{tp.issue_date || '—'}</dd></div>
+                    <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Style Number</dt><dd className="text-heading">{tp.style_number || '—'}</dd></div>
+                    <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Designer</dt><dd className="text-heading truncate">{tp.designer || '—'}</dd></div>
+                    <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Block</dt><dd className="text-heading truncate">{tp.block || '—'}</dd></div>
+                  </dl>
+                  {(tp.description || tp.note) && (
+                    <p className="text-muted text-sm mt-3">{tp.description || tp.note}</p>
+                  )}
+                  {tp.errors.length > 0 && (
+                    <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-300">
+                      {tp.errors.map((e, i) => <p key={i}>{e}</p>)}
+                    </div>
+                  )}
+                </div>
+              ))
             )}
           </div>
         )}

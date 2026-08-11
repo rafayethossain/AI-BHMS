@@ -30,6 +30,7 @@ from .models import (
     StockFabricAllocation,
     Style,
     StyleItem,
+    StyleTechPack,
     StyleVersion,
     TAMilestone,
 )
@@ -115,6 +116,33 @@ class StyleVersionSerializer(serializers.ModelSerializer):
         model = StyleVersion
         fields = ["id", "style", "style_number", "version_number", "revision_notes", "status", "created_at"]
         read_only_fields = ["id", "created_at", "version_number"]
+
+
+class StyleTechPackSerializer(serializers.ModelSerializer):
+    source_pdf_url = serializers.SerializerMethodField()
+    excel_url = serializers.SerializerMethodField()
+    bom_items_count = serializers.SerializerMethodField()
+
+    def get_source_pdf_url(self, obj):
+        return obj.source_pdf.url if obj.source_pdf else None
+
+    def get_excel_url(self, obj):
+        return obj.excel_file.url if obj.excel_file else None
+
+    def get_bom_items_count(self, obj):
+        return len(obj.extracted_data.get("bom_rows", []) or [])
+
+    class Meta:
+        model = StyleTechPack
+        fields = [
+            "id", "techpack_number", "style", "status",
+            "source_pdf_url", "excel_url", "bom_items_count",
+            "issue_date", "block", "based_on", "customer", "style_number",
+            "size", "designer", "pattern_cutter", "issuer", "cloth_code",
+            "length", "sketch", "description", "note",
+            "errors", "warnings", "created_at", "updated_at",
+        ]
+        read_only_fields = fields
 
 
 class StockFabricAllocationSerializer(serializers.ModelSerializer):
@@ -400,6 +428,7 @@ class BOMItemSerializer(serializers.ModelSerializer):
             "consumption", "waste_percent", "unit_price", "vendor", "vendor_name",
             "supplier", "supplier_name", "ordered_qty", "delivered_qty",
             "eta_date", "confirmed_date", "actual_date", "status",
+            "location", "colour", "width_size", "match",
             "line_total"
         ]
         read_only_fields = ["id"]

@@ -1212,6 +1212,9 @@ export const merchApi = {
   getStyleDesignImages: (styleId: string) =>
     api.get<DesignImage[]>(`/merchandising/styles/${styleId}/design_images/`),
 
+  getStyleTechPacks: (styleId: string) =>
+    api.get<StyleTechPack[]>(`/merchandising/styles/${styleId}/tech_packs/`),
+
   getDesignImages: (params?: Record<string, string>) =>
     api.get<{ results: DesignImage[]; count: number }>('/merchandising/design-images/', { params }),
 
@@ -1551,7 +1554,83 @@ export const merchApi = {
     api.get<UnsoldAnalysisResponse>('/merchandising/job-requests/unsold_analysis/', { params }),
   getJobQueue: (params?: Record<string, string>) =>
     api.get<{ results: JobRequest[]; count: number }>('/merchandising/job-requests/queue/', { params }),
+
+  // Tech Packs (RQ-036 / RQ-040)
+  uploadTechPack: (id: string, file: File) => {
+    const fd = new FormData();
+    fd.append('tech_pack', file);
+    return api.post<{ tech_pack: string }>(`/merchandising/styles/${id}/upload-tech-pack/`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  extractTechPack: (file: File, buyer: string) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('buyer', buyer);
+    return api.post<TechPackExtractResult>('/merchandising/styles/techpack/extract/', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  getTechPackExcel: (techpackId: string) =>
+    api.get(`/merchandising/styles/techpack/excel/`, {
+      params: { techpack: techpackId },
+      responseType: 'blob',
+    }),
+  importTechPack: (file: File, buyer: string, techpackId?: string) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('buyer', buyer);
+    if (techpackId) fd.append('techpack', techpackId);
+    return api.post<TechPackImportResult>('/merchandising/styles/techpack/import/', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
+
+export interface TechPackExtractResult {
+  id: string;
+  techpack_number: string;
+  status: string;
+  data: Record<string, unknown>;
+  excel_download_url: string;
+}
+
+export interface TechPackImportResult {
+  style: { id: string; style_number: string; name: string };
+  style_version: { id: string; version_number: string };
+  bom: { id: string; name: string; version: string };
+  created: boolean;
+  style_items_created: number;
+  bom_items_created: number;
+}
+
+export interface StyleTechPack {
+  id: string;
+  techpack_number: string;
+  style: string;
+  status: string;
+  source_pdf_url: string | null;
+  excel_url: string | null;
+  bom_items_count: number;
+  issue_date: string | null;
+  block: string;
+  based_on: string;
+  customer: string;
+  style_number: string;
+  size: string;
+  designer: string;
+  pattern_cutter: string;
+  issuer: string;
+  cloth_code: string;
+  length: string;
+  sketch: string;
+  description: string;
+  note: string;
+  errors: string[];
+  warnings: string[];
+  created_at: string;
+  updated_at: string;
+}
 
 export interface ProductionPlan {
   id: string;

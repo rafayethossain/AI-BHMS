@@ -554,6 +554,10 @@ class BOMItem(TenantModel):
         choices=TrimStatus.choices,
         default=TrimStatus.TBC,
     )
+    location = models.CharField(max_length=100, null=True, blank=True, default="")
+    colour = models.CharField(max_length=100, null=True, blank=True, default="")
+    width_size = models.CharField(max_length=100, null=True, blank=True, default="")
+    match = models.CharField(max_length=100, null=True, blank=True, default="")
 
     class Meta:
         ordering = ["category", "item_name"]
@@ -809,8 +813,6 @@ class JobType(models.TextChoices):
     SAMPLE = "sample", "Sample"
     THREE_D = "3d", "3D"
     MINI_MARKER = "mini_marker", "Mini-Marker"
-
-
 class JobPriority(models.IntegerChoices):
     LOW = 1, "Low"
     NORMAL = 2, "Normal"
@@ -860,3 +862,94 @@ class JobRequest(TenantModel):
 
     def __str__(self):
         return f"{self.job_number} - {self.job_type}"
+
+
+class StyleTechPack(TenantModel):
+    """
+    A tech-pack processing task (RQ-039 → RQ-042).
+
+    Persists each step of the PDF → Excel → import flow: the source PDF, the
+    generated Excel, the raw extraction payload, any extraction errors, and the
+    progress state (`draft → extracted → in_progress → completed`) so progress
+    is visible as the task advances. The normalized design-sheet fields mirror
+    the ``TechPackDesignInfo`` DTO; the raw JSON is kept in ``extracted_data``
+    for re-import/preview. ``style`` stays null until the Excel import links it.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        EXTRACTED = "extracted", "Extracted"
+        IN_PROGRESS = "in_progress", "In Progress"
+        COMPLETED = "completed", "Completed"
+
+    techpack_number = models.CharField(max_length=50)
+    style = models.ForeignKey(
+        Style, on_delete=models.SET_NULL, null=True, blank=True, related_name="tech_packs"
+    )
+    source_pdf = models.FileField(upload_to="tech_packs/source/", blank=True)
+    excel_file = models.FileField(upload_to="tech_packs/excel/", blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    extracted_data = models.JSONField(default=dict, blank=True)
+    errors = models.JSONField(default=list, blank=True)
+    warnings = models.JSONField(default=list, blank=True)
+
+    issue_date = models.DateField(null=True, blank=True)
+    block = models.CharField(max_length=100, blank=True)
+    based_on = models.CharField(max_length=100, blank=True)
+    customer = models.CharField(max_length=100, blank=True)
+    style_number = models.CharField(max_length=50, blank=True)
+    size = models.CharField(max_length=50, blank=True)
+    designer = models.CharField(max_length=100, blank=True)
+    pattern_cutter = models.CharField(max_length=100, blank=True)
+    issuer = models.CharField(max_length=100, blank=True)
+    cloth_code = models.CharField(max_length=255, blank=True)
+    length = models.CharField(max_length=50, blank=True)
+    sketch = models.CharField(max_length=255, blank=True)
+    description = models.TextField(blank=True)
+    note = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        unique_together = ["tenant", "techpack_number"]
+
+    def __str__(self):
+        number = self.style_number or (self.style.style_number if self.style else "") or "unlinked"
+        return f"{self.techpack_number} - {number}"
+
+    @classmethod
+    def next_techpack_number(cls, tenant):
+        """Return the next TP-XXXX tech-pack number for a tenant."""
+        import re
+        existing = cls.objects.filter(
+            tenant=tenant, techpack_number__startswith="TP-"
+        ).values_list("techpack_number", flat=True)
+        max_num = 1000
+        for number in existing:
+            match = re.match(r"^TP-(\d+)$", number)
+            if match:
+                max_num = max(max_num, int(match.group(1)))
+        return f"TP-{max_num + 1:04d}"
+
+    def mark_extracted(self, data):
+        """Store the extraction payload and move draft → extracted."""
+        if self.status != self.Status.DRAFT:
+            raise ValueError("Only draft tech-packs can be marked as extracted")
+        self.extracted_data = data
+        self.status = self.Status.EXTRACTED
+        self.save(update_fields=["extracted_data", "status", "updated_at"])
+
+    def mark_in_progress(self):
+        """Move extracted → in_progress once manual completion starts."""
+        if self.status != self.Status.EXTRACTED:
+            raise ValueError("Only extracted tech-packs can move to in progress")
+        self.status = self.Status.IN_PROGRESS
+        self.save(update_fields=["status", "updated_at"])
+
+    def complete(self, style=None):
+        """Move in_progress → completed, optionally linking the imported style."""
+        if self.status != self.Status.IN_PROGRESS:
+            raise ValueError("Only in-progress tech-packs can be completed")
+        if style is not None:
+            self.style = style
+        self.status = self.Status.COMPLETED
+        self.save(update_fields=["style", "status", "updated_at"])
