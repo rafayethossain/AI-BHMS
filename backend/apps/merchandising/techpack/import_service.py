@@ -22,7 +22,15 @@ from dataclasses import dataclass
 
 from django.db import transaction
 
-from ..models import BOM, BOMItem, Style, StyleItem, StyleTechPack, StyleVersion
+from ..models import (
+    BOM,
+    BOMItem,
+    DesignSheet,
+    Style,
+    StyleItem,
+    StyleTechPack,
+    StyleVersion,
+)
 from .pdf_parser import TechPackDocument
 
 
@@ -36,6 +44,7 @@ class TechPackImportResult:
     style_items: list[StyleItem]
     bom_items: list[BOMItem]
     created: bool
+    design_sheet: DesignSheet | None = None
 
 
 @transaction.atomic
@@ -106,12 +115,17 @@ def import_style_from_techpack(
             )
         )
 
+    design_sheet = None
     if techpack is not None:
         _complete_techpack(techpack, style)
+        design_sheet, _ = DesignSheet.objects.get_or_create(
+            tenant=tenant, tech_pack=techpack,
+        )
 
     return TechPackImportResult(
         style=style, style_version=style_version, bom=bom,
         style_items=style_items, bom_items=bom_items, created=created,
+        design_sheet=design_sheet,
     )
 
 

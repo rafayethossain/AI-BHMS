@@ -908,6 +908,17 @@ class StyleTechPack(TenantModel):
     description = models.TextField(blank=True)
     note = models.TextField(blank=True)
 
+    # Design Sheet enhancement fields (Day 1)
+    sketch_image = models.ImageField(
+        upload_to="tech_packs/sketches/", blank=True, null=True
+    )
+    sketch_thumbnail = models.ImageField(
+        upload_to="tech_packs/sketches/thumbs/", blank=True, null=True
+    )
+    other_images = models.JSONField(default=list, blank=True)
+    notes_initials = models.CharField(max_length=10, blank=True)
+    notes_date = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ["-created_at"]
         unique_together = ["tenant", "techpack_number"]
@@ -953,3 +964,129 @@ class StyleTechPack(TenantModel):
             self.style = style
         self.status = self.Status.COMPLETED
         self.save(update_fields=["style", "status", "updated_at"])
+
+
+# ---------------------------------------------------------------------------
+# Design Sheet (Week 2)
+# ---------------------------------------------------------------------------
+
+class DesignSheet(TenantModel):
+    """
+    Design sheet linked to StyleTechPack.
+    Provides status workflow and links to fit specs and job requests.
+    """
+
+    class Status(models.TextChoices):
+        NEW = "new", "New"
+        REJECTED = "rejected", "Rejected"
+        CLOSED = "closed", "Closed"
+        ARCHIVED = "archived", "Archived"
+
+    tech_pack = models.OneToOneField(
+        StyleTechPack,
+        on_delete=models.CASCADE,
+        related_name="design_sheet",
+    )
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.NEW
+    )
+    sketch_annotations = models.JSONField(
+        default=list, blank=True,
+        help_text="List of {id, x, y, text} sketch annotations (percentages 0-100)",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"DesignSheet - {self.tech_pack}"
+
+
+class FitSpecification(TenantModel):
+    """
+    Fit specification for a design sheet (Dev Spec, 1st Fit, 2nd Fit, etc.).
+    """
+
+    design_sheet = models.ForeignKey(
+        DesignSheet,
+        on_delete=models.CASCADE,
+        related_name="fit_specs",
+    )
+    fit_number = models.CharField(max_length=50)
+    fit_date = models.DateField()
+    description = models.CharField(max_length=200)
+    notes = models.TextField(blank=True)
+    is_selected = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["fit_number"]
+        unique_together = ["tenant", "design_sheet", "fit_number"]
+
+    def __str__(self):
+        return f"{self.fit_number} - {self.description}"
+
+
+class FitImage(TenantModel):
+    """Images for a fit specification."""
+
+    fit_spec = models.ForeignKey(
+        FitSpecification,
+        on_delete=models.CASCADE,
+        related_name="images",
+    )
+    image = models.ImageField(upload_to="fits/")
+    caption = models.CharField(max_length=200, blank=True)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ["order"]
+
+    def __str__(self):
+        return f"FitImage - {self.fit_spec.fit_number}"
+
+
+class DesignJobRequest(TenantModel):
+    """
+    Job request for patterns, samples, mini markers linked to a design sheet.
+    This is separate from the existing JobRequest model which is for
+    cross-department job queue management.
+    """
+
+    class JobType(models.TextChoices):
+        NEW_PATTERN = "new_pattern", "New Pattern"
+        TECH_SAMPLE = "tech_sample", "Technical Sample"
+        FIT_SAMPLE = "fit_sample", "Fit Sample"
+        MINI_MARKER = "mini_marker", "Mini Marker"
+        THREE_D = "3d", "3D Sample"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        IN_PROGRESS = "in_progress", "In Progress"
+        COMPLETED = "completed", "Completed"
+
+    design_sheet = models.ForeignKey(
+        DesignSheet,
+        on_delete=models.CASCADE,
+        related_name="job_requests",
+    )
+    job_type = models.CharField(max_length=50, choices=JobType.choices)
+    required_by = models.DateField()
+    work_location = models.CharField(max_length=100, blank=True)
+    no_of_garments = models.IntegerField(default=1)
+    allocated_to = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="design_job_requests",
+    )
+    notes = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING
+    )
+
+    class Meta:
+        ordering = ["-required_by", "-created_at"]
+
+    def __str__(self):
+        return f"{self.get_job_type_display()} - {self.design_sheet}"

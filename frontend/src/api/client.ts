@@ -1585,6 +1585,31 @@ export const merchApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  // Design Sheet - Sketch Upload
+  uploadTechPackSketch: (techpackId: string, file: File) => {
+    const fd = new FormData();
+    fd.append('sketch_image', file);
+    return api.put<{ sketch_image_url: string; message: string }>(
+      `/merchandising/styles/techpack/${techpackId}/sketch/`,
+      fd,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+  },
+  // Design Sheet - Notes Update
+  updateTechPackNotes: (techpackId: string, data: { note?: string; notes_initials?: string }) =>
+    api.put<{ note: string; notes_initials: string; notes_date: string; message: string }>(
+      `/merchandising/styles/techpack/${techpackId}/notes/`,
+      data
+    ),
+  // Design Sheets
+  getDesignSheets: (params?: Record<string, string>) =>
+    api.get<PaginatedResponse<DesignSheet>>('/merchandising/design-sheets/', { params }),
+  getDesignSheet: (id: string) =>
+    api.get<DesignSheet>(`/merchandising/design-sheets/${id}/`),
+  transitionDesignSheet: (id: string, status: string) =>
+    api.post<{ status: string; message: string }>(`/merchandising/design-sheets/${id}/transition/`, { status }),
+  saveDesignSheetAnnotations: (id: string, annotations: SketchAnnotation[]) =>
+    api.patch<{ annotations: SketchAnnotation[] }>(`/merchandising/design-sheets/${id}/annotations/`, { annotations }),
 };
 
 export interface TechPackExtractResult {
@@ -1602,6 +1627,7 @@ export interface TechPackImportResult {
   created: boolean;
   style_items_created: number;
   bom_items_created: number;
+  design_sheet: { id: string; status: string } | null;
 }
 
 export interface StyleTechPack {
@@ -1628,6 +1654,78 @@ export interface StyleTechPack {
   note: string;
   errors: string[];
   warnings: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FitImage {
+  id: string;
+  fit_spec: string;
+  image: string;
+  caption: string;
+  order: number;
+  created_at: string;
+}
+
+export interface FitSpecification {
+  id: string;
+  design_sheet: string;
+  fit_number: string;
+  fit_date: string | null;
+  description: string;
+  notes: string;
+  is_selected: boolean;
+  images: FitImage[];
+  created_at: string;
+}
+
+export interface DesignJobRequest {
+  id: string;
+  design_sheet: string;
+  design_sheet_number: string;
+  job_type: string;
+  required_by: string | null;
+  work_location: string;
+  no_of_garments: number | null;
+  allocated_to: string | null;
+  allocated_to_name: string | null;
+  notes: string;
+  status: string;
+  created_at: string;
+}
+
+export interface SketchAnnotation {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+}
+
+export interface DesignSheet {
+  id: string;
+  tech_pack: string;
+  status: string;
+  style_code: string;
+  buyer_name: string;
+  file_number: string;
+  sketch_url: string | null;
+  issue_date: string | null;
+  block: string;
+  based_on: string;
+  customer: string;
+  style_number: string;
+  size: string;
+  designer: string;
+  pattern_cutter: string;
+  issuer: string;
+  cloth_code: string;
+  length: string;
+  sketch: string;
+  description: string;
+  note: string;
+  sketch_annotations: SketchAnnotation[];
+  fit_specs: FitSpecification[];
+  job_requests: DesignJobRequest[];
   created_at: string;
   updated_at: string;
 }

@@ -18,6 +18,9 @@ media/
 # ===== Golden test fixtures (kept local only) =====
 PDF Extract/
 
+# ===== Proprietary reference solution (kept local only) =====
+Reference Solution/
+
 # ===== Python =====
 __pycache__/
 *.py[cod]

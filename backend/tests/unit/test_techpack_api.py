@@ -27,6 +27,7 @@ from rest_framework.test import APIClient
 from apps.merchandising.models import (
     BOM,
     BOMItem,
+    DesignSheet,
     Style,
     StyleItem,
     StyleTechPack,
@@ -365,6 +366,40 @@ class TestImportTechPack:
         assert resp.data["bom"]["version"] == 1
         assert resp.data["style_items_created"] == 6
         assert resp.data["bom_items_created"] == 6
+
+    def test_creates_design_sheet_for_linked_techpack(
+        self, tp_api_client, sample_pdf, sample_workbook, tp_api_buyer
+    ):
+        extract_resp = _extract_pdf(tp_api_client, sample_pdf, tp_api_buyer)
+        techpack_id = extract_resp.data["id"]
+        resp = _import_workbook(
+            tp_api_client, sample_workbook, tp_api_buyer, techpack=techpack_id
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        tenant = tp_api_buyer.tenant
+        assert DesignSheet.objects.filter(
+            tenant=tenant, tech_pack_id=techpack_id
+        ).count() == 1
+
+    def test_import_response_includes_design_sheet(
+        self, tp_api_client, sample_pdf, sample_workbook, tp_api_buyer
+    ):
+        extract_resp = _extract_pdf(tp_api_client, sample_pdf, tp_api_buyer)
+        techpack_id = extract_resp.data["id"]
+        resp = _import_workbook(
+            tp_api_client, sample_workbook, tp_api_buyer, techpack=techpack_id
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        assert "design_sheet" in resp.data
+        assert resp.data["design_sheet"]["id"] is not None
+        assert resp.data["design_sheet"]["status"] == "new"
+
+    def test_import_without_techpack_does_not_create_design_sheet(
+        self, tp_api_client, sample_workbook, tp_api_buyer
+    ):
+        resp = _import_workbook(tp_api_client, sample_workbook, tp_api_buyer)
+        assert resp.status_code == status.HTTP_200_OK
+        assert DesignSheet.objects.filter(tenant=tp_api_buyer.tenant).count() == 0
 
     def test_rolls_back_on_fatal_error(self, tp_api_client, sample_workbook, tp_api_buyer, monkeypatch):
         import apps.merchandising.views as views_module

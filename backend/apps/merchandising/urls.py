@@ -10,7 +10,11 @@ from .views import (
     CostingLineViewSet,
     CostingViewSet,
     DesignImageViewSet,
+    DesignJobRequestViewSet,
+    DesignSheetViewSet,
     FileOpeningViewSet,
+    FitImageViewSet,
+    FitSpecificationViewSet,
     FitSpecViewSet,
     HitViewSet,
     JobRequestViewSet,
@@ -42,6 +46,10 @@ router.register(r"costings", CostingViewSet)
 router.register(r"costing-lines", CostingLineViewSet)
 router.register(r"tas", TAViewSet)
 router.register(r"ta-milestones", TAMilestoneViewSet)
+router.register(r"design-sheets", DesignSheetViewSet)
+router.register(r"design-job-requests", DesignJobRequestViewSet)
+router.register(r"fit-specifications", FitSpecificationViewSet)
+router.register(r"fit-images", FitImageViewSet)
 
 urlpatterns = [
     path("", include(router.urls)),

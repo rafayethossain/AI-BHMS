@@ -16,9 +16,13 @@ from .models import (
     Costing,
     CostingLine,
     DesignImage,
+    DesignJobRequest,
+    DesignSheet,
     FileOpening,
     FileOpeningNote,
+    FitImage,
     FitSpec,
+    FitSpecification,
     FitStage,
     Hit,
     JobPriority,
@@ -121,6 +125,8 @@ class StyleVersionSerializer(serializers.ModelSerializer):
 class StyleTechPackSerializer(serializers.ModelSerializer):
     source_pdf_url = serializers.SerializerMethodField()
     excel_url = serializers.SerializerMethodField()
+    sketch_image_url = serializers.SerializerMethodField()
+    sketch_thumbnail_url = serializers.SerializerMethodField()
     bom_items_count = serializers.SerializerMethodField()
 
     def get_source_pdf_url(self, obj):
@@ -129,6 +135,12 @@ class StyleTechPackSerializer(serializers.ModelSerializer):
     def get_excel_url(self, obj):
         return obj.excel_file.url if obj.excel_file else None
 
+    def get_sketch_image_url(self, obj):
+        return obj.sketch_image.url if obj.sketch_image else None
+
+    def get_sketch_thumbnail_url(self, obj):
+        return obj.sketch_thumbnail.url if obj.sketch_thumbnail else None
+
     def get_bom_items_count(self, obj):
         return len(obj.extracted_data.get("bom_rows", []) or [])
 
@@ -136,13 +148,21 @@ class StyleTechPackSerializer(serializers.ModelSerializer):
         model = StyleTechPack
         fields = [
             "id", "techpack_number", "style", "status",
-            "source_pdf_url", "excel_url", "bom_items_count",
+            "source_pdf_url", "excel_url", "sketch_image_url",
+            "sketch_thumbnail_url", "bom_items_count",
             "issue_date", "block", "based_on", "customer", "style_number",
             "size", "designer", "pattern_cutter", "issuer", "cloth_code",
             "length", "sketch", "description", "note",
+            "sketch_image", "sketch_thumbnail", "other_images",
+            "notes_initials", "notes_date",
             "errors", "warnings", "created_at", "updated_at",
         ]
-        read_only_fields = fields
+        read_only_fields = [
+            "id", "techpack_number", "style", "status",
+            "source_pdf_url", "excel_url", "sketch_image_url",
+            "sketch_thumbnail_url", "bom_items_count",
+            "errors", "warnings", "created_at", "updated_at",
+        ]
 
 
 class StockFabricAllocationSerializer(serializers.ModelSerializer):
@@ -764,3 +784,87 @@ class OrderManagerSerializer(serializers.Serializer):
             "gold_seal": gold_seal_tile,
             "risk": {"level": level, "flags": flags},
         }
+
+
+# ---------------------------------------------------------------------------
+# Design Sheet Serializers (Week 2)
+# ---------------------------------------------------------------------------
+
+class FitImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FitImage
+        fields = ["id", "fit_spec", "image", "caption", "order", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+
+class FitSpecificationSerializer(serializers.ModelSerializer):
+    images = FitImageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = FitSpecification
+        fields = [
+            "id", "design_sheet", "fit_number", "fit_date", "description", "notes",
+            "is_selected", "images", "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+
+class DesignJobRequestSerializer(serializers.ModelSerializer):
+    allocated_to_name = serializers.CharField(source="allocated_to.get_full_name", read_only=True, default="")
+    design_sheet_number = serializers.CharField(
+        source="design_sheet.tech_pack.techpack_number", read_only=True, default=""
+    )
+
+    class Meta:
+        model = DesignJobRequest
+        fields = [
+            "id", "design_sheet", "design_sheet_number",
+            "job_type", "required_by", "work_location",
+            "no_of_garments", "allocated_to", "allocated_to_name",
+            "notes", "status", "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+
+class DesignSheetSerializer(serializers.ModelSerializer):
+    fit_specs = FitSpecificationSerializer(many=True, read_only=True)
+    job_requests = DesignJobRequestSerializer(many=True, read_only=True)
+    style_code = serializers.CharField(source="tech_pack.style.style_number", read_only=True, default="")
+    buyer_name = serializers.CharField(source="tech_pack.style.buyer.name", read_only=True, default="")
+    file_number = serializers.CharField(source="tech_pack.techpack_number", read_only=True)
+    sketch_url = serializers.SerializerMethodField()
+
+    issue_date = serializers.DateField(source="tech_pack.issue_date", read_only=True, default=None, allow_null=True)
+    block = serializers.CharField(source="tech_pack.block", read_only=True, default="")
+    based_on = serializers.CharField(source="tech_pack.based_on", read_only=True, default="")
+    customer = serializers.CharField(source="tech_pack.customer", read_only=True, default="")
+    style_number = serializers.CharField(source="tech_pack.style_number", read_only=True, default="")
+    size = serializers.CharField(source="tech_pack.size", read_only=True, default="")
+    designer = serializers.CharField(source="tech_pack.designer", read_only=True, default="")
+    pattern_cutter = serializers.CharField(source="tech_pack.pattern_cutter", read_only=True, default="")
+    issuer = serializers.CharField(source="tech_pack.issuer", read_only=True, default="")
+    cloth_code = serializers.CharField(source="tech_pack.cloth_code", read_only=True, default="")
+    length = serializers.CharField(source="tech_pack.length", read_only=True, default="")
+    sketch = serializers.CharField(source="tech_pack.sketch", read_only=True, default="")
+    description = serializers.CharField(source="tech_pack.description", read_only=True, default="")
+    note = serializers.CharField(source="tech_pack.note", read_only=True, default="")
+
+    class Meta:
+        model = DesignSheet
+        fields = [
+            "id", "tech_pack", "status", "style_code", "buyer_name",
+            "file_number", "sketch_url", "fit_specs", "job_requests",
+            "issue_date", "block", "based_on", "customer", "style_number",
+            "size", "designer", "pattern_cutter", "issuer", "cloth_code",
+            "length", "sketch", "description", "note", "sketch_annotations",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_sketch_url(self, obj):
+        if obj.tech_pack.sketch_image:
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(obj.tech_pack.sketch_image.url)
+            return obj.tech_pack.sketch_image.url
+        return None

@@ -71,6 +71,8 @@ import OrderManagerDashboardPage from './pages/OrderManagerDashboardPage';
 import BookingSchedulePage from './pages/BookingSchedulePage';
 import PaperworkComparisonPage from './pages/PaperworkComparisonPage';
 import TechPackImportWizardPage from './pages/TechPackImportWizardPage';
+import DesignSheetsListPage from './pages/DesignSheetsListPage';
+import DesignSheetPage from './pages/DesignSheetPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -165,6 +167,8 @@ function App() {
             <Route path="/logistics/reconciliations" element={<ProtectedRoute><FinalHitReconciliationsPage /></ProtectedRoute>} />
             <Route path="/fit-specs" element={<ProtectedRoute><FitSpecsPage /></ProtectedRoute>} />
             <Route path="/styles/techpack-import" element={<ProtectedRoute><TechPackImportWizardPage /></ProtectedRoute>} />
+            <Route path="/design-sheets" element={<ProtectedRoute><DesignSheetsListPage /></ProtectedRoute>} />
+            <Route path="/design-sheets/:id" element={<ProtectedRoute><DesignSheetPage /></ProtectedRoute>} />
             <Route path="/jobs" element={<ProtectedRoute><JobRequestsPage /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

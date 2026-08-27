@@ -9,9 +9,13 @@ from .models import (
     BOMItem,
     Costing,
     DesignImage,
+    DesignJobRequest,
+    DesignSheet,
     FileOpening,
     FileOpeningNote,
+    FitImage,
     FitSpec,
+    FitSpecification,
     Hit,
     JobRequest,
     POAmendment,
@@ -144,3 +148,30 @@ class POAmendmentAdmin(admin.ModelAdmin):
     list_display = ["amendment_number", "purchase_order", "field_name", "status", "created_at"]
     list_filter = ["status"]
     search_fields = ["amendment_number", "purchase_order__po_number"]
+
+
+@admin.register(DesignSheet)
+class DesignSheetAdmin(admin.ModelAdmin):
+    list_display = ["id", "tech_pack", "status", "created_at"]
+    list_filter = ["status"]
+    search_fields = ["tech_pack__techpack_number"]
+
+
+@admin.register(FitSpecification)
+class FitSpecificationAdmin(admin.ModelAdmin):
+    list_display = ["fit_number", "design_sheet", "fit_date", "description", "is_selected"]
+    list_filter = ["is_selected"]
+    search_fields = ["fit_number", "design_sheet__tech_pack__techpack_number"]
+
+
+@admin.register(FitImage)
+class FitImageAdmin(admin.ModelAdmin):
+    list_display = ["fit_spec", "caption", "order"]
+    search_fields = ["fit_spec__fit_number"]
+
+
+@admin.register(DesignJobRequest)
+class DesignJobRequestAdmin(admin.ModelAdmin):
+    list_display = ["job_type", "design_sheet", "required_by", "status", "allocated_to"]
+    list_filter = ["job_type", "status"]
+    search_fields = ["design_sheet__tech_pack__techpack_number"]

@@ -33,9 +33,13 @@ from .models import (
     Costing,
     CostingLine,
     DesignImage,
+    DesignJobRequest,
+    DesignSheet,
     FileOpening,
     FileOpeningNote,
+    FitImage,
     FitSpec,
+    FitSpecification,
     Hit,
     JobPriority,
     JobRequest,
@@ -57,8 +61,12 @@ from .serializers import (
     CostingLineSerializer,
     CostingSerializer,
     DesignImageSerializer,
+    DesignJobRequestSerializer,
+    DesignSheetSerializer,
     FileOpeningNoteSerializer,
     FileOpeningSerializer,
+    FitImageSerializer,
+    FitSpecificationSerializer,
     FitSpecSerializer,
     HitSerializer,
     JobRequestSerializer,
@@ -77,6 +85,7 @@ from .serializers import (
 from .services import NoCurrentFitSpecError, NoTrimItemsError, copy_fit_spec, copy_trim_items
 from .techpack.excel_export import write_techpack_workbook
 from .techpack.excel_import import parse_techpack_workbook
+from .techpack.image_utils import process_sketch_image
 from .techpack.import_service import import_style_from_techpack
 from .techpack.pdf_parser import StyleTechPackParser
 
@@ -331,12 +340,90 @@ class StyleViewSet(viewsets.ModelViewSet):
                     "name": result.bom.name,
                     "version": result.bom.version,
                 },
+                "design_sheet": (
+                    {
+                        "id": result.design_sheet.id,
+                        "status": result.design_sheet.status,
+                    }
+                    if result.design_sheet is not None else None
+                ),
                 "created": result.created,
                 "style_items_created": len(result.style_items),
                 "bom_items_created": len(result.bom_items),
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=False, methods=["put", "patch"], url_path="techpack/(?P<techpack_id>[^/.]+)/sketch")
+    def techpack_sketch(self, request, techpack_id=None):
+        """Upload/update sketch image for a tech-pack."""
+        try:
+            techpack = StyleTechPack.objects.get(
+                tenant=request.tenant, id=techpack_id
+            )
+        except StyleTechPack.DoesNotExist:
+            return Response({"error": "Tech-pack not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        sketch_file = request.FILES.get("sketch_image")
+        if not sketch_file:
+            return Response({"error": "No image provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate image type
+        allowed_types = ["image/jpeg", "image/png", "image/webp"]
+        if sketch_file.content_type not in allowed_types:
+            return Response(
+                {"error": f"Invalid image type. Allowed: {', '.join(allowed_types)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate image size (max 10MB)
+        if sketch_file.size > 10 * 1024 * 1024:
+            return Response({"error": "Image too large. Max 10MB"}, status=status.HTTP_400_BAD_REQUEST)
+
+        main_bytes, thumb_bytes = process_sketch_image(sketch_file.read())
+        main_name = sketch_file.name.rsplit(".", 1)[0] or "sketch"
+
+        techpack.sketch_image.save(
+            f"{main_name}.jpg", ContentFile(main_bytes), save=False
+        )
+        techpack.sketch_thumbnail.save(
+            f"{main_name}_thumb.png", ContentFile(thumb_bytes), save=False
+        )
+        techpack.save(update_fields=["sketch_image", "sketch_thumbnail", "updated_at"])
+
+        return Response({
+            "sketch_image_url": request.build_absolute_uri(techpack.sketch_image.url),
+            "sketch_thumbnail_url": request.build_absolute_uri(techpack.sketch_thumbnail.url),
+            "message": "Sketch uploaded successfully",
+        })
+
+    @action(detail=False, methods=["put", "patch"], url_path="techpack/(?P<techpack_id>[^/.]+)/notes")
+    def techpack_notes(self, request, techpack_id=None):
+        """Update notes with initials and auto-timestamp."""
+        try:
+            techpack = StyleTechPack.objects.get(
+                tenant=request.tenant, id=techpack_id
+            )
+        except StyleTechPack.DoesNotExist:
+            return Response({"error": "Tech-pack not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        note = request.data.get("note")
+        initials = request.data.get("notes_initials")
+
+        if note is not None:
+            techpack.note = note
+        if initials is not None:
+            techpack.notes_initials = initials
+            techpack.notes_date = timezone.now()
+
+        techpack.save(update_fields=["note", "notes_initials", "notes_date", "updated_at"])
+
+        return Response({
+            "note": techpack.note,
+            "notes_initials": techpack.notes_initials,
+            "notes_date": techpack.notes_date,
+            "message": "Notes updated successfully",
+        })
 
     @action(detail=True, methods=["post"])
     def transition(self, request, pk=None):
@@ -2981,6 +3068,172 @@ class TAMilestoneViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return TAMilestone.objects.filter(tenant=self.request.tenant)
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.tenant)
+
+
+class DesignSheetViewSet(viewsets.ModelViewSet):
+    """Design sheet CRUD + workflow (Week 2)."""
+
+    queryset = DesignSheet.objects.all()
+    serializer_class = DesignSheetSerializer
+    permission_classes = [IsAuthenticated, HasPermission]
+    pagination_class = StandardResultsSetPagination
+    required_permissions = {
+        "list": "merchandising:view", "retrieve": "merchandising:view",
+        "create": "merchandising:create", "update": "merchandising:edit",
+        "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
+    }
+
+    def get_queryset(self):
+        return DesignSheet.objects.filter(tenant=self.request.tenant).select_related(
+            "tech_pack__style__buyer"
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.tenant)
+
+    @action(detail=True, methods=["post"], url_path="transition")
+    def transition(self, request, pk=None):
+        """Move design sheet through its workflow states."""
+        design_sheet = self.get_object()
+        new_status = request.data.get("status")
+        if new_status not in DesignSheet.Status.values:
+            return Response(
+                {"error": f"Invalid status. Valid: {list(DesignSheet.Status.values)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        design_sheet.status = new_status
+        design_sheet.save(update_fields=["status", "updated_at"])
+        return Response({
+            "status": design_sheet.status,
+            "message": f"Design sheet set to {design_sheet.get_status_display()}",
+        })
+
+    @action(detail=True, methods=["patch"], url_path="annotations")
+    def annotations(self, request, pk=None):
+        """Save the sketch annotation list (id, x, y, text)."""
+        design_sheet = self.get_object()
+        value = request.data.get("annotations")
+        if not isinstance(value, list):
+            return Response(
+                {"error": "annotations must be a list"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        for item in value:
+            if not isinstance(item, dict) or "id" not in item or "text" not in item:
+                return Response(
+                    {"error": "each annotation needs id and text"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            for key in ("x", "y"):
+                if key in item and not isinstance(item[key], (int, float)):
+                    return Response(
+                        {"error": f"{key} must be numeric"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+        design_sheet.sketch_annotations = value
+        design_sheet.save(update_fields=["sketch_annotations", "updated_at"])
+        return Response({"annotations": design_sheet.sketch_annotations})
+
+    @action(detail=True, methods=["post"], url_path="create-job")
+    def create_job(self, request, pk=None):
+        """Create a job request for this design sheet."""
+        design_sheet = self.get_object()
+        data = request.data
+        job_type = data.get("job_type")
+        if job_type not in DesignJobRequest.JobType.values:
+            return Response(
+                {"error": f"Invalid job type. Valid: {list(DesignJobRequest.JobType.values)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        req_by = data.get("required_by")
+        if not req_by:
+            return Response({"error": "required_by is required"}, status=status.HTTP_400_BAD_REQUEST)
+        job = DesignJobRequest.objects.create(
+            tenant=request.tenant,
+            design_sheet=design_sheet,
+            job_type=job_type,
+            required_by=req_by,
+            work_location=data.get("work_location", ""),
+            no_of_garments=data.get("no_of_garments", 1),
+            allocated_to_id=data.get("allocated_to"),
+            notes=data.get("notes", ""),
+        )
+        return Response(
+            DesignJobRequestSerializer(job, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class FitSpecificationViewSet(viewsets.ModelViewSet):
+    """Fit specification CRUD for design sheets (Week 2)."""
+
+    queryset = FitSpecification.objects.all()
+    serializer_class = FitSpecificationSerializer
+    permission_classes = [IsAuthenticated, HasPermission]
+    pagination_class = StandardResultsSetPagination
+    required_permissions = {
+        "list": "merchandising:view", "retrieve": "merchandising:view",
+        "create": "merchandising:create", "update": "merchandising:edit",
+        "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
+    }
+
+    def get_queryset(self):
+        return FitSpecification.objects.filter(tenant=self.request.tenant)
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.tenant)
+
+    @action(detail=True, methods=["post"], url_path="select")
+    def select(self, request, pk=None):
+        """Mark this fit spec as the selected/approved one."""
+        fit_spec = self.get_object()
+        FitSpecification.objects.filter(
+            tenant=request.tenant, design_sheet=fit_spec.design_sheet,
+            is_selected=True,
+        ).update(is_selected=False)
+        fit_spec.is_selected = True
+        fit_spec.save(update_fields=["is_selected", "updated_at"])
+        return Response({"is_selected": True, "message": f"{fit_spec.fit_number} selected"})
+
+
+class DesignJobRequestViewSet(viewsets.ModelViewSet):
+    """Design-sheet job requests CRUD (Week 2)."""
+
+    queryset = DesignJobRequest.objects.all()
+    serializer_class = DesignJobRequestSerializer
+    permission_classes = [IsAuthenticated, HasPermission]
+    pagination_class = StandardResultsSetPagination
+    required_permissions = {
+        "list": "merchandising:view", "retrieve": "merchandising:view",
+        "create": "merchandising:create", "update": "merchandising:edit",
+        "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
+    }
+
+    def get_queryset(self):
+        return DesignJobRequest.objects.filter(tenant=self.request.tenant)
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.tenant)
+
+
+class FitImageViewSet(viewsets.ModelViewSet):
+    """Fit spec images CRUD (Week 2)."""
+
+    queryset = FitImage.objects.all()
+    serializer_class = FitImageSerializer
+    permission_classes = [IsAuthenticated, HasPermission]
+    pagination_class = StandardResultsSetPagination
+    required_permissions = {
+        "list": "merchandising:view", "retrieve": "merchandising:view",
+        "create": "merchandising:create", "update": "merchandising:edit",
+        "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
+    }
+
+    def get_queryset(self):
+        return FitImage.objects.filter(tenant=self.request.tenant)
 
     def perform_create(self, serializer):
         serializer.save(tenant=self.request.tenant)
