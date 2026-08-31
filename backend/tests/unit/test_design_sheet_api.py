@@ -197,7 +197,28 @@ class TestDesignSheetAPI:
         assert resp.data["note"] == "Front pocket change"
         assert resp.data["issue_date"] == "2026-08-01"
 
+    def test_design_sheet_detail_returns_season_and_style_id(
+        self, ds_client, ds_tenant, ds_style, ds_design_sheet
+    ):
+        from apps.setup.models import Season
+        season = Season.objects.create(
+            tenant=ds_tenant, code="FW26", name="Fall / Winter 2026",
+            start_date="2026-07-01", end_date="2026-12-31",
+        )
+        ds_style.season = season
+        ds_style.save(update_fields=["season"])
+        resp = ds_client.get(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/"
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.data["season"] == "Fall / Winter 2026"
+        assert resp.data["style_id"] == str(ds_style.id)
+
     def test_transition_rejects_invalid_status(self, ds_client, ds_design_sheet):
+        # Issuer/designer set so we reach the status validation, not the guard
+        ds_design_sheet.tech_pack.issuer = "Alice"
+        ds_design_sheet.tech_pack.designer = "Bob"
+        ds_design_sheet.tech_pack.save(update_fields=["issuer", "designer"])
         resp = ds_client.post(
             f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/transition/",
             {"status": "bogus"},
@@ -205,6 +226,9 @@ class TestDesignSheetAPI:
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_transition_to_closed(self, ds_client, ds_design_sheet):
+        ds_design_sheet.tech_pack.issuer = "Alice"
+        ds_design_sheet.tech_pack.designer = "Bob"
+        ds_design_sheet.tech_pack.save(update_fields=["issuer", "designer"])
         resp = ds_client.post(
             f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/transition/",
             {"status": "closed"},
@@ -212,6 +236,34 @@ class TestDesignSheetAPI:
         assert resp.status_code == status.HTTP_200_OK
         ds_design_sheet.refresh_from_db()
         assert ds_design_sheet.status == "closed"
+
+    def test_transition_blocked_without_issuer(self, ds_client, ds_design_sheet):
+        ds_design_sheet.tech_pack.designer = "Bob"
+        ds_design_sheet.tech_pack.save(update_fields=["designer"])
+        resp = ds_client.post(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/transition/",
+            {"status": "closed"},
+        )
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        ds_design_sheet.refresh_from_db()
+        assert ds_design_sheet.status == "new"
+
+    def test_transition_blocked_without_designer(self, ds_client, ds_design_sheet):
+        ds_design_sheet.tech_pack.issuer = "Alice"
+        ds_design_sheet.tech_pack.save(update_fields=["issuer"])
+        resp = ds_client.post(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/transition/",
+            {"status": "archived"},
+        )
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_reopen_to_new_not_blocked_without_fields(self, ds_client, ds_design_sheet):
+        # Reopening back to "new" must stay possible regardless of issuer/designer
+        resp = ds_client.post(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/transition/",
+            {"status": "new"},
+        )
+        assert resp.status_code == status.HTTP_200_OK
 
     def test_create_job(self, ds_client, ds_design_sheet):
         resp = ds_client.post(

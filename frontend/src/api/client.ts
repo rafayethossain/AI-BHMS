@@ -1471,6 +1471,36 @@ export const merchApi = {
   deleteBOMItem: (id: string) =>
     api.delete(`/merchandising/bom-items/${id}/`),
 
+  getFitSpecifications: (params?: Record<string, string>) =>
+    api.get<{ results: FitSpecification[]; count: number }>('/merchandising/fit-specifications/', { params }),
+
+  createFitSpecification: (data: Record<string, unknown>) =>
+    api.post<FitSpecification>('/merchandising/fit-specifications/', data),
+
+  updateFitSpecification: (id: string, data: Record<string, unknown>) =>
+    api.patch<FitSpecification>(`/merchandising/fit-specifications/${id}/`, data),
+
+  createFitImage: (data: FormData) =>
+    api.post<FitImage>('/merchandising/fit-images/', data),
+
+  deleteFitImage: (id: string) =>
+    api.delete(`/merchandising/fit-images/${id}/`),
+
+  updateFitImage: (id: string, data: Record<string, unknown>) =>
+    api.patch<FitImage>(`/merchandising/fit-images/${id}/`, data),
+
+  createDesignSheetJob: (designSheetId: string, data: Record<string, unknown>) =>
+    api.post<DesignJobRequest>(`/merchandising/design-sheets/${designSheetId}/create-job/`, data),
+
+  copyFitSpec: (targetId: string, data: Record<string, unknown>) =>
+    api.post<FitSpecification>(`/merchandising/design-sheets/${targetId}/copy-fit-spec/`, data),
+
+  getDesignJobRequests: (params?: Record<string, string>) =>
+    api.get<{ results: DesignJobRequest[]; count: number }>('/merchandising/design-job-requests/', { params }),
+
+  updateDesignJobRequest: (id: string, data: Record<string, unknown>) =>
+    api.patch<DesignJobRequest>(`/merchandising/design-job-requests/${id}/`, data),
+
   getCostings: (params?: Record<string, string>) =>
     api.get<{ results: Costing[]; count: number }>('/merchandising/costings/', { params }),
 
@@ -1706,6 +1736,8 @@ export interface DesignSheet {
   tech_pack: string;
   status: string;
   style_code: string;
+  style_id?: string;
+  season?: string;
   buyer_name: string;
   file_number: string;
   sketch_url: string | null;
@@ -1726,9 +1758,23 @@ export interface DesignSheet {
   sketch_annotations: SketchAnnotation[];
   fit_specs: FitSpecification[];
   job_requests: DesignJobRequest[];
+  material_items?: DesignSheetMaterialItem[];
   created_at: string;
   updated_at: string;
 }
+
+export type DesignSheetMaterialItem = {
+  id: string;
+  bom_id: string;
+  type: string;
+  description_code: string;
+  location: string;
+  supplier: string;
+  colour: string;
+  width_size: string;
+  qty: number | null;
+  match: string;
+} & Record<string, unknown>;
 
 export interface ProductionPlan {
   id: string;

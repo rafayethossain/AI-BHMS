@@ -1,30 +1,128 @@
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { render, screen, waitFor, act } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const materialCapture = vi.hoisted(() => ({
+  current: null as null | {
+    bomItems: Record<string, unknown>[];
+    onItemEdit?: (field: string, value: unknown, row: Record<string, unknown>) => void;
+    onItemAdd?: (row?: Record<string, unknown>) => void;
+    onItemDelete?: (row: Record<string, unknown>) => void;
+    onItemSelect?: (row: Record<string, unknown>) => void;
+  },
+}));
+
 vi.mock('../../components/Layout', () => ({
-  default: ({ children }: { children: React.ReactNode }) => <div data-testid="layout">{children}</div>,
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="layout">{children}</div>
+  ),
 }));
 
-vi.mock('../../contexts/ToastContext', () => ({
-  useToast: () => ({ toast: vi.fn() }),
+vi.mock('../../components/DesignSheetHeader', () => ({
+  default: () => <div data-testid="header-mock" />,
 }));
 
-vi.mock('../../api/client', () => ({
-  merchApi: { getDesignSheet: vi.fn() },
+vi.mock('../../components/DesignSheetSketch', () => ({
+  default: () => <div data-testid="sketch-mock" />,
 }));
+
+vi.mock('../../components/DesignSheetMaterial', () => ({
+  default: (props: {
+    bomItems: Record<string, unknown>[];
+    onItemEdit?: (field: string, value: unknown, row: Record<string, unknown>) => void;
+    onItemAdd?: (row?: Record<string, unknown>) => void;
+    onItemDelete?: (row: Record<string, unknown>) => void;
+    onItemSelect?: (row: Record<string, unknown>) => void;
+  }) => {
+    materialCapture.current = props;
+    return <div data-testid="material-mock" />;
+  },
+}));
+
+const fitSpecCapture = vi.hoisted(() => ({
+  current: null as null | {
+    fitSpecs: Record<string, unknown>[];
+    onCreateFitSpec?: (data: Record<string, unknown>) => void;
+    onSelectFitSpec?: (id: string) => void;
+    onAddFitImage?: (fitSpecId: string, file: File) => void;
+    onDeleteFitImage?: (imageId: string) => void;
+    onReorderFitImage?: (imageId: string, newOrder: number) => void;
+    onCopyFromBase?: () => void;
+    onCopyFromOtherStyle?: (sourceSheetId: string) => void;
+    otherSheets: { id: string; file_number: string; style_code: string }[];
+  },
+}));
+
+const jobCapture = vi.hoisted(() => ({
+  current: null as null | {
+    jobRequests: Record<string, unknown>[];
+    users: { id: string; name: string }[];
+    onCreateJobRequest?: (data: Record<string, unknown>) => void;
+    onAllocateUser?: (jobId: string, userId: string) => void;
+  },
+}));
+
+vi.mock('../../components/DesignSheetFitSpecs', () => ({
+  default: (props: {
+    fitSpecs: Record<string, unknown>[];
+    onCreateFitSpec?: (data: Record<string, unknown>) => void;
+    onSelectFitSpec?: (id: string) => void;
+    onAddFitImage?: (fitSpecId: string, file: File) => void;
+    onDeleteFitImage?: (imageId: string) => void;
+    onReorderFitImage?: (imageId: string, newOrder: number) => void;
+    onCopyFromBase?: () => void;
+    onCopyFromOtherStyle?: (sourceSheetId: string) => void;
+    otherSheets: { id: string; file_number: string; style_code: string }[];
+  }) => {
+    fitSpecCapture.current = props;
+    return <div data-testid="fitspec-mock" />;
+  },
+}));
+
+vi.mock('../../components/DesignSheetJobRequests', () => ({
+  default: (props: {
+    jobRequests: Record<string, unknown>[];
+    users: { id: string; name: string }[];
+    onCreateJobRequest?: (data: Record<string, unknown>) => void;
+    onAllocateUser?: (jobId: string, userId: string) => void;
+  }) => {
+    jobCapture.current = props;
+    return <div data-testid="job-mock" />;
+  },
+}));
+
+const merchApiMock = vi.hoisted(() => ({
+  getDesignSheet: vi.fn(),
+  updateBOMItem: vi.fn(),
+  createBOMItem: vi.fn(),
+  deleteBOMItem: vi.fn(),
+  createFitSpecification: vi.fn(),
+  updateFitSpecification: vi.fn(),
+  createFitImage: vi.fn(),
+  deleteFitImage: vi.fn(),
+  updateFitImage: vi.fn(),
+  copyFitSpec: vi.fn(),
+  getDesignSheets: vi.fn(),
+  createDesignSheetJob: vi.fn(),
+  updateDesignJobRequest: vi.fn(),
+}));
+
+const usersApiMock = vi.hoisted(() => ({
+  getUsers: vi.fn(),
+}));
+
+vi.mock('../../api/client', () => ({ merchApi: merchApiMock, usersApi: usersApiMock }));
 
 import DesignSheetPage from '../DesignSheetPage';
-import { merchApi } from '../../api/client';
 import type { DesignSheet } from '../../api/client';
 
-const designSheet: DesignSheet = {
+const baseSheet: DesignSheet = {
   id: 'ds-1',
   tech_pack: 'tp-1',
   status: 'new',
   style_code: '67741T',
   buyer_name: 'CMT Apparel',
-  file_number: 'TP-1001',
+  file_number: 'TP-1002',
   sketch_url: null,
   issue_date: null,
   block: '',
@@ -57,42 +155,445 @@ function renderPage() {
   );
 }
 
-describe('DesignSheetPage', () => {
+describe('DesignSheetPage material grid wiring', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    materialCapture.current = null;
+    fitSpecCapture.current = null;
+    jobCapture.current = null;
+    usersApiMock.getUsers.mockResolvedValue({
+      data: {
+        count: 2,
+        results: [
+          {
+            id: 'u1',
+            full_name: 'Alice Rahman',
+            username: 'alice',
+            first_name: 'Alice',
+            last_name: 'Rahman',
+            email: 'alice@demo.com',
+          },
+          {
+            id: 'u2',
+            full_name: 'Bob Chowdhury',
+            username: 'bob',
+            first_name: 'Bob',
+            last_name: 'Chowdhury',
+            email: 'bob@demo.com',
+          },
+        ],
+      },
+    });
+    merchApiMock.getDesignSheets.mockResolvedValue({
+      data: {
+        count: 3,
+        results: [
+          { id: 'ds-1', file_number: 'TP-1002', style_code: '67741T' },
+          { id: 'ds-2', file_number: 'TP-2001', style_code: '67711A' },
+          { id: 'ds-3', file_number: 'TP-3003', style_code: '90001Z' },
+        ],
+      },
+    });
   });
 
-  it('shows a loading state while the design sheet is being fetched', () => {
-    (merchApi.getDesignSheet as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
+  it('passes mapped material rows into the Material grid', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({
+      data: {
+        ...baseSheet,
+        material_items: [
+          {
+            id: 'bi-1',
+            bom_id: 'bom-1',
+            type: 'Cloth',
+            description_code: 'SANDWASH LINEN XK-529',
+            location: 'CUT ANGLE',
+            supplier: 'FOURSEASONS',
+            colour: 'WHITE',
+            width_size: '60in',
+            qty: 2.25,
+            match: 'Left',
+          },
+          {
+            id: 'bi-2',
+            bom_id: 'bom-1',
+            type: 'Trims',
+            description_code: 'BUTTON 4 HOLES FV9757',
+            location: '',
+            supplier: '',
+            colour: 'BLACK',
+            width_size: '25mm',
+            qty: null,
+            match: '',
+          },
+        ],
+      },
+    });
     renderPage();
-    expect(screen.getByTestId('design-sheet-loading')).toBeInTheDocument();
+    expect(await screen.findByTestId('material-mock')).toBeInTheDocument();
+    expect(materialCapture.current?.bomItems[0]).toMatchObject({
+      id: 'bi-1',
+      type: 'Cloth',
+      description_code: 'SANDWASH LINEN XK-529',
+      supplier: 'FOURSEASONS',
+      qty: 2.25,
+    });
   });
 
-  it('renders the header with file number, style code and buyer after load', async () => {
-    (merchApi.getDesignSheet as ReturnType<typeof vi.fn>).mockResolvedValue({ data: designSheet });
+  it('persists grid edits through updateBOMItem and refreshes locally', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({
+      data: {
+        ...baseSheet,
+        material_items: [
+          {
+            id: 'bi-1',
+            bom_id: 'bom-1',
+            type: 'Cloth',
+            description_code: 'SANDWASH LINEN XK-529',
+            location: 'CUT ANGLE',
+            supplier: 'FOURSEASONS',
+            colour: 'WHITE',
+            width_size: '60in',
+            qty: 2.25,
+            match: 'Left',
+          },
+        ],
+      },
+    });
+    merchApiMock.updateBOMItem.mockResolvedValue({ data: {} });
     renderPage();
-    expect(await screen.findByText('TP-1001')).toBeInTheDocument();
-    expect(screen.getByText('67741T')).toBeInTheDocument();
-    expect(screen.getByText('CMT Apparel')).toBeInTheDocument();
+    await screen.findByTestId('material-mock');
+    await act(async () => {
+      materialCapture.current?.onItemEdit?.('qty', 3, { id: 'bi-1' });
+    });
+    expect(merchApiMock.updateBOMItem).toHaveBeenCalledWith('bi-1', { ordered_qty: 3 });
+    await waitFor(() => {
+      expect(materialCapture.current?.bomItems[0].qty).toBe(3);
+    });
   });
 
-  it('renders a status badge for the design sheet', async () => {
-    (merchApi.getDesignSheet as ReturnType<typeof vi.fn>).mockResolvedValue({ data: designSheet });
+  it('does not send a patch for supplier edits', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({
+      data: {
+        ...baseSheet,
+        material_items: [
+          {
+            id: 'bi-1',
+            bom_id: 'bom-1',
+            type: 'Cloth',
+            description_code: 'SANDWASH LINEN XK-529',
+            location: 'CUT ANGLE',
+            supplier: 'FOURSEASONS',
+            colour: 'WHITE',
+            width_size: '60in',
+            qty: 2.25,
+            match: 'Left',
+          },
+        ],
+      },
+    });
     renderPage();
-    expect((await screen.findAllByText('New')).length).toBeGreaterThan(0);
+    await screen.findByTestId('material-mock');
+    await act(async () => {
+      materialCapture.current?.onItemEdit?.('supplier', 'NEW SUP', { id: 'bi-1' });
+    });
+    expect(merchApiMock.updateBOMItem).not.toHaveBeenCalled();
   });
 
-  it('renders the Sketch, Fit Specs and Job Requests sections', async () => {
-    (merchApi.getDesignSheet as ReturnType<typeof vi.fn>).mockResolvedValue({ data: designSheet });
+  it('creates a BOM item and refetches when Add Item is used', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({
+      data: {
+        ...baseSheet,
+        material_items: [
+          {
+            id: 'bi-1',
+            bom_id: 'bom-1',
+            type: 'Cloth',
+            description_code: 'SANDWASH LINEN XK-529',
+            location: '',
+            supplier: '',
+            colour: '',
+            width_size: '',
+            qty: 2.25,
+            match: '',
+          },
+        ],
+      },
+    });
+    merchApiMock.createBOMItem.mockResolvedValue({ data: {} });
     renderPage();
-    expect(await screen.findByRole('heading', { name: 'Sketch' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Fit Specs' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Job Requests' })).toBeInTheDocument();
-  });
-
-  it('shows an error message when the fetch fails', async () => {
-    (merchApi.getDesignSheet as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('boom'));
-    renderPage();
-    expect(await screen.findByText(/failed to load design sheet/i)).toBeInTheDocument();
+    await screen.findByTestId('material-mock');
+    await act(async () => {
+      materialCapture.current?.onItemAdd?.();
+    });
+    expect(merchApiMock.createBOMItem).toHaveBeenCalledWith({
+      bom: 'bom-1',
+      item_name: 'New Item',
+      category: 'Others',
+    });
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
   });
 });
+
+describe('DesignSheetPage fit spec + job request wiring', () => {
+  const sheetWithFitAndJob: DesignSheet = {
+    ...baseSheet,
+    fit_specs: [
+      {
+        id: 'fs-1',
+        design_sheet: 'ds-1',
+        fit_number: 'DEV SPEC',
+        fit_date: '2026-08-10',
+        description: '',
+        notes: '',
+        is_selected: true,
+        images: [],
+        created_at: '2026-08-10T10:00:00Z',
+      },
+    ],
+    job_requests: [
+      {
+        id: 'jr-1',
+        design_sheet: 'ds-1',
+        design_sheet_number: 'TP-1002',
+        job_type: 'new_pattern',
+        required_by: '2026-09-01',
+        work_location: 'Cutting Section',
+        no_of_garments: 120,
+        allocated_to: null,
+        allocated_to_name: null,
+        notes: '',
+        status: 'pending',
+        created_at: '2026-08-10T10:00:00Z',
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fitSpecCapture.current = null;
+    jobCapture.current = null;
+    usersApiMock.getUsers.mockResolvedValue({
+      data: {
+        count: 1,
+        results: [
+          {
+            id: 'u1',
+            full_name: 'Alice Rahman',
+            username: 'alice',
+            first_name: 'Alice',
+            last_name: 'Rahman',
+            email: 'alice@demo.com',
+          },
+        ],
+      },
+    });
+    merchApiMock.getDesignSheets.mockResolvedValue({
+      data: {
+        count: 3,
+        results: [
+          { id: 'ds-1', file_number: 'TP-1002', style_code: '67741T' },
+          { id: 'ds-2', file_number: 'TP-2001', style_code: '67711A' },
+          { id: 'ds-3', file_number: 'TP-3003', style_code: '90001Z' },
+        ],
+      },
+    });
+  });
+
+  it('passes fit specs, job requests and mapped users into the components', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: sheetWithFitAndJob });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    expect(fitSpecCapture.current?.fitSpecs).toEqual([
+      expect.objectContaining({ id: 'fs-1', fit_number: 'DEV SPEC', is_selected: true }),
+    ]);
+    expect(jobCapture.current?.jobRequests).toEqual([
+      expect.objectContaining({ id: 'jr-1', job_type: 'new_pattern' }),
+    ]);
+    expect(jobCapture.current?.users).toEqual([{ id: 'u1', name: 'Alice Rahman' }]);
+  });
+
+  it('creates a fit spec through the API and refetches the sheet', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    merchApiMock.createFitSpecification.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await act(async () => {
+      fitSpecCapture.current?.onCreateFitSpec?.({
+        fit_number: 'DEV SPEC',
+        fit_date: '2026-09-01',
+        description: 'First proto',
+        notes: '',
+      });
+    });
+    expect(merchApiMock.createFitSpecification).toHaveBeenCalledWith({
+      design_sheet: 'ds-1',
+      fit_number: 'DEV SPEC',
+      fit_date: '2026-09-01',
+      description: 'First proto',
+      notes: '',
+    });
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('selects a fit spec through a PATCH and refetches the sheet', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    merchApiMock.updateFitSpecification.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await act(async () => {
+      fitSpecCapture.current?.onSelectFitSpec?.('fs-2');
+    });
+    expect(merchApiMock.updateFitSpecification).toHaveBeenCalledWith('fs-2', { is_selected: true });
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('creates a job request through create-job and refetches the sheet', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    merchApiMock.createDesignSheetJob.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('job-mock');
+    await act(async () => {
+      jobCapture.current?.onCreateJobRequest?.({
+        job_type: 'tech_sample',
+        required_by: '2026-09-10',
+        work_location: 'Sample Room',
+        no_of_garments: 5,
+        allocated_to: 'u1',
+        notes: '',
+      });
+    });
+    expect(merchApiMock.createDesignSheetJob).toHaveBeenCalledWith('ds-1', {
+      job_type: 'tech_sample',
+      required_by: '2026-09-10',
+      work_location: 'Sample Room',
+      no_of_garments: 5,
+      allocated_to: 'u1',
+      notes: '',
+    });
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('allocates a user through PATCH and refetches the sheet', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    merchApiMock.updateDesignJobRequest.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('job-mock');
+    await act(async () => {
+      jobCapture.current?.onAllocateUser?.('jr-1', 'u1');
+    });
+    expect(merchApiMock.updateDesignJobRequest).toHaveBeenCalledWith('jr-1', {
+      allocated_to: 'u1',
+    });
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('uploads a fit image through the API and refetches the sheet', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    merchApiMock.createFitImage.mockResolvedValue({ data: {} });
+    const file = new File(['x'], 'fit.png', { type: 'image/png' });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await act(async () => {
+      fitSpecCapture.current?.onAddFitImage?.('fs-1', file);
+    });
+    expect(merchApiMock.createFitImage).toHaveBeenCalledTimes(1);
+    const form = merchApiMock.createFitImage.mock.calls[0][0] as FormData;
+    expect(form.get('fit_spec')).toBe('fs-1');
+    expect(form.get('image')).toBe(file);
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('deletes a fit image through the API and refetches the sheet', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    merchApiMock.deleteFitImage.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await act(async () => {
+      fitSpecCapture.current?.onDeleteFitImage?.('img-1');
+    });
+    expect(merchApiMock.deleteFitImage).toHaveBeenCalledWith('img-1');
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('reorders a fit image via PATCH and refetches the sheet', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    merchApiMock.updateFitImage.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await act(async () => {
+      fitSpecCapture.current?.onReorderFitImage?.('img-2', 0);
+    });
+    expect(merchApiMock.updateFitImage).toHaveBeenCalledWith('img-2', { order: 0 });
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('lists other design sheets for the copy picker, excluding the current one', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await waitFor(() => {
+      expect(fitSpecCapture.current?.otherSheets).toEqual([
+        { id: 'ds-2', file_number: 'TP-2001', style_code: '67711A' },
+        { id: 'ds-3', file_number: 'TP-3003', style_code: '90001Z' },
+      ]);
+    });
+  });
+
+  it('copies a fit spec from the base via the API and refetches the sheet', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    merchApiMock.copyFitSpec.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await act(async () => {
+      fitSpecCapture.current?.onCopyFromBase?.();
+    });
+    expect(merchApiMock.copyFitSpec).toHaveBeenCalledWith('ds-1', {});
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('copies a fit spec from another style via the API with the source id', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    merchApiMock.copyFitSpec.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await act(async () => {
+      fitSpecCapture.current?.onCopyFromOtherStyle?.('ds-2');
+    });
+    expect(merchApiMock.copyFitSpec).toHaveBeenCalledWith('ds-1', {
+      source_design_sheet: 'ds-2',
+    });
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('links to the printable design sheet page', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: sheetWithFitAndJob });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    expect(screen.getByRole('link', { name: 'Print Design Sheet' })).toHaveAttribute(
+      'href',
+      '/design-sheets/ds-1/print',
+    );
+  });
+});
+
+

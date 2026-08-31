@@ -73,6 +73,7 @@ import PaperworkComparisonPage from './pages/PaperworkComparisonPage';
 import TechPackImportWizardPage from './pages/TechPackImportWizardPage';
 import DesignSheetsListPage from './pages/DesignSheetsListPage';
 import DesignSheetPage from './pages/DesignSheetPage';
+import DesignSheetPrintPage from './pages/DesignSheetPrintPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -169,6 +170,7 @@ function App() {
             <Route path="/styles/techpack-import" element={<ProtectedRoute><TechPackImportWizardPage /></ProtectedRoute>} />
             <Route path="/design-sheets" element={<ProtectedRoute><DesignSheetsListPage /></ProtectedRoute>} />
             <Route path="/design-sheets/:id" element={<ProtectedRoute><DesignSheetPage /></ProtectedRoute>} />
+            <Route path="/design-sheets/:id/print" element={<ProtectedRoute><DesignSheetPrintPage /></ProtectedRoute>} />
             <Route path="/jobs" element={<ProtectedRoute><JobRequestsPage /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

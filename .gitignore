@@ -75,6 +75,12 @@ celerybeat.pid
 graphify-out/
 graphify-out-*/   # if any suffix variants exist
 
+# ===== Runtime logs =====
+backend_be.out.log
+backend_be.err.log
+backend_be.pid.log
+*.pid
+
 # ===== IDE / OS =====
 .vscode/
 .idea/

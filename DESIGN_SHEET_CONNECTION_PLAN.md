@@ -725,12 +725,35 @@ def create_design_sheets(apps, schema_editor):
 
 ### 6.1 Unit Tests
 
+> **Aligned to implementation (2026-08-30).** File names/counts reflect the
+> actual suite; documented intent is preserved. Run (from `backend/`):
+> `python -m pytest tests/unit/test_design_sheet*.py tests/unit/test_fit_spec.py tests/unit/test_job_request.py`
+>
+> **2026-08-31:** +30→ design-sheet model/rules tests (30 in file), new
+> `test_design_sheet_e2e_flows.py` (6 journey tests), and migration
+> `0033_fitspecification_unique_selected_fit_spec_per_design_sheet.py`
+> (partial `UniqueConstraint` — one selected fit spec per design sheet
+> enforced at the DB, not just the `select` endpoint).
+>
+> **2026-08-31 (GC gap closure):** `test_design_sheet_api.py` →25
+> (transition issuer/designer guard, `season`/`style_id` on detail),
+> `test_design_sheet_fit_spec_copy.py` →10 (annotations include flag).
+> Full design-sheet subset **92 passed**. Frontend: new
+> `DesignSheetImages.tsx` gallery (10 tests), copy-from-base annotations
+> checkbox, fit-spec description inline editing → full suite **12 files /
+> 113 tests**, `tsc -b` clean, lint 0 errors.
+
 | Test File | Tests | Coverage |
 |-----------|-------|----------|
-| `test_design_sheet.py` | 15 | DesignSheet model, status transitions |
-| `test_fit_specification.py` | 12 | FitSpec CRUD, image upload |
-| `test_job_request.py` | 10 | JobRequest CRUD, status transitions |
-| `test_design_sheet_api.py` | 20 | All API endpoints |
+| `test_design_sheet.py` | 30 | DesignSheet model, status transitions (`transition_to`), related cascades, FitSpec/FitImage/DesignJobRequest model rules, one-selected-per-sheet constraint |
+| `test_design_sheet_api.py` | 25 | DesignSheet / fit-spec / job / sketch / notes API; mandatory issuer+designer transition guard; `season` + `style_id` on detail |
+| `test_design_sheet_material_grid.py` | 5 | Material Breakdown grid API flow (`material_items`, BOMItem PATCH/POST) |
+| `test_design_sheet_fit_spec_copy.py` | 10 | `copy-fit-spec` action: selected-source copy, base (`based_on`) resolution, images include/exclude, annotations include/exclude, fallbacks, 400 cases |
+| `test_design_sheet_e2e_flows.py` | 6 | Journey-level API flows: intro (sketch→notes→sheet→annotations→transition), fit-spec lifecycle + images + selection, copy-from-base (±images), job allocate/status, cross-tenant refusal, DB-enforced single selection |
+| `test_fit_spec.py` | 16 | FitSpec CRUD, selection, image upload |
+| `test_job_request.py` | 14 | DesignJobRequest CRUD, status transitions |
+| `test_design_costing.py` | 22 | Design sheet costings |
+| `test_design_image.py` | 16 | Design image gallery / operations |
 
 ### 6.2 Integration Tests
 

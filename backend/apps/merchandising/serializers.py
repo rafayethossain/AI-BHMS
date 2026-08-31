@@ -830,9 +830,12 @@ class DesignSheetSerializer(serializers.ModelSerializer):
     fit_specs = FitSpecificationSerializer(many=True, read_only=True)
     job_requests = DesignJobRequestSerializer(many=True, read_only=True)
     style_code = serializers.CharField(source="tech_pack.style.style_number", read_only=True, default="")
+    style_id = serializers.CharField(source="tech_pack.style_id", read_only=True, default="")
     buyer_name = serializers.CharField(source="tech_pack.style.buyer.name", read_only=True, default="")
     file_number = serializers.CharField(source="tech_pack.techpack_number", read_only=True)
     sketch_url = serializers.SerializerMethodField()
+    material_items = serializers.SerializerMethodField()
+    season = serializers.CharField(source="tech_pack.style.season.name", read_only=True, default="")
 
     issue_date = serializers.DateField(source="tech_pack.issue_date", read_only=True, default=None, allow_null=True)
     block = serializers.CharField(source="tech_pack.block", read_only=True, default="")
@@ -854,6 +857,7 @@ class DesignSheetSerializer(serializers.ModelSerializer):
         fields = [
             "id", "tech_pack", "status", "style_code", "buyer_name",
             "file_number", "sketch_url", "fit_specs", "job_requests",
+            "material_items", "style_id", "season",
             "issue_date", "block", "based_on", "customer", "style_number",
             "size", "designer", "pattern_cutter", "issuer", "cloth_code",
             "length", "sketch", "description", "note", "sketch_annotations",
@@ -868,3 +872,48 @@ class DesignSheetSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.tech_pack.sketch_image.url)
             return obj.tech_pack.sketch_image.url
         return None
+
+    def get_material_items(self, obj):
+        """Material Breakdown grid rows (BOMItems) in grid field names.
+
+        Uses the techpack's style → latest style version → BOM (active BOM
+        preferred, otherwise the latest by version). Any grid edit is written
+        back against the returned ``id`` through ``PATCH /bom-items/{id}/``.
+        """
+        techpack = obj.tech_pack
+        style = techpack.style if techpack.style_id else None
+        if not style:
+            return []
+        style_version = style.versions.order_by("-version_number").first()
+        if not style_version:
+            return []
+        bom = (
+            BOM.objects.filter(
+                tenant=obj.tenant, style_version=style_version, status="active",
+            ).order_by("-version").first()
+            or BOM.objects.filter(
+                tenant=obj.tenant, style_version=style_version,
+            ).order_by("-version").first()
+        )
+        if not bom:
+            return []
+        items = BOMItem.objects.filter(tenant=obj.tenant, bom=bom).order_by("id")
+        return [
+            {
+                "id": str(item.id),
+                "bom_id": str(bom.id),
+                "type": item.category,
+                "description_code": item.item_name,
+                "location": item.location or "",
+                "supplier": (
+                    item.supplier.name
+                    if item.supplier
+                    else (item.vendor.name if item.vendor else "")
+                ),
+                "colour": item.colour or "",
+                "width_size": item.width_size or "",
+                "qty": float(item.ordered_qty) if item.ordered_qty is not None else None,
+                "match": item.match or "",
+            }
+            for item in items
+        ]

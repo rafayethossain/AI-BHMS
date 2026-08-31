@@ -1,40 +1,268 @@
-import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import DesignSheetHeader from '../components/DesignSheetHeader';
 import DesignSheetSketch from '../components/DesignSheetSketch';
-import { merchApi } from '../api/client';
+import DesignSheetMaterial from '../components/DesignSheetMaterial';
+import DesignSheetFitSpecs from '../components/DesignSheetFitSpecs';
+import DesignSheetImages, { type DesignImagesUploadData } from '../components/DesignSheetImages';
+import DesignSheetJobRequests from '../components/DesignSheetJobRequests';
+import { merchApi, usersApi } from '../api/client';
+import { toBomItemPatch, toMaterialRows } from '../api/materialGrid';
+import type { MaterialItem } from '../components/DesignSheetMaterial';
+import type { UserOption } from '../components/DesignSheetJobRequests';
 import type { DesignSheet } from '../api/client';
+import type { DesignImage } from '../api/client';
 
 export default function DesignSheetPage() {
   const { id } = useParams<{ id: string }>();
   const [sheet, setSheet] = useState<DesignSheet | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userOptions, setUserOptions] = useState<UserOption[]>([]);
+  const [designImages, setDesignImages] = useState<DesignImage[]>([]);
+  const [fitCopySources, setFitCopySources] = useState<import('../components/DesignSheetFitSpecs').FitCopySourceOption[]>([]);
 
   useEffect(() => {
+    usersApi
+      .getUsers()
+      .then((res) =>
+        setUserOptions(
+          res.data.results.map((u) => ({
+            id: u.id,
+            name: u.full_name || u.username,
+          })),
+        ),
+      )
+      .catch(() => setUserOptions([]));
+    merchApi
+      .getDesignSheets()
+      .then((res) => setFitCopySources(res.data.results.map((s) => ({ id: s.id, file_number: s.file_number, style_code: s.style_code }))))
+      .catch(() => setFitCopySources([]));
+  }, []);
+
+  const loadSheet = useCallback(() => {
     if (!id) {
       setLoading(false);
-      return;
+      return Promise.resolve();
     }
-    let cancelled = false;
     setLoading(true);
     setError(null);
-    merchApi
+    return merchApi
       .getDesignSheet(id)
       .then((res) => {
-        if (!cancelled) setSheet(res.data);
+        setSheet(res.data);
+        const styleId = res.data.style_id;
+        if (styleId) {
+          return merchApi
+            .getStyleDesignImages(styleId)
+            .then((imgRes) => setDesignImages(imgRes.data))
+            .catch(() => setDesignImages([]));
+        }
+        setDesignImages([]);
+        return undefined;
       })
-      .catch(() => {
-        if (!cancelled) setError('Failed to load design sheet');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => setError('Failed to load design sheet'))
+      .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    loadSheet();
+  }, [loadSheet]);
+
+  const materialItems = sheet ? toMaterialRows(sheet.material_items ?? []) : [];
+
+  const handleMaterialEdit = (field: string, value: unknown, row: MaterialItem) => {
+    const rowId = typeof row.id === 'string' ? row.id : null;
+    const patch = toBomItemPatch(field, value);
+    if (!patch || !rowId) return;
+    setError(null);
+    merchApi
+      .updateBOMItem(rowId, patch)
+      .then(() => {
+        setSheet((prev) =>
+          prev
+            ? {
+                ...prev,
+                material_items: prev.material_items?.map((item) =>
+                  item.id === rowId ? { ...item, [field]: value } : item,
+                ),
+              }
+            : prev,
+        );
+      })
+      .catch(() => setError('Failed to save material edit'));
+  };
+
+  const handleMaterialAdd = () => {
+    const bomId = materialItems[0]?.bom_id;
+    if (!bomId) return;
+    setError(null);
+    merchApi
+      .createBOMItem({ bom: bomId, item_name: 'New Item', category: 'Others' })
+      .then(() => loadSheet())
+      .catch(() => setError('Failed to add material item'));
+  };
+
+  const handleMaterialDelete = (row: MaterialItem) => {
+    const rowId = typeof row.id === 'string' ? row.id : null;
+    if (!rowId) return;
+    setError(null);
+    merchApi
+      .deleteBOMItem(rowId)
+      .then(() =>
+        setSheet((prev) =>
+          prev
+            ? {
+                ...prev,
+                material_items: prev.material_items?.filter((item) => item.id !== rowId),
+              }
+            : prev,
+        ),
+      )
+      .catch(() => setError('Failed to delete material item'));
+  };
+
+  const refreshSheet = () => {
+    setError(null);
+    return loadSheet();
+  };
+
+  const handleFitSpecCreate = (data: import('../components/DesignSheetFitSpecs').FitSpecFormData) => {
+    if (!sheet) return;
+    setError(null);
+    merchApi
+      .createFitSpecification({ design_sheet: sheet.id, ...data })
+      .then(() => refreshSheet())
+      .catch(() => setError('Failed to create fit spec'));
+  };
+
+  const handleFitSpecSelect = (fitSpecId: string) => {
+    setError(null);
+    merchApi
+      .updateFitSpecification(fitSpecId, { is_selected: true })
+      .then(() => refreshSheet())
+      .catch(() => setError('Failed to select fit spec'));
+  };
+
+  const handleFitSpecUpdate = (fitSpecId: string, data: Record<string, unknown>) => {
+    setError(null);
+    merchApi
+      .updateFitSpecification(fitSpecId, data)
+      .then(() => refreshSheet())
+      .catch(() => setError('Failed to update fit spec'));
+  };
+
+  const handleFitImageAdd = (fitSpecId: string, file: File) => {
+    const form = new FormData();
+    form.append('fit_spec', fitSpecId);
+    form.append('image', file);
+    setError(null);
+    merchApi
+      .createFitImage(form)
+      .then(() => refreshSheet())
+      .catch(() => setError('Failed to upload fit image'));
+  };
+
+  const handleFitImageDelete = (imageId: string) => {
+    setError(null);
+    merchApi
+      .deleteFitImage(imageId)
+      .then(() => refreshSheet())
+      .catch(() => setError('Failed to delete fit image'));
+  };
+
+  const handleFitImageReorder = (imageId: string, newOrder: number) => {
+    setError(null);
+    merchApi
+      .updateFitImage(imageId, { order: newOrder })
+      .then(() => refreshSheet())
+      .catch(() => setError('Failed to reorder fit image'));
+  };
+
+  const handleFitSpecCopyFromBase = (opts?: { include_annotations: boolean }) => {
+    if (!sheet) return;
+    setError(null);
+    merchApi
+      .copyFitSpec(sheet.id, opts ?? {})
+      .then(() => refreshSheet())
+      .catch(() => setError('Failed to copy fit spec from base'));
+  };
+
+  const handleFitSpecCopyFromOtherStyle = (sourceSheetId: string) => {
+    if (!sheet) return;
+    setError(null);
+    merchApi
+      .copyFitSpec(sheet.id, { source_design_sheet: sourceSheetId })
+      .then(() => refreshSheet())
+      .catch(() => setError('Failed to copy fit spec'));
+  };
+
+  const handleJobCreate = (data: import('../components/DesignSheetJobRequests').JobRequestFormData) => {
+    if (!sheet) return;
+    setError(null);
+    merchApi
+      .createDesignSheetJob(sheet.id, data)
+      .then(() => refreshSheet())
+      .catch(() => setError('Failed to create job request'));
+  };
+
+  const handleJobAllocate = (jobId: string, userId: string) => {
+    setError(null);
+    merchApi
+      .updateDesignJobRequest(jobId, { allocated_to: userId })
+      .then(() => refreshSheet())
+      .catch(() => setError('Failed to allocate user'));
+  };
+
+  const handleDesignImageUpload = (data: DesignImagesUploadData) => {
+    const form = new FormData();
+    form.append('style', data.styleId);
+    form.append('role', data.role);
+    form.append('caption', data.caption);
+    form.append('image', data.file);
+    setError(null);
+    merchApi
+      .createDesignImage(form)
+      .then(() => {
+        setDesignImages([]);
+        return loadSheet();
+      })
+      .then(() => refreshImages())
+      .catch(() => setError('Failed to upload design image'));
+  };
+
+  const handleDesignImageSetMain = (imageId: string) => {
+    setError(null);
+    merchApi
+      .setMainDesignImage(imageId)
+      .then(() => refreshImages())
+      .catch(() => setError('Failed to set main image'));
+  };
+
+  const handleDesignImageSetRole = (imageId: string, role: string) => {
+    setError(null);
+    merchApi
+      .updateDesignImage(imageId, { role })
+      .then(() => refreshImages())
+      .catch(() => setError('Failed to update image role'));
+  };
+
+  const handleDesignImageDelete = (imageId: string) => {
+    setError(null);
+    merchApi
+      .deleteDesignImage(imageId)
+      .then(() => setDesignImages((prev) => prev.filter((i) => i.id !== imageId)))
+      .catch(() => setError('Failed to delete image'));
+  };
+
+  const refreshImages = () => {
+    if (!sheet?.style_id) return Promise.resolve();
+    return merchApi
+      .getStyleDesignImages(sheet.style_id)
+      .then((res) => setDesignImages(res.data))
+      .catch(() => setDesignImages([]));
+  };
 
   if (loading) {
     return (
@@ -71,6 +299,14 @@ export default function DesignSheetPage() {
 
         {sheet && (
           <div className="space-y-6">
+            <div className="flex justify-end">
+              <Link
+                to={`/design-sheets/${sheet.id}/print`}
+                className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+              >
+                Print Design Sheet
+              </Link>
+            </div>
             <DesignSheetHeader sheet={sheet} onStatusChange={setSheet} />
             <DesignSheetSketch
               techpackId={sheet.tech_pack}
@@ -80,38 +316,38 @@ export default function DesignSheetPage() {
               onAnnotationsChange={(annotations) => setSheet({ ...sheet, sketch_annotations: annotations })}
               onSketchChange={(url) => setSheet({ ...sheet, sketch_url: url })}
             />
-
-            <section className="bg-surface rounded-xl border border-border p-6">
-              <h2 className="text-lg font-bold mb-3">Fit Specs</h2>
-              {sheet.fit_specs.length === 0 ? (
-                <p className="text-muted text-sm">No fit specs yet.</p>
-              ) : (
-                <ul className="space-y-2 text-sm">
-                  {sheet.fit_specs.map((fs) => (
-                    <li key={fs.id} className="flex items-center gap-3 text-heading">
-                      <span className="font-mono">{fs.fit_number}</span>
-                      {fs.is_selected && <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-500/20 text-badge-emerald">Selected</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section className="bg-surface rounded-xl border border-border p-6">
-              <h2 className="text-lg font-bold mb-3">Job Requests</h2>
-              {sheet.job_requests.length === 0 ? (
-                <p className="text-muted text-sm">No job requests yet.</p>
-              ) : (
-                <ul className="space-y-2 text-sm">
-                  {sheet.job_requests.map((jr) => (
-                    <li key={jr.id} className="flex items-center gap-3 text-heading">
-                      <span className="font-mono">{jr.job_type}</span>
-                      <span className="text-muted">{jr.status}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+            <DesignSheetMaterial
+              bomItems={materialItems}
+              onItemEdit={handleMaterialEdit}
+              onItemAdd={handleMaterialAdd}
+              onItemDelete={handleMaterialDelete}
+            />
+            <DesignSheetFitSpecs
+              fitSpecs={sheet.fit_specs}
+              onCreateFitSpec={handleFitSpecCreate}
+              onSelectFitSpec={handleFitSpecSelect}
+              onAddFitImage={handleFitImageAdd}
+              onDeleteFitImage={handleFitImageDelete}
+              onReorderFitImage={handleFitImageReorder}
+              onCopyFromBase={handleFitSpecCopyFromBase}
+              onCopyFromOtherStyle={handleFitSpecCopyFromOtherStyle}
+              onUpdateFitSpec={handleFitSpecUpdate}
+              otherSheets={fitCopySources.filter((s) => s.id !== sheet.id)}
+            />
+            <DesignSheetImages
+              images={designImages}
+              styleId={sheet.style_id || undefined}
+              onUpload={handleDesignImageUpload}
+              onSetMain={handleDesignImageSetMain}
+              onSetRole={handleDesignImageSetRole}
+              onDelete={handleDesignImageDelete}
+            />
+            <DesignSheetJobRequests
+              jobRequests={sheet.job_requests}
+              users={userOptions}
+              onCreateJobRequest={handleJobCreate}
+              onAllocateUser={handleJobAllocate}
+            />
           </div>
         )}
       </main>

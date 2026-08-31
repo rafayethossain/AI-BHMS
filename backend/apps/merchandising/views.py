@@ -3099,13 +3099,22 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
         """Move design sheet through its workflow states."""
         design_sheet = self.get_object()
         new_status = request.data.get("status")
-        if new_status not in DesignSheet.Status.values:
+        if new_status != DesignSheet.Status.NEW and (
+            not design_sheet.tech_pack.issuer or not design_sheet.tech_pack.designer
+        ):
             return Response(
-                {"error": f"Invalid status. Valid: {list(DesignSheet.Status.values)}"},
+                {
+                    "error": (
+                        "Issuer and Designer are mandatory and must be set "
+                        "before moving the design sheet out of New."
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        design_sheet.status = new_status
-        design_sheet.save(update_fields=["status", "updated_at"])
+        try:
+            design_sheet.transition_to(new_status)
+        except ValidationError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({
             "status": design_sheet.status,
             "message": f"Design sheet set to {design_sheet.get_status_display()}",
@@ -3163,6 +3172,92 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
         )
         return Response(
             DesignJobRequestSerializer(job, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"], url_path="copy-fit-spec")
+    def copy_fit_spec(self, request, pk=None):
+        """
+        Copy a fit spec into this design sheet.
+
+        Source is either an explicit ``source_design_sheet`` id ("Copy from
+        Another Style") or, when omitted, the sheet itself is based on
+        (``tech_pack.based_on`` matching a file number - "Copy from Base").
+        The source's selected spec is copied (falling back to its latest);
+        the copy becomes the target's new selected spec. Images follow the
+        spec unless ``include_images`` is false.
+        """
+        target = self.get_object()
+        base_ref = target.tech_pack.based_on or ""
+        source_id = request.data.get("source_design_sheet")
+        if source_id:
+            source = (
+                DesignSheet.objects.filter(tenant=target.tenant)
+                .filter(id=source_id)
+                .first()
+            )
+            if source is None:
+                return Response({"detail": "Source design sheet not found."}, status=status.HTTP_400_BAD_REQUEST)
+        elif base_ref:
+            source = (
+                DesignSheet.objects.filter(tenant=target.tenant)
+                .filter(
+                    Q(tech_pack__techpack_number=base_ref)
+                    | Q(tech_pack__based_on=base_ref)
+                )
+                .exclude(id=target.id)
+                .order_by("-created_at")
+                .first()
+            )
+            if source is None:
+                return Response({"detail": f"No design sheet found for base '{base_ref}'."}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"detail": "No source design sheet or base reference to copy from."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if source.id == target.id:
+            return Response({"detail": "Source and target must be different design sheets."}, status=status.HTTP_400_BAD_REQUEST)
+
+        src_spec = (
+            source.fit_specs.filter(is_selected=True).order_by("-created_at").first()
+            or source.fit_specs.order_by("-created_at").first()
+        )
+        if src_spec is None:
+            return Response({"detail": "Source design sheet has no fit specs to copy."}, status=status.HTTP_400_BAD_REQUEST)
+
+        include_images = str(request.data.get("include_images", True)).lower() not in ("false", "0", "no")
+        include_annotations = str(request.data.get("include_annotations", True)).lower() not in ("false", "0", "no")
+        fit_labels = ["DEV SPEC", "1ST FIT", "2ND FIT", "3RD FIT", "4TH FIT"]
+        existing = target.fit_specs.count()
+        fit_number = fit_labels[existing] if existing < len(fit_labels) else f"FIT {existing + 1}"
+        target.fit_specs.update(is_selected=False)
+        new_spec = FitSpecification.objects.create(
+            tenant=target.tenant,
+            design_sheet=target,
+            fit_number=fit_number,
+            fit_date=src_spec.fit_date,
+            description=src_spec.description,
+            notes=src_spec.notes,
+            is_selected=True,
+        )
+        if include_images:
+            for img in src_spec.images.all():
+                new_img = FitImage(
+                    tenant=target.tenant, fit_spec=new_spec,
+                    caption=img.caption, order=img.order,
+                )
+                if img.image.name:
+                    new_img.image.name = img.image.name
+                new_img.save()
+        if include_annotations and source.sketch_annotations:
+            merged = list(target.sketch_annotations or []) + [
+                {**annotation, "id": str(uuid.uuid4())}
+                for annotation in source.sketch_annotations
+            ]
+            target.sketch_annotations = merged
+            target.save(update_fields=["sketch_annotations", "updated_at"])
+
+        return Response(
+            FitSpecificationSerializer(new_spec, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED,
         )
 

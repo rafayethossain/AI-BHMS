@@ -1001,6 +1001,24 @@ class DesignSheet(TenantModel):
     def __str__(self):
         return f"DesignSheet - {self.tech_pack}"
 
+    def transition_to(self, status):
+        """
+        Move the design sheet to ``status``.
+
+        ``status`` must be one of the workflow values (new/rejected/closed/
+        archived); the workflow is intentionally permissive so any valid
+        status is reachable (reopen to ``new`` included). Raises
+        :class:`ValidationError` for anything outside the workflow.
+        """
+        if status not in self.Status.values:
+            raise ValidationError(
+                f"Invalid design sheet status {status!r}. "
+                f"Valid: {list(self.Status.values)}"
+            )
+        self.status = status
+        self.save(update_fields=["status", "updated_at"])
+        return self.status
+
 
 class FitSpecification(TenantModel):
     """
@@ -1021,6 +1039,13 @@ class FitSpecification(TenantModel):
     class Meta:
         ordering = ["fit_number"]
         unique_together = ["tenant", "design_sheet", "fit_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "design_sheet"],
+                condition=models.Q(is_selected=True),
+                name="unique_selected_fit_spec_per_design_sheet",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.fit_number} - {self.description}"

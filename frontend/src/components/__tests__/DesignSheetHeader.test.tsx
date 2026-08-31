@@ -56,9 +56,9 @@ describe('DesignSheetHeader', () => {
     vi.clearAllMocks();
   });
 
-  it('renders all 14 design-info fields', () => {
+  it('renders all 15 design-info fields', () => {
     renderHeader();
-    const labels = ['Issue Date', 'Block', 'Based On', 'Customer', 'Style Number', 'Size', 'Designer', 'Pattern Cutter', 'Issuer', 'Cloth Code', 'Length', 'Sketch', 'Description', 'Note'];
+    const labels = ['Issue Date', 'Block', 'Based On', 'Customer', 'Style Number', 'Season', 'Size', 'Designer', 'Pattern Cutter', 'Issuer', 'Cloth Code', 'Length', 'Sketch', 'Description', 'Note'];
     labels.forEach((label) => {
       expect(screen.getByText(label)).toBeInTheDocument();
     });
