@@ -10,7 +10,7 @@ from io import StringIO
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Max, Q
 from django.http import FileResponse, HttpResponse
 from django.urls import reverse
@@ -24,7 +24,7 @@ from rest_framework.response import Response
 from apps.commercial.models import ProformaInvoice, SalesContract
 from apps.core.pagination import StandardResultsSetPagination
 from apps.core.permissions import HasPermission
-from apps.setup.models import Buyer, ColorCode, Factory
+from apps.setup.models import Buyer, ColorCode, Factory, ProductType
 
 from .models import (
     BOM,
@@ -32,6 +32,7 @@ from .models import (
     BOMItem,
     Costing,
     CostingLine,
+    DesignCosting,
     DesignImage,
     DesignJobRequest,
     DesignSheet,
@@ -60,7 +61,9 @@ from .serializers import (
     BOMSerializer,
     CostingLineSerializer,
     CostingSerializer,
+    DesignCostingSerializer,
     DesignImageSerializer,
+    DesignInitSerializer,
     DesignJobRequestSerializer,
     DesignSheetSerializer,
     FileOpeningNoteSerializer,
@@ -2169,6 +2172,7 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
             "shipments__schedule_items",
             "shipments__reconciliations",
             "shipments__gold_seals",
+            "ta__milestones",
         ).order_by("delivery_date", "po_number")
 
         results = [OrderManagerSerializer(po, context={"today": today}).data for po in qs]
@@ -2909,6 +2913,166 @@ class CostingViewSet(viewsets.ModelViewSet):
         return Response(CostingSerializer(costing).data)
 
 
+class DesignCostingViewSet(viewsets.ModelViewSet):
+    """Style-level single-piece design costing (RQ-013 / G-12).
+
+    Design cost is the source of truth a PO costing is prepared from. Tenant-
+    scoped and RBAC-guarded like the order-level Costing.
+    """
+    queryset = DesignCosting.objects.all()
+    serializer_class = DesignCostingSerializer
+    pagination_class = StandardResultsSetPagination
+    filterset_fields = ["style", "status", "sheet_type", "is_live", "is_single_size", "is_patterned"]
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permissions = {
+        "list": "merchandising:view", "retrieve": "merchandising:view",
+        "create": "merchandising:create", "update": "merchandising:edit",
+        "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
+        "set_live": "merchandising:edit", "approve": "merchandising:edit",
+        "reject": "merchandising:edit", "prepare_po_costing": "merchandising:create",
+    }
+
+    def get_queryset(self):
+        return DesignCosting.objects.filter(tenant=self.request.tenant)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except serializers.ValidationError as exc:
+            return Response(
+                exc.detail if hasattr(exc, "detail") else exc,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def perform_create(self, serializer):
+        try:
+            serializer.save(tenant=self.request.tenant, created_by=self.request.user)
+        except IntegrityError as exc:
+            if "unique" in str(exc).lower():
+                raise serializers.ValidationError({
+                    "version": "A design costing with this style and version already exists."
+                })
+            raise exc
+
+    def perform_update(self, serializer):
+        serializer.save()
+
+    def _validate_status(self, costing, allowed):
+        if costing.status not in allowed:
+            raise serializers.ValidationError(
+                f"Cannot act on design costing in '{costing.status}' status"
+            )
+
+    @action(detail=True, methods=["post"])
+    def approve(self, request, pk=None):
+        costing = self.get_object()
+        if costing.status not in ("draft", "pending"):
+            return Response(
+                {"error": f"Cannot approve design costing in '{costing.status}' status"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        costing.status = "approved"
+        costing.approved_by = request.user
+        costing.approved_at = timezone.now()
+        costing.save(update_fields=["status", "approved_by", "approved_at"])
+        return Response(self.get_serializer(costing).data)
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        costing = self.get_object()
+        if costing.status not in ("draft", "pending"):
+            return Response(
+                {"error": f"Cannot reject design costing in '{costing.status}' status"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        costing.status = "rejected"
+        costing.save(update_fields=["status"])
+        return Response(self.get_serializer(costing).data)
+
+    @action(detail=True, methods=["post"])
+    def set_live(self, request, pk=None):
+        costing = self.get_object()
+        DesignCosting.objects.filter(
+            style=costing.style, tenant=costing.tenant
+        ).update(is_live=False)
+        costing.is_live = True
+        costing.save(update_fields=["is_live"])
+        return Response(self.get_serializer(costing).data)
+
+    @action(detail=True, methods=["post"])
+    def prepare_po_costing(self, request, pk=None):
+        """Derive a PurchaseOrder `Costing` from this approved design costing.
+
+        Forward dot: the approved Style-level single-piece design cost is the
+        source of truth a PO costing is prepared from (reference "single-piece
+        costing → PO costing"). Copies the design cost + its cost lines into a
+        new order-level Costing snapshot and returns it.
+        """
+        design = self.get_object()
+        if design.status != "approved":
+            return Response(
+                {"error": "Only an approved design costing can be prepared into a PO costing."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        po_id = request.data.get("purchase_order_id")
+        if not po_id:
+            return Response(
+                {"error": "purchase_order_id is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            purchase_order = PurchaseOrder.objects.get(
+                id=po_id, tenant=request.tenant
+            )
+        except PurchaseOrder.DoesNotExist:
+            return Response(
+                {"error": "Purchase order not found for this tenant."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        if Costing.objects.filter(purchase_order=purchase_order, tenant=request.tenant).exists():
+            return Response(
+                {"error": "A costing already exists for this purchase order."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        costing = Costing.objects.create(
+            tenant=request.tenant,
+            purchase_order=purchase_order,
+            version=1,
+            status="draft",
+            sheet_type=design.sheet_type,
+            is_live=True,
+            fabric_cost=design.fabric_cost,
+            trim_cost=design.trim_cost,
+            cm_cost=design.cm_cost,
+            overhead_cost=design.overhead_cost,
+            total_cost=design.total_cost,
+            target_price=design.target_price,
+            margin=design.margin,
+            is_single_size=design.is_single_size,
+            size_ratio=design.size_ratio,
+            is_patterned=design.is_patterned,
+            patterned_fabric_options=design.patterned_fabric_options,
+            notes=design.notes,
+            created_by=request.user,
+        )
+        for line in design.lines.all():
+            CostingLine.objects.create(
+                tenant=request.tenant,
+                costing=costing,
+                category=line.category,
+                description=line.description,
+                unit_price=line.unit_price,
+                consumption=line.consumption,
+                size_width=line.size_width,
+                sort_order=line.sort_order,
+                created_by=request.user,
+            )
+        return Response(
+            CostingSerializer(costing).data,
+            status=status.HTTP_201_CREATED
+        )
+
+
 class CostingLineViewSet(viewsets.ModelViewSet):
     queryset = CostingLine.objects.all()
     serializer_class = CostingLineSerializer
@@ -3084,15 +3248,226 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
         "list": "merchandising:view", "retrieve": "merchandising:view",
         "create": "merchandising:create", "update": "merchandising:edit",
         "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
+        "init": "merchandising:create", "export": "merchandising:view",
     }
 
     def get_queryset(self):
         return DesignSheet.objects.filter(tenant=self.request.tenant).select_related(
-            "tech_pack__style__buyer"
+            "tech_pack__style__buyer", "tech_pack__buyer", "tech_pack__product_type",
+            "tech_pack__style__department",
         )
 
     def perform_create(self, serializer):
         serializer.save(tenant=self.request.tenant)
+
+    @action(detail=False, methods=["post"], url_path="init")
+    def init(self, request):
+        """Create a design sheet fresh or by copying an existing sheet.
+
+        The Design register "+ New Design" dialog sends ``mode``
+        (``fresh``/``copy``), typed selections (``product_type`` and ``buyer``
+        reference setup records), ``block_reference``, ``description`` and the
+        two include flags. ``copy`` requires a tenant-scoped
+        ``source_design_sheet``; the new sheet inherits the source's technical
+        header + sketch and records ``based_on`` = source tech-pack number.
+
+        The unique ``style_code`` is generated automatically. ``relationship``
+        is always ``new`` in fresh mode and ``based_on`` in copy mode (handled
+        by the client, but the server enforces it). ``style_number`` (style
+        reference) is never taken from the client: it stays blank in fresh mode
+        and is derived from the source in copy mode. Annotations and the note
+        are carried over only when ``include_annotation`` / ``include_notes``
+        are true.
+        """
+        payload = DesignInitSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = payload.validated_data
+
+        source = None
+        if data["mode"] == "copy":
+            source_id = data.get("source_design_sheet")
+            if not source_id:
+                return Response(
+                    {"detail": "source_design_sheet is required when mode is 'copy'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            source = (
+                DesignSheet.objects.filter(tenant=request.tenant)
+                .select_related("tech_pack", "tech_pack__product_type", "tech_pack__buyer")
+                .filter(id=source_id)
+                .first()
+            )
+            if source is None:
+                return Response(
+                    {"detail": "Source design sheet not found."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        product_type = self._resolve_setup_model(
+            ProductType, request.tenant, data.get("product_type")
+        )
+        if data.get("product_type") and product_type is None:
+            return Response(
+                {"detail": "Selected product type was not found for this tenant."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        buyer = self._resolve_setup_model(Buyer, request.tenant, data.get("buyer"))
+        if data.get("buyer") and buyer is None:
+            return Response(
+                {"detail": "Selected buyer was not found for this tenant."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        source_tp = source.tech_pack if source else None
+        relationship = (
+            StyleTechPack.Relationship.BASED_ON
+            if data["mode"] == "copy"
+            else StyleTechPack.Relationship.NEW
+        )
+        # Copy mode: garments type / style reference / product type derive from
+        # the source; buyer is client-selected (or carries over from source).
+        effective_product_type = (
+            product_type
+            if product_type is not None
+            else (source_tp.product_type if source_tp else None)
+        )
+        effective_buyer = (
+            buyer
+            if buyer is not None
+            else (source_tp.buyer if source_tp else None)
+        )
+        garments_type = (
+            effective_product_type.name
+            if effective_product_type
+            else (source_tp.style_type if source_tp else "")
+        )
+        style_reference = source_tp.style_number if source_tp else ""
+
+        with transaction.atomic():
+            techpack = StyleTechPack.objects.create(
+                tenant=request.tenant,
+                techpack_number=StyleTechPack.next_techpack_number(request.tenant),
+                style_code=StyleTechPack.next_style_code(request.tenant),
+                style=source_tp.style if source_tp else None,
+                product_type=effective_product_type,
+                buyer=effective_buyer,
+                style_type=garments_type,
+                style_number=style_reference,
+                relationship=relationship,
+                block=data["block_reference"] or (source_tp.block if source_tp else ""),
+                description=data["description"] or (source_tp.description if source_tp else ""),
+                based_on=(source_tp.techpack_number if source_tp else ""),
+                customer=(effective_buyer.name if effective_buyer else ""),
+                size=source_tp.size if source_tp else "",
+                designer=source_tp.designer if source_tp else "",
+                pattern_cutter=source_tp.pattern_cutter if source_tp else "",
+                issuer=source_tp.issuer if source_tp else "",
+                cloth_code=source_tp.cloth_code if source_tp else "",
+                length=source_tp.length if source_tp else "",
+                sketch=source_tp.sketch if source_tp else "",
+                contains=source_tp.contains if source_tp else "",
+                risk_date=source_tp.risk_date if source_tp else None,
+                pattern_request_date=(
+                    source_tp.pattern_request_date if source_tp else None
+                ),
+                note=(
+                    source_tp.note
+                    if source_tp and data["include_notes"]
+                    else ""
+                ),
+                other_images=list(source_tp.other_images) if source_tp else [],
+            )
+            if source_tp and source_tp.sketch_image:
+                techpack.sketch_image.name = source_tp.sketch_image.name
+                techpack.save(update_fields=["sketch_image"])
+            if source_tp and source_tp.sketch_thumbnail:
+                techpack.sketch_thumbnail.name = source_tp.sketch_thumbnail.name
+                techpack.save(update_fields=["sketch_thumbnail"])
+
+            sheet = DesignSheet.objects.create(
+                tenant=request.tenant,
+                tech_pack=techpack,
+                status=DesignSheet.Status.NEW,
+                sketch_annotations=(
+                    list(source.sketch_annotations or [])
+                    if source and data["include_annotation"]
+                    else []
+                ),
+            )
+
+        return Response(
+            DesignSheetSerializer(sheet, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def _resolve_setup_model(self, model, tenant, pk):
+        """Resolve a setup record scoped to a tenant, or None when not found."""
+        if pk is None:
+            return None
+        return model.objects.filter(tenant=tenant, id=pk).first()
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        """Export the design register to a tenant-scoped .xlsx workbook.
+
+        One row per design sheet, mirroring the register grid columns
+        (including **Buyer**) with display labels for status and relationship.
+        """
+        from openpyxl import Workbook
+
+        sheets = self.filter_queryset(self.get_queryset()).order_by("-created_at")
+
+        headers = [
+            "File Number", "Style Code", "Style Name", "Buyer", "Style Type",
+            "Product Type", "Block", "Based on", "Relationship", "Status",
+            "Department", "Designer", "Pattern Cutter", "Issuer", "Cloth Code",
+            "Size", "Length", "Sketch", "Contains", "Risk Date",
+            "Pattern Request Date", "Description", "Notes", "Live Orders",
+            "Completed Orders",
+        ]
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Design Register"
+        ws.append(headers)
+        from apps.merchandising.design_register import order_counts_for_style
+
+        for sheet in sheets:
+            tp = sheet.tech_pack
+            live, completed = order_counts_for_style(tp.style)
+            ws.append([
+                tp.techpack_number,
+                tp.style_code,
+                tp.style.name if tp.style_id else "",
+                tp.buyer_display_name(),
+                tp.style_type,
+                tp.product_type.name if tp.product_type_id else "",
+                tp.block,
+                tp.based_on,
+                tp.get_relationship_display(),
+                sheet.get_status_display(),
+                tp.style.department.name if tp.style_id and tp.style.department_id else "",
+                tp.designer,
+                tp.pattern_cutter,
+                tp.issuer,
+                tp.cloth_code,
+                tp.size,
+                tp.length,
+                tp.sketch,
+                tp.contains,
+                tp.risk_date,
+                tp.pattern_request_date,
+                tp.description,
+                tp.note,
+                live,
+                completed,
+            ])
+
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response["Content-Disposition"] = 'attachment; filename="design_register.xlsx"'
+        wb.save(response)
+        return response
 
     @action(detail=True, methods=["post"], url_path="transition")
     def transition(self, request, pk=None):

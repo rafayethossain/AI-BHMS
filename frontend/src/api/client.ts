@@ -202,9 +202,26 @@ export interface DesignImage {
   created_at: string;
 }
 
+export interface RiskPayload {
+  code: string;
+  label: string;
+  color: string;
+  numeric: number;
+}
+
+export interface OrderRisk {
+  fabric: RiskPayload;
+  trims: RiskPayload;
+  labels: RiskPayload;
+  technical: RiskPayload;
+  overall: RiskPayload;
+}
+
 export interface PurchaseOrder {
   id: string;
   po_number: string;
+  file_number: string | null;
+  style_number: string | null;
   file_opening: string;
   buyer: string;
   buyer_name: string;
@@ -214,6 +231,7 @@ export interface PurchaseOrder {
   factory_name: string;
   po_date: string;
   delivery_date: string;
+  actual_completion_date: string | null;
   quantity: number;
   unit_price: string;
   total_value: string;
@@ -233,6 +251,7 @@ export interface PurchaseOrder {
   created_at: string;
   risk_level: string | null;
   risk_level_detail: { id: string; code: string; name: string; color: string } | null;
+  risk: OrderRisk | null;
 }
 
 export interface PurchaseOrderItem {
@@ -707,6 +726,49 @@ export interface Costing {
   created_at: string;
 }
 
+export interface DesignCostingLine {
+  id: string;
+  costing: string;
+  category: string;
+  category_label: string;
+  description: string;
+  unit_price: string;
+  consumption: string;
+  size_width: string;
+  sort_order: number;
+  line_total: string;
+  created_at: string;
+}
+
+export interface DesignCosting {
+  id: string;
+  style: string;
+  style_number: string;
+  style_name: string;
+  version: number;
+  status: string;
+  sheet_type: string;
+  sheet_type_label: string;
+  is_live: boolean;
+  target_price: string | null;
+  fabric_cost: string;
+  trim_cost: string;
+  cm_cost: string;
+  overhead_cost: string;
+  total_cost: string;
+  margin: string;
+  margin_percent: number | null;
+  is_single_size: boolean;
+  size_ratio: SizeRatioEntry[];
+  is_patterned: boolean;
+  patterned_fabric_options: string[];
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  lines: DesignCostingLine[];
+  notes: string;
+}
+
 export interface TA {
   id: string;
   purchase_order: string;
@@ -811,6 +873,35 @@ export interface ProformaInvoice {
   validity_date: string | null;
   status: string;
   remarks: string;
+}
+
+export interface ForwardOrder {
+  id: string;
+  month: string;
+  buyer: string;
+  buyer_name: string;
+  factory: string;
+  factory_name: string;
+  purchase_order: string | null;
+  po_number: string | null;
+  quantity: string;
+  unit_cost: string;
+  total_cost: string;
+  service_pct: string;
+  service_charge: string;
+  in_hand_units: string;
+  status: string;
+  remarks: string;
+  created_at: string;
+}
+
+export interface MonthlyForwardRow {
+  month: string;
+  buyer: string;
+  count: number;
+  quantity: string;
+  total_cost: string;
+  service_charge: string;
 }
 
 export interface SalesContract {
@@ -1014,6 +1105,17 @@ export const commercialApi = {
   acceptPI: (id: string) => api.post(`/commercial/proforma-invoices/${id}/accept/`),
   rejectPI: (id: string) => api.post(`/commercial/proforma-invoices/${id}/reject/`),
   exportPI_pdf: (id: string) => api.get(`/commercial/proforma-invoices/${id}/export_pdf/`, { responseType: 'blob' }),
+  // Forward Orders (RQ-048)
+  getForwardOrders: (params?: Record<string, string>) =>
+    api.get<{ results: ForwardOrder[]; count: number }>('/commercial/forward-orders/', { params }),
+  createForwardOrder: (data: Record<string, unknown>) =>
+    api.post<ForwardOrder>('/commercial/forward-orders/', data),
+  updateForwardOrder: (id: string, data: Record<string, unknown>) =>
+    api.patch<ForwardOrder>(`/commercial/forward-orders/${id}/`, data),
+  deleteForwardOrder: (id: string) =>
+    api.delete(`/commercial/forward-orders/${id}/`),
+  getMonthlyForward: () =>
+    api.get<{ results: MonthlyForwardRow[] }>('/commercial/forward-orders/monthly_forward/'),
   // Sales Contracts
   getSCs: (params?: Record<string, string>) =>
     api.get<{ results: SalesContract[]; count: number }>('/commercial/sales-contracts/', { params }),
@@ -1133,6 +1235,24 @@ export interface OrderManagerRisk {
   flags: string[];
 }
 
+export interface OrderManagerNextMilestone {
+  name: string;
+  planned_date: string | null;
+  is_critical: boolean;
+  days_until: number | null;
+}
+
+export interface OrderManagerCriticalPath {
+  has_ta: boolean;
+  status: 'no-ta' | 'on-track' | 'off-track' | 'complete';
+  milestones_total: number;
+  milestones_completed: number;
+  milestones_delayed: number;
+  critical_milestones_total: number;
+  critical_milestones_completed: number;
+  next_milestone: OrderManagerNextMilestone | null;
+}
+
 export interface OrderManagerRow {
   po_id: string;
   po_number: string;
@@ -1151,6 +1271,7 @@ export interface OrderManagerRow {
   schedule: OrderManagerScheduleTile;
   gold_seal: OrderManagerGoldSealTile;
   risk: OrderManagerRisk;
+  critical_path: OrderManagerCriticalPath;
 }
 
 export interface OrderManagerSummary {
@@ -1172,6 +1293,9 @@ export interface OrderManagerDashboard {
 export const merchApi = {
   getStyles: (params?: Record<string, string>) =>
     api.get<{ results: Style[]; count: number }>('/merchandising/styles/', { params }),
+
+  getPurchaseOrders: (params?: Record<string, string>) =>
+    api.get<{ results: PurchaseOrder[]; count: number }>('/merchandising/purchase-orders/', { params }),
 
   getStyle: (id: string) =>
     api.get<Style>(`/merchandising/styles/${id}/`),
@@ -1634,12 +1758,43 @@ export const merchApi = {
   // Design Sheets
   getDesignSheets: (params?: Record<string, string>) =>
     api.get<PaginatedResponse<DesignSheet>>('/merchandising/design-sheets/', { params }),
+  exportDesignSheets: () =>
+    api.get<Blob>('/merchandising/design-sheets/export/', { responseType: 'blob' }),
   getDesignSheet: (id: string) =>
     api.get<DesignSheet>(`/merchandising/design-sheets/${id}/`),
   transitionDesignSheet: (id: string, status: string) =>
     api.post<{ status: string; message: string }>(`/merchandising/design-sheets/${id}/transition/`, { status }),
   saveDesignSheetAnnotations: (id: string, annotations: SketchAnnotation[]) =>
     api.patch<{ annotations: SketchAnnotation[] }>(`/merchandising/design-sheets/${id}/annotations/`, { annotations }),
+  updateDesignSheet: (id: string, data: { layout_order: string[] }) =>
+    api.patch<DesignSheet>(`/merchandising/design-sheets/${id}/`, data),
+  initDesignSheet: (data: {
+    mode: 'fresh' | 'copy';
+    source_design_sheet?: string;
+    product_type?: string;
+    buyer?: string;
+    garments_type?: string;
+    style_reference?: string;
+    relationship?: string;
+    block_reference?: string;
+    description?: string;
+    include_annotation?: boolean;
+    include_notes?: boolean;
+  }) => api.post<DesignSheet>('/merchandising/design-sheets/init/', data),
+
+  // Style-level Design Costings (RQ-013 / G-12)
+  getDesignCostings: (params?: Record<string, string>) =>
+    api.get<{ results: DesignCosting[]; count: number }>('/merchandising/design-costings/', { params }),
+  getDesignCosting: (id: string) =>
+    api.get<DesignCosting>(`/merchandising/design-costings/${id}/`),
+  approveDesignCosting: (id: string) =>
+    api.post<DesignCosting>(`/merchandising/design-costings/${id}/approve/`),
+  rejectDesignCosting: (id: string) =>
+    api.post<DesignCosting>(`/merchandising/design-costings/${id}/reject/`),
+  setLiveDesignCosting: (id: string) =>
+    api.post<DesignCosting>(`/merchandising/design-costings/${id}/set_live/`),
+  preparePOCosting: (id: string, purchaseOrderId: string) =>
+    api.post<Costing>(`/merchandising/design-costings/${id}/prepare_po_costing/`, { purchase_order_id: purchaseOrderId }),
 };
 
 export interface TechPackExtractResult {
@@ -1756,9 +1911,22 @@ export interface DesignSheet {
   description: string;
   note: string;
   sketch_annotations: SketchAnnotation[];
+  layout_order: string[];
   fit_specs: FitSpecification[];
   job_requests: DesignJobRequest[];
   material_items?: DesignSheetMaterialItem[];
+  style_name?: string;
+  department?: string;
+  style_type?: string;
+  product_type_id?: string;
+  product_type_name?: string;
+  buyer_id?: string;
+  relationship?: string;
+  contains?: string;
+  risk_date?: string | null;
+  pattern_request_date?: string | null;
+  live_orders_count?: number;
+  completed_orders_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -2015,6 +2183,9 @@ export interface BookingScheduleItem {
   notes: string;
   is_at_risk: boolean;
   is_reconciliation_trigger: boolean;
+  is_last_hit: boolean;
+  snapshot_date: string | null;
+  snapshot_data: Record<string, unknown> | null;
 }
 
 export interface Docket {
@@ -2033,6 +2204,130 @@ export interface Docket {
   sales_notified_at: string | null;
   notes: string;
   requires_sales_notification: boolean;
+  created_at: string;
+}
+
+export interface ExportRecap {
+  id: string;
+  purchase_order: string | null;
+  factory: string | null;
+  factory_name: string | null;
+  forwarder: string | null;
+  forwarder_name: string | null;
+  fob_no: string;
+  s_c_number: string;
+  factory_invoice: string;
+  factory_invoice_date: string | null;
+  customer_invoice: string;
+  customer_invoice_date: string | null;
+  quantity: string;
+  fob_value: string;
+  cmpt_value: string;
+  cost_value: string;
+  service_pct: string;
+  ex_factory_date: string | null;
+  mode: string;
+  mode_label: string;
+  hbl: string;
+  on_board_date: string | null;
+  eta_date: string | null;
+  container: string;
+  bl_number: string;
+  courier: string;
+  factory_pay_terms: string;
+  factory_amount: string;
+  factory_due_date: string | null;
+  factory_paid_date: string | null;
+  factory_payment_status: string;
+  customer_pay_terms: string;
+  customer_received_amount: string;
+  customer_due_date: string | null;
+  customer_payment_date: string | null;
+  customer_payment_status: string;
+  remarks: string;
+  created_at: string;
+}
+
+export interface ImportRecap {
+  id: string;
+  supplier: string | null;
+  supplier_name: string | null;
+  factory: string | null;
+  factory_name: string | null;
+  s_c_number: string;
+  invoice_value: string;
+  item_category: string;
+  item_category_label: string;
+  quantity: string;
+  rolls_bales: number | null;
+  container: string;
+  bl_hawb: string;
+  mode: string;
+  mode_label: string;
+  lc_foc: string;
+  lc_foc_label: string;
+  vessel: string;
+  pcd_date: string | null;
+  etd_date: string | null;
+  eta_date: string | null;
+  atb_date: string | null;
+  unstuffed_date: string | null;
+  in_house_date: string | null;
+  agent: string;
+  docs_received: boolean;
+  status: string;
+  status_label: string;
+  remarks: string;
+  created_at: string;
+}
+
+export interface SupplierPayment {
+  id: string;
+  supplier: string | null;
+  supplier_name: string | null;
+  purchase_order: string | null;
+  po_number: string | null;
+  lc: string | null;
+  lc_number: string | null;
+  payment_ref: string;
+  invoice_no: string;
+  fn_ref: string;
+  allocated_amount: string;
+  amount: string;
+  currency: string;
+  payment_date: string | null;
+  due_date: string | null;
+  payment_method: string;
+  released: boolean;
+  released_at: string | null;
+  released_by: string | null;
+  released_by_name: string | null;
+payment_status: string;
+  remarks: string;
+  created_at: string;
+}
+
+export interface CostReconciliation {
+  id: string;
+  purchase_order: string;
+  po_number: string;
+  export_recap: string | null;
+  costing: string | null;
+  factory_inv_amount: string;
+  factory_inv_qty: string;
+  planning_cm_amount: string;
+  planning_cm_qty: string;
+  factory_inv_per_unit: string;
+  planning_cm_per_unit: string;
+  saving_loss_per_unit: string;
+  saving_loss_total: string;
+  is_mismatch: boolean;
+  status: string;
+  status_label: string;
+  notes: string;
+  reconciled_by: string | null;
+  reconciled_by_name: string | null;
+  reconciled_at: string | null;
   created_at: string;
 }
 
@@ -2056,6 +2351,51 @@ export interface FinalHitReconciliation {
   is_short: boolean;
   requires_debit: boolean;
   created_at: string;
+}
+
+export interface SalesSummaryRow {
+  buyer?: string;
+  factory?: string;
+  quantity: string;
+  fob_value: string;
+  cmpt_value: string;
+  cost_value: string;
+  factory_amount: string;
+  customer_received_amount: string;
+}
+
+export interface SalesSummaryResponse {
+  buyers: SalesSummaryRow[];
+  factories: SalesSummaryRow[];
+  total: SalesSummaryRow;
+}
+
+export interface ImportRecapSummaryRow {
+  supplier?: string;
+  factory?: string;
+  item_category?: string;
+  invoice_value: string;
+  quantity: string;
+}
+
+export interface ImportRecapSummaryResponse {
+  suppliers: ImportRecapSummaryRow[];
+  factories: ImportRecapSummaryRow[];
+  categories: ImportRecapSummaryRow[];
+  total: ImportRecapSummaryRow;
+}
+
+export interface ExportRecapSummaryRow {
+  factory?: string;
+  quantity: string;
+  fob_value: string;
+  cmpt_value: string;
+  cost_value: string;
+}
+
+export interface ExportRecapSummaryResponse {
+  factories: ExportRecapSummaryRow[];
+  total: ExportRecapSummaryRow;
 }
 
 export interface PaperworkComparisonRow {
@@ -2221,6 +2561,56 @@ export const logisticsApi = {
     api.post<FinalHitReconciliation>(`/logistics/reconciliations/${id}/waive/`, data),
   getOverLimitReconciliations: () =>
     api.get<{ count: number; results: FinalHitReconciliation[] }>('/logistics/reconciliations/over_limit/'),
+
+  // Import Recap (RQ-043 / B2)
+  getImportRecaps: (params?: Record<string, string>) =>
+    api.get<{ results: ImportRecap[]; count: number }>('/logistics/import-recaps/', { params }),
+  createImportRecap: (data: Record<string, unknown>) =>
+    api.post<ImportRecap>('/logistics/import-recaps/', data),
+  updateImportRecap: (id: string, data: Record<string, unknown>) =>
+    api.patch<ImportRecap>(`/logistics/import-recaps/${id}/`, data),
+  deleteImportRecap: (id: string) => api.delete(`/logistics/import-recaps/${id}/`),
+
+  // Export Recap (RQ-044 / B3)
+  getExportRecaps: (params?: Record<string, string>) =>
+    api.get<{ results: ExportRecap[]; count: number }>('/logistics/export-recaps/', { params }),
+  createExportRecap: (data: Record<string, unknown>) =>
+    api.post<ExportRecap>('/logistics/export-recaps/', data),
+  updateExportRecap: (id: string, data: Record<string, unknown>) =>
+    api.patch<ExportRecap>(`/logistics/export-recaps/${id}/`, data),
+  deleteExportRecap: (id: string) => api.delete(`/logistics/export-recaps/${id}/`),
+
+  // Supplier Payment (RQ-045 / B4)
+  getSupplierPayments: (params?: Record<string, string>) =>
+    api.get<{ results: SupplierPayment[]; count: number }>('/logistics/supplier-payments/', { params }),
+  createSupplierPayment: (data: Record<string, unknown>) =>
+    api.post<SupplierPayment>('/logistics/supplier-payments/', data),
+  updateSupplierPayment: (id: string, data: Record<string, unknown>) =>
+    api.patch<SupplierPayment>(`/logistics/supplier-payments/${id}/`, data),
+  deleteSupplierPayment: (id: string) => api.delete(`/logistics/supplier-payments/${id}/`),
+  releaseSupplierPayment: (id: string) =>
+    api.post<SupplierPayment>(`/logistics/supplier-payments/${id}/release/`, {}),
+  getSupplierPaymentsDuePivot: (params?: Record<string, string>) =>
+    api.get<{ results: { supplier: string; month: string; total: string; released_total: string; overdue_due: string }[] }>(
+      '/logistics/supplier-payments/due_pivot/', { params },
+    ),
+
+  // Cost Reconciliation (RQ-046 / B5)
+  getCostReconciliations: (params?: Record<string, string>) =>
+    api.get<{ results: CostReconciliation[]; count: number }>('/logistics/cost-reconciliations/', { params }),
+  createCostReconciliation: (data: Record<string, unknown>) =>
+    api.post<CostReconciliation>('/logistics/cost-reconciliations/', data),
+  updateCostReconciliation: (id: string, data: Record<string, unknown>) =>
+    api.patch<CostReconciliation>(`/logistics/cost-reconciliations/${id}/`, data),
+  deleteCostReconciliation: (id: string) => api.delete(`/logistics/cost-reconciliations/${id}/`),
+  compareCostReconciliation: (id: string, data: Record<string, unknown>) =>
+    api.post<CostReconciliation>(`/logistics/cost-reconciliations/${id}/compare/`, data),
+  resolveCostReconciliation: (id: string, data: Record<string, unknown>) =>
+    api.post<CostReconciliation>(`/logistics/cost-reconciliations/${id}/resolve/`, data),
+  // Summary / recap reports (RQ-047 / B6)
+  getSalesSummary: () => api.get<SalesSummaryResponse>('/logistics/export-recaps/sales_summary/'),
+  getExportRecapSummary: () => api.get<ExportRecapSummaryResponse>('/logistics/export-recaps/recap_summary/'),
+  getImportRecapSummary: () => api.get<ImportRecapSummaryResponse>('/logistics/import-recaps/recap_summary/'),
 };
 
 export const dashboardApi = {
@@ -2470,8 +2860,14 @@ export interface FabricOrder {
   bulk_approved_date: string | null;
   bulk_approved_by: string | null;
   bulk_approved_by_name: string | null;
+  bulk_approved_notes: string;
+  strike_off_required_date: string | null;
+  strike_off_actual_date: string | null;
+  strike_off_approval_date: string | null;
   onboard_date: string | null;
   eta_date: string | null;
+  actual_arrival_date: string | null;
+  paperwork_date: string | null;
   clearance_date: string | null;
   risk_level: string | null;
   risk_level_code: string | null;
@@ -2565,6 +2961,11 @@ export interface FabricUtilization {
   accounted_meters: string;
   excess_meters: string;
   efficiency_pct: string;
+  tolerance_pct: string;
+  tolerance_upper_meters: string;
+  tolerance_lower_meters: string;
+  tolerance_status: string;
+  over_tolerance: boolean;
   notes: string;
   recorded_by: string | null;
   recorded_by_name: string | null;
@@ -2704,6 +3105,62 @@ export const fabricApi = {
     api.get<MonthlySummary>('/fabric/utilizations/monthly_summary/', { params: period ? { period } : undefined }),
   getQuarterlyMillReport: (year: string, quarter: string) =>
     api.get<QuarterlyMillReport>('/fabric/utilizations/quarterly_mill_report/', { params: { year, quarter } }),
+};
+
+// ---- B9 Help & Onboarding types & API ----
+
+export interface TourCompletion {
+  id: string;
+  tour_id: string;
+  completed_at: string;
+  user_email: string;
+  tenant: string;
+  created_at: string;
+}
+
+export interface OnboardingChecklistItem {
+  id: string;
+  item_key: string;
+  completed: boolean;
+  completed_at: string | null;
+  user_email: string;
+  tenant: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReleaseNote {
+  id: string;
+  version: string;
+  title: string;
+  body: string;
+  released_at: string;
+  is_published: boolean;
+  created_at: string;
+}
+
+export const helpApi = {
+  // Tour completions
+  getTourCompletions: () =>
+    api.get<{ results: TourCompletion[]; count: number }>('/help/tour-completions/'),
+  createTourCompletion: (tourId: string) =>
+    api.post<TourCompletion>('/help/tour-completions/', { tour_id: tourId }),
+
+  // Onboarding checklist
+  getOnboardingItems: () =>
+    api.get<{ results: OnboardingChecklistItem[]; count: number }>('/help/onboarding/'),
+  createOnboardingItem: (itemKey: string) =>
+    api.post<OnboardingChecklistItem>('/help/onboarding/', { item_key: itemKey }),
+  completeOnboardingItem: (id: string) =>
+    api.post<OnboardingChecklistItem>(`/help/onboarding/${id}/complete/`),
+  incompleteOnboardingItem: (id: string) =>
+    api.post<OnboardingChecklistItem>(`/help/onboarding/${id}/incomplete/`),
+
+  // Release notes
+  getReleaseNotes: () =>
+    api.get<{ results: ReleaseNote[]; count: number }>('/help/release-notes/'),
+  getReleaseNote: (id: string) =>
+    api.get<ReleaseNote>(`/help/release-notes/${id}/`),
 };
 
 export default api;

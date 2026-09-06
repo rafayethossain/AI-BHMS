@@ -3,18 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { merchApi, setupApi } from '../api/client';
 import type { Style, Buyer } from '../api/client';
 import SearchableSelect from '../components/SearchableSelect';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import EntityCard, { CardListToggle } from '../components/EntityCard';
 import { useToast } from '../contexts/ToastContext';
 import Layout from '../components/Layout';
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-surface-alt/20 text-muted',
-  active: 'bg-blue-500/20 text-badge-blue',
-  approved: 'bg-emerald-500/20 text-badge-emerald',
-  archived: 'bg-amber-500/20 text-badge-amber',
-};
 
 export default function StylesListPage() {
   const navigate = useNavigate();
@@ -22,11 +15,6 @@ export default function StylesListPage() {
   const [styles, setStyles] = useState<Style[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [filters, setFilters] = useState<Record<string, string>>({});
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', description: '', buyer: '' });
   const [creating, setCreating] = useState(false);
@@ -37,16 +25,12 @@ export default function StylesListPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
-      Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
-      const res = await merchApi.getStyles(params);
+      const res = await merchApi.getStyles({ page_size: '10000' });
       setStyles(res.data.results); setCount(res.data.count);
     } catch { toast('error', 'Failed to load styles'); } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, [search, page, sortField, sortOrder, filters]);
+  useEffect(() => { fetchData(); }, []);
   useEffect(() => {
     setupApi.getBuyers({ page_size: '500' }).then((r) => setBuyers(r.data.results)).catch(() => {}); // Silently ignore - secondary dropdown data
   }, []);
@@ -65,32 +49,13 @@ export default function StylesListPage() {
     try { await merchApi.deleteStyle(id); setDeleteId(null); toast('success', 'Style deleted'); fetchData(); } catch { toast('error', 'Failed to delete style'); }
   };
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
-
-  const handleFilterChange = (f: Record<string, string>) => { setFilters(f); setPage(1); };
-
-  const columns: Column[] = [
-    { key: 'image', label: '', className: 'w-14', render: (_v, row) => {
-      const url = (row.main_image as string | null) || (row.sketch_front as string | null) || null;
-      return url ? (
-        <img src={url} alt={String(row.name)} className="w-10 h-10 object-cover rounded-lg border border-input-border" />
-      ) : (
-        <div className="w-10 h-10 bg-surface-alt rounded-lg border border-input-border flex items-center justify-center text-xs text-faint">—</div>
-      );
-    }},
-    { key: 'style_number', label: 'Style #', sortable: true, render: (v) => <span className="font-mono text-emerald-400">{String(v)}</span> },
-    { key: 'name', label: 'Name', sortable: true },
-    { key: 'buyer_name', label: 'Buyer', sortable: true },
-    { key: 'status', label: 'Status', sortable: true, filterable: true, filterOptions: ['draft', 'active', 'approved', 'archived'],
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v)}</span> },
-    { key: 'file_openings_count', label: 'FOs', sortable: true, className: 'text-right' },
-    { key: 'purchase_orders_count', label: 'POs', sortable: true, className: 'text-right' },
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => (
-      <div className="flex justify-end gap-3">
-        <button onClick={(e) => { e.stopPropagation(); navigate(`/styles/${row.id}`); }} className="text-sm text-blue-400 hover:text-blue-300">View</button>
-        <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(row.id)); }} className="text-sm text-red-400 hover:text-red-300">Delete</button>
-      </div>
-    )},
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Style #', field: 'style_number', headerFilter: true, frozen: true, hozAlign: 'left' },
+    { title: 'Name', field: 'name', headerFilter: true },
+    { title: 'Buyer', field: 'buyer_name', headerFilter: true },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'FOs', field: 'file_openings_count', hozAlign: 'right' },
+    { title: 'POs', field: 'purchase_orders_count', hozAlign: 'right' },
   ];
 
   return (
@@ -110,21 +75,19 @@ export default function StylesListPage() {
         </div>
 
         {view === 'list' ? (
-          <DataTable
+          <SpreadsheetGrid
             data={styles as unknown as Record<string, unknown>[]}
             columns={columns}
-            totalCount={count}
-            page={page}
-            pageSize={25}
-            onPageChange={setPage}
-            searchValue={search}
-            onSearchChange={(v) => { setSearch(v); setPage(1); }}
-            searchPlaceholder="Search styles..."
-            onSort={handleSort}
-            sortField={sortField}
-            sortOrder={sortOrder}
-            filters={filters}
-            onFilterChange={handleFilterChange}
+            height={460}
+            toolbar
+            title="Styles"
+            exportable
+            columnChooser
+            paginationSize={25}
+            actionColumn
+            onAdd={() => setShowCreate(true)}
+            onView={(row) => navigate(`/styles/${String(row.id)}`)}
+            onDelete={(row) => setDeleteId(String(row.id))}
             onRowClick={(row) => navigate(`/styles/${String(row.id)}`)}
             loading={loading}
           />

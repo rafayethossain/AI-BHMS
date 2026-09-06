@@ -1,21 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import DataTable from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import SearchableSelect from '../components/SearchableSelect';
 import { merchApi, usersApi } from '../api/client';
 import type { JobRequest, JobDashboard, UnsoldAnalysisResponse, Style, PurchaseOrder, User } from '../api/client';
-import type { Column } from '../components/DataTable';
 import { useToast } from '../contexts/ToastContext';
 
 const TYPE_LABELS: Record<string, string> = { pattern: 'Pattern', sample: 'Sample', '3d': '3D', mini_marker: 'Mini-Marker' };
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-amber-500/20 text-badge-amber', in_progress: 'bg-blue-500/20 text-badge-blue',
-  completed: 'bg-emerald-500/20 text-badge-emerald', cancelled: 'bg-red-500/20 text-badge-red',
-};
-const PRIORITY_COLORS: Record<string, string> = {
-  low: 'bg-surface-alt/20 text-muted', normal: 'bg-blue-500/20 text-badge-blue',
-  high: 'bg-amber-500/20 text-badge-amber', urgent: 'bg-red-500/20 text-badge-red',
-};
 
 const dateAgo = (days: number) => {
   const d = new Date();
@@ -45,13 +37,9 @@ export default function JobRequestsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const pageSize = 10;
 
   useEffect(() => { load(); }, [view]);
-  useEffect(() => { setPage(1); }, [search]);
   useEffect(() => {
     merchApi.getJobDashboard().then(r => setDash(r.data)).catch(() => {});
     merchApi.getStyles({ page_size: '200' }).then(r => setStyles(r.data.results)).catch(() => {});
@@ -63,7 +51,7 @@ export default function JobRequestsPage() {
     if (view === 'analysis') { loadAnalysis(); return; }
     setLoading(true);
     try {
-      const res = view === 'queue' ? await merchApi.getJobQueue({ page_size: '200' }) : await merchApi.getJobRequests({ page_size: '200' });
+      const res = view === 'queue' ? await merchApi.getJobQueue({ page_size: '10000' }) : await merchApi.getJobRequests({ page_size: '10000' });
       setItems(res.data.results);
     } catch { toast('error', 'Failed to load jobs');
     } finally { setLoading(false); }
@@ -117,33 +105,23 @@ export default function JobRequestsPage() {
     catch { toast('error', 'Failed to delete'); setDeleteId(null); }
   };
 
-  const filtered = useMemo(() => items.filter(i =>
-    i.job_number.toLowerCase().includes(search.toLowerCase()) ||
-    i.style_number.toLowerCase().includes(search.toLowerCase()) ||
-    i.description.toLowerCase().includes(search.toLowerCase())
-  ), [items, search]);
-  const pagedData = useMemo(() => { const s = (page - 1) * pageSize; return filtered.slice(s, s + pageSize); }, [filtered, page]);
-
-  const columns: Column[] = [
-    { key: 'job_number', label: 'Job #', sortable: true, render: (v) => <span className="font-mono text-heading">{String(v)}</span> },
-    { key: 'job_type', label: 'Type', render: (_v, row) => <span className="text-body">{TYPE_LABELS[String(row.job_type)] || String(row.job_type)}</span> },
-    { key: 'style_number', label: 'Style', sortable: true, render: (v) => <span className="font-mono text-body">{String(v)}</span> },
-    { key: 'description', label: 'Description', render: (v) => <span className="text-muted">{v ? String(v).slice(0, 40) : '-'}</span> },
-    { key: 'assigned_to_name', label: 'Assigned', render: (v) => v ? <span className="text-muted">{String(v)}</span> : <span className="text-red-400">Unassigned</span> },
-    { key: 'required_by_date', label: 'Due', render: (v) => <span className="text-muted">{v ? String(v) : '-'}</span> },
-    { key: 'priority', label: 'Priority', render: (_v, row) => {
-      const label = String(row.priority_display).toLowerCase();
-      return <span className={`px-2 py-1 rounded-full text-xs font-medium ${PRIORITY_COLORS[label] || 'bg-surface-alt text-muted'}`}>{String(row.priority_display)}</span>;
-    }},
-    { key: 'status', label: 'Status', render: (_v, row) => {
-      const s = String(row.status);
-      return <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[s] || 'bg-surface-alt text-muted'}`}>{String(row.status_display)}</span>;
-    }},
-    { key: 'actions', label: 'Actions', className: 'text-right', render: (_v, row) => {
-      const item = row as unknown as JobRequest;
-      return <><button onClick={(e) => { e.stopPropagation(); handleOpenModal(item); }} className="text-heading hover:text-emerald-500 mr-3 text-sm">Edit</button><button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} className="text-red-500 hover:text-red-400 text-sm">Delete</button></>;
-    }},
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Job #', field: 'job_number', headerFilter: true },
+    { title: 'Type', field: 'job_type_display' },
+    { title: 'Style', field: 'style_number', headerFilter: true },
+    { title: 'Description', field: 'description' },
+    { title: 'Assigned', field: 'assigned_to_name' },
+    { title: 'Due', field: 'required_by_date' },
+    { title: 'Priority', field: 'priority_display' },
+    { title: 'Status', field: 'status_display', headerFilter: true },
   ];
+
+  const gridData = items.map((job) => ({
+    ...job,
+    assigned_to_name: job.assigned_to_name || 'Unassigned',
+    description: job.description ? String(job.description).slice(0, 40) : '-',
+    required_by_date: job.required_by_date || '-',
+  }));
 
   const stats = dash ? [
     { label: 'Total Jobs', value: dash.total, color: 'text-heading' },
@@ -152,11 +130,11 @@ export default function JobRequestsPage() {
     { label: 'Unassigned', value: dash.unassigned, color: 'text-orange-400' },
   ] : [];
 
-  if (view !== 'analysis' && loading && items.length === 0) return <Layout><div className="p-6 flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-2 border-emerald-400 border-t-transparent rounded-full" /></div></Layout>;
-
   const styleOptions = styles.map(s => ({ value: s.id, label: s.style_number, description: s.name }));
   const poOptions = pos.map(p => ({ value: p.id, label: p.po_number, description: p.buyer_name }));
   const userOptions = users.map(u => ({ value: u.id, label: u.full_name || u.username, description: u.email }));
+
+  const inputCls = 'w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500';
 
   return (
     <Layout>
@@ -222,15 +200,15 @@ export default function JobRequestsPage() {
             <div className="bg-surface rounded-xl border border-border p-4 flex flex-wrap items-end gap-4">
               <div>
                 <label className="block text-sm text-muted mb-1">From</label>
-                <input type="date" value={analysisFilters.start_date} onChange={(e) => setAnalysisFilters({ ...analysisFilters, start_date: e.target.value })} className="px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                <input type="date" value={analysisFilters.start_date} onChange={(e) => setAnalysisFilters({ ...analysisFilters, start_date: e.target.value })} className={inputCls} />
               </div>
               <div>
                 <label className="block text-sm text-muted mb-1">To</label>
-                <input type="date" value={analysisFilters.end_date} onChange={(e) => setAnalysisFilters({ ...analysisFilters, end_date: e.target.value })} className="px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                <input type="date" value={analysisFilters.end_date} onChange={(e) => setAnalysisFilters({ ...analysisFilters, end_date: e.target.value })} className={inputCls} />
               </div>
               <div>
                 <label className="block text-sm text-muted mb-1">Status</label>
-                <select value={analysisFilters.status} onChange={(e) => setAnalysisFilters({ ...analysisFilters, status: e.target.value })} className="px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <select value={analysisFilters.status} onChange={(e) => setAnalysisFilters({ ...analysisFilters, status: e.target.value })} className={inputCls}>
                   <option value="">All</option>
                   <option value="not_sold">Not Sold</option>
                   <option value="sold">Sold</option>
@@ -308,7 +286,22 @@ export default function JobRequestsPage() {
             )}
           </>
         ) : (
-        <DataTable data={pagedData as unknown as Record<string, unknown>[]} columns={columns} totalCount={filtered.length} page={page} pageSize={pageSize} onPageChange={setPage} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search by job #, style, or description..." loading={loading} onRowClick={(row) => handleOpenModal(row as unknown as JobRequest)} />
+          <SpreadsheetGrid
+            data={gridData as unknown as Record<string, unknown>[]}
+            columns={columns}
+            height={480}
+            toolbar
+            title="Job Requests"
+            exportable
+            columnChooser
+            paginationSize={10}
+            actionColumn
+            onAdd={() => handleOpenModal()}
+            onEdit={(row) => handleOpenModal(row as unknown as JobRequest)}
+            onDelete={(row) => handleDelete(String(row.id))}
+            onRowClick={(row) => handleOpenModal(row as unknown as JobRequest)}
+            loading={loading}
+          />
         )}
       </div>
 
@@ -320,7 +313,7 @@ export default function JobRequestsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-muted mb-1">Job Type *</label>
-                  <select value={form.job_type} onChange={(e) => setForm({ ...form, job_type: e.target.value })} className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                  <select value={form.job_type} onChange={(e) => setForm({ ...form, job_type: e.target.value })} className={inputCls}>
                     <option value="pattern">Pattern</option>
                     <option value="sample">Sample</option>
                     <option value="3d">3D</option>
@@ -329,7 +322,7 @@ export default function JobRequestsPage() {
                 </div>
                 <div>
                   <label className="block text-sm text-muted mb-1">Priority</label>
-                  <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                  <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className={inputCls}>
                     <option value="1">Low</option>
                     <option value="2">Normal</option>
                     <option value="3">High</option>
@@ -347,11 +340,11 @@ export default function JobRequestsPage() {
               </div>
               <div>
                 <label className="block text-sm text-muted mb-1">Description</label>
-                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className={inputCls} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-sm text-muted mb-1">Work Location</label><input type="text" value={form.work_location} onChange={(e) => setForm({ ...form, work_location: e.target.value })} className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
-                <div><label className="block text-sm text-muted mb-1">Required By</label><input type="date" value={form.required_by_date} onChange={(e) => setForm({ ...form, required_by_date: e.target.value })} className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
+                <div><label className="block text-sm text-muted mb-1">Work Location</label><input type="text" value={form.work_location} onChange={(e) => setForm({ ...form, work_location: e.target.value })} className={inputCls} /></div>
+                <div><label className="block text-sm text-muted mb-1">Required By</label><input type="date" value={form.required_by_date} onChange={(e) => setForm({ ...form, required_by_date: e.target.value })} className={inputCls} /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -360,7 +353,7 @@ export default function JobRequestsPage() {
                 </div>
                 <div>
                   <label className="block text-sm text-muted mb-1">Status</label>
-                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className={inputCls}>
                     <option value="pending">Pending</option>
                     <option value="in_progress">In Progress</option>
                     <option value="completed">Completed</option>
@@ -368,7 +361,7 @@ export default function JobRequestsPage() {
                   </select>
                 </div>
               </div>
-              <div><label className="block text-sm text-muted mb-1">Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
+              <div><label className="block text-sm text-muted mb-1">Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className={inputCls} /></div>
             </div>
             <div className="p-6 border-t border-border flex justify-end gap-3">
               <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-body hover:text-heading transition-colors">Cancel</button>

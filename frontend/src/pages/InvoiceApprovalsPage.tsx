@@ -1,22 +1,12 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { commercialApi } from '../api/client';
 import type { InvoiceApproval, InvoiceApprovalDashboard } from '../api/client';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import { useToast } from '../contexts/ToastContext';
 import Layout from '../components/Layout';
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-amber-500/20 text-badge-amber',
-  approved: 'bg-emerald-500/20 text-badge-emerald',
-  rejected: 'bg-red-500/20 text-red-400',
-};
-
-const MATCH_COLORS: Record<string, string> = {
-  match: 'bg-emerald-500/20 text-badge-emerald',
-  mismatch: 'bg-red-500/20 text-red-400',
-  over_tolerance: 'bg-amber-500/20 text-badge-amber',
-};
+const STATUS_LABELS = ['pending', 'approved', 'rejected'];
 
 const INVOICE_TYPE_OPTIONS = [
   { value: 'fabric', label: 'Fabric' },
@@ -34,12 +24,8 @@ export default function InvoiceApprovalsPage() {
   const [invoices, setInvoices] = useState<InvoiceApproval[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [matchFilter, setMatchFilter] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [dashboard, setDashboard] = useState<InvoiceApprovalDashboard | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingInv, setEditingInv] = useState<InvoiceApproval | null>(null);
@@ -53,11 +39,9 @@ export default function InvoiceApprovalsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
+      const params: Record<string, string> = { page: '1', page_size: '10000' };
       if (statusFilter) params.status = statusFilter;
       if (matchFilter) params.match = matchFilter;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
       const res = await commercialApi.getInvoiceApprovals(params);
       setInvoices(res.data.results);
       setCount(res.data.count);
@@ -71,7 +55,7 @@ export default function InvoiceApprovalsPage() {
     } catch { /* non-critical */ }
   };
 
-  useEffect(() => { fetchData(); }, [search, statusFilter, matchFilter, page, sortField, sortOrder]);
+  useEffect(() => { fetchData(); }, [statusFilter, matchFilter]);
   useEffect(() => { fetchDashboard(); }, []);
 
   const refresh = () => { fetchData(); fetchDashboard(); };
@@ -151,45 +135,29 @@ export default function InvoiceApprovalsPage() {
     } catch { toast('error', 'Failed to export invoice approvals CSV'); }
   };
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
+  const actionable = invoices.filter(i => i.status === 'pending' || (i.over_tolerance && !i.debit_note));
 
-  const columns: Column[] = [
-    { key: 'invoice_number', label: 'Invoice #', sortable: true, render: (v) => <span className="font-mono text-emerald-400">{String(v)}</span> },
-    { key: 'po_number', label: 'PO #', sortable: true, render: (v) => <span className="font-mono text-body">{v ? String(v) : '—'}</span> },
-    { key: 'buyer_name', label: 'Buyer', sortable: true, render: (v) => <span className="text-body">{v ? String(v) : '—'}</span> },
-    { key: 'invoice_type_display', label: 'Type', sortable: false, render: (v) => <span className="text-body">{String(v)}</span> },
-    { key: 'amount', label: 'Amount', sortable: true, render: (v, row) => {
-      const inv = row as unknown as InvoiceApproval;
-      return <span className="text-body">{String(v)} {inv.currency_code || ''}</span>;
-    } },
-    { key: 'match_status', label: 'Match', sortable: false,
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${MATCH_COLORS[String(v)] || ''}`}>{String(v)}</span> },
-    { key: 'status', label: 'Status', sortable: true,
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v)}</span> },
-    { key: 'invoice_date', label: 'Invoice Date', sortable: true, render: (v) => (v ? new Date(String(v)).toLocaleDateString() : '—') },
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => {
-      const inv = row as unknown as InvoiceApproval;
-      return (
-        <div className="flex justify-end gap-1.5">
-          {inv.status === 'pending' && (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); handleApprove(inv); }} disabled={acting} className="text-xs px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-badge-emerald rounded transition-colors">Approve</button>
-              <button onClick={(e) => { e.stopPropagation(); setRejectInv(inv); }} disabled={acting} className="text-xs px-2 py-1 bg-red-900/50 hover:bg-red-800 text-red-400 rounded transition-colors">Reject</button>
-            </>
-          )}
-          {inv.over_tolerance && !inv.debit_note && (
-            <button onClick={(e) => { e.stopPropagation(); handleRaiseDebit(inv); }} disabled={acting} className="text-xs px-2 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-badge-amber rounded transition-colors">Raise Debit</button>
-          )}
-          {inv.debit_note && (
-            <span className="text-xs px-2 py-1 bg-amber-500/10 text-badge-amber rounded">Debit {String(inv.debit_number)}</span>
-          )}
-          {inv.status === 'pending' && (
-            <button onClick={(e) => { e.stopPropagation(); openEdit(inv); }} className="text-xs px-2 py-1 bg-surface-alt hover:bg-surface-alt text-heading rounded transition-colors">Edit</button>
-          )}
-          <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(inv.id)); }} className="text-xs px-2 py-1 bg-red-900/50 hover:bg-red-800 text-red-400 rounded transition-colors">Del</button>
-        </div>
-      );
-    }},
+  const gridData = invoices.map(inv => ({
+    id: inv.id,
+    invoice_number: inv.invoice_number,
+    po_number: inv.po_number ?? '—',
+    buyer_name: inv.buyer_name ?? '—',
+    invoice_type_display: inv.invoice_type_display,
+    amount: `${String(inv.amount)} ${inv.currency_code || ''}`.trim(),
+    match_status: inv.match_status,
+    status: inv.status,
+    invoice_date: inv.invoice_date ? new Date(String(inv.invoice_date)).toLocaleDateString() : '—',
+  }));
+
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Invoice #', field: 'invoice_number', headerFilter: true },
+    { title: 'PO #', field: 'po_number', headerFilter: true },
+    { title: 'Buyer', field: 'buyer_name', headerFilter: true },
+    { title: 'Type', field: 'invoice_type_display' },
+    { title: 'Amount', field: 'amount', hozAlign: 'right' },
+    { title: 'Match', field: 'match_status', headerFilter: true },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'Invoice Date', field: 'invoice_date' },
   ];
 
   const cards = [
@@ -201,7 +169,10 @@ export default function InvoiceApprovalsPage() {
     { label: 'Auto-Approve Ready', value: dashboard?.auto_approval_eligible ?? 0, color: 'text-heading' },
   ];
 
-  const inputCls = 'w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500';
+  const actionBadge = (inv: InvoiceApproval) => {
+    if (inv.debit_note) return <span className="text-xs px-2 py-1 bg-amber-500/10 text-badge-amber rounded">Debit {String(inv.debit_number)}</span>;
+    return null;
+  };
 
   return (
     <Layout>
@@ -232,35 +203,69 @@ export default function InvoiceApprovalsPage() {
 
         <div className="bg-surface rounded-xl border border-border p-3 mb-4 flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted">Status:</span>
-          {[{ value: '', label: 'All' }, ...Object.keys(STATUS_COLORS).map((s) => ({ value: s, label: s.replace('_', ' ') }))].map((opt) => (
-            <button key={opt.value || 'all'} onClick={() => { setStatusFilter(opt.value); setPage(1); }}
+          {[{ value: '', label: 'All' }, ...STATUS_LABELS.map((s) => ({ value: s, label: s.replace('_', ' ') }))].map((opt) => (
+            <button key={opt.value || 'all'} onClick={() => setStatusFilter(opt.value)}
               className={`text-xs px-3 py-1 rounded-full transition-colors ${statusFilter === opt.value ? 'bg-emerald-600/20 text-badge-emerald' : 'bg-surface-alt text-muted hover:text-heading'}`}>
               {opt.label}
             </button>
           ))}
           <span className="text-xs text-muted ml-2">Match:</span>
           {[{ value: '', label: 'All' }, { value: 'match', label: 'Match' }, { value: 'mismatch', label: 'Mismatch' }, { value: 'over_tolerance', label: 'Over Tolerance' }].map((opt) => (
-            <button key={opt.value || 'match-all'} onClick={() => { setMatchFilter(opt.value); setPage(1); }}
+            <button key={opt.value || 'match-all'} onClick={() => setMatchFilter(opt.value)}
               className={`text-xs px-3 py-1 rounded-full transition-colors ${matchFilter === opt.value ? 'bg-emerald-600/20 text-badge-emerald' : 'bg-surface-alt text-muted hover:text-heading'}`}>
               {opt.label}
             </button>
           ))}
         </div>
 
-        <DataTable
-          data={invoices as unknown as Record<string, unknown>[]}
-          columns={columns}
-          totalCount={count}
-          page={page}
-          pageSize={25}
-          onPageChange={setPage}
-          searchValue={search}
-          onSearchChange={(v) => { setSearch(v); setPage(1); }}
-          searchPlaceholder="Search invoice approvals..."
-          onSort={handleSort}
-          sortField={sortField}
-          sortOrder={sortOrder}
+        {actionable.length > 0 && (
+          <div className="bg-surface rounded-xl border border-border p-5 mb-6">
+            <h2 className="text-sm font-semibold text-heading mb-3">Register Actions</h2>
+            <p className="text-xs text-muted mb-3">Pending invoices can be approved / rejected (with reason); over-tolerance invoices can have a debit raised. Edit and delete are available via the grid row actions.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {actionable.map(inv => (
+                <div key={inv.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-heading truncate">{inv.invoice_number} — {inv.buyer_name ?? '—'}</p>
+                    <p className="text-xs text-muted font-mono">{inv.status}{inv.over_tolerance && !inv.debit_note ? ' · over tolerance' : ''}</p>
+                  </div>
+                  <div className="shrink-0 flex gap-2">
+                    {inv.status === 'pending' && (
+                      <>
+                        <button onClick={() => handleApprove(inv)} disabled={acting} className="px-2 py-1 text-xs bg-emerald-600/20 hover:bg-emerald-600/30 text-badge-emerald rounded transition-colors disabled:opacity-50">Approve</button>
+                        <button onClick={() => { setRejectInv(inv); }} disabled={acting} className="px-2 py-1 text-xs bg-red-900/50 hover:bg-red-800 text-red-400 rounded transition-colors disabled:opacity-50">Reject</button>
+                      </>
+                    )}
+                    {inv.over_tolerance && !inv.debit_note && (
+                      <button onClick={() => handleRaiseDebit(inv)} disabled={acting} className="px-2 py-1 text-xs bg-amber-600/20 hover:bg-amber-600/30 text-badge-amber rounded transition-colors disabled:opacity-50">Raise Debit</button>
+                    )}
+                    {actionBadge(inv)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <SpreadsheetGrid
+          title="Invoice Approvals"
+          toolbar={true}
+          exportable={true}
+          columnChooser={true}
+          actionColumn={true}
+          paginationSize={25}
+          height={480}
           loading={loading}
+          data={gridData}
+          columns={columns}
+          onAdd={openCreate}
+          onEdit={(row) => {
+            const inv = invoices.find(i => i.id === row.id);
+            if (!inv) return;
+            if (inv.status !== 'pending') { toast('warning', 'Only pending invoices can be edited'); return; }
+            openEdit(inv);
+          }}
+          onDelete={(row) => setDeleteId(String(row.id))}
         />
       </main>
 
@@ -273,44 +278,45 @@ export default function InvoiceApprovalsPage() {
                 <div>
                   <label className="block text-sm text-body mb-1">Purchase Order ID *</label>
                   <input required value={form.purchase_order} onChange={(e) => setForm({ ...form, purchase_order: e.target.value })}
-                    className={inputCls} placeholder="PO UUID" />
+                    className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="PO UUID" />
                 </div>
                 <div>
                   <label className="block text-sm text-body mb-1">Invoice Type *</label>
-                  <select value={form.invoice_type} onChange={(e) => setForm({ ...form, invoice_type: e.target.value })} className={inputCls}>
+                  <select value={form.invoice_type} onChange={(e) => setForm({ ...form, invoice_type: e.target.value })}
+                    className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
                     {INVOICE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm text-body mb-1">Invoice Date</label>
                   <input type="date" value={form.invoice_date} onChange={(e) => setForm({ ...form, invoice_date: e.target.value })}
-                    className={inputCls} />
+                    className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
                 <div>
                   <label className="block text-sm text-body mb-1">Quantity *</label>
                   <input required type="number" step="0.01" min="0.01" value={form.quantity}
-                    onChange={(e) => setForm({ ...form, quantity: e.target.value })} className={inputCls} />
+                    onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
                 <div>
                   <label className="block text-sm text-body mb-1">Unit Price *</label>
                   <input required type="number" step="0.01" min="0.01" value={form.unit_price}
-                    onChange={(e) => setForm({ ...form, unit_price: e.target.value })} className={inputCls} />
+                    onChange={(e) => setForm({ ...form, unit_price: e.target.value })} className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
                 <div>
                   <label className="block text-sm text-body mb-1">Amount *</label>
                   <input required type="number" step="0.01" min="0.01" value={form.amount}
-                    onChange={(e) => setForm({ ...form, amount: e.target.value })} className={inputCls} />
+                    onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
                 <div>
                   <label className="block text-sm text-body mb-1">Currency ID</label>
                   <input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}
-                    className={inputCls} placeholder="Currency UUID" />
+                    className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Currency UUID" />
                 </div>
               </div>
               <div>
                 <label className="block text-sm text-body mb-1">Notes</label>
                 <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  className={inputCls} rows={2} />
+                  className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" rows={2} />
               </div>
               <div className="flex justify-end gap-3 mt-4">
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-body hover:text-heading transition-colors">Cancel</button>
@@ -329,7 +335,7 @@ export default function InvoiceApprovalsPage() {
             <h2 className="text-lg font-bold mb-2">Reject {rejectInv.invoice_number}?</h2>
             <p className="text-muted text-sm mb-4">A rejection reason is required.</p>
             <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
-              className={inputCls} rows={3} placeholder="e.g. Price does not match the PO" />
+              className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" rows={3} placeholder="e.g. Price does not match the PO" />
             <div className="flex justify-end gap-3 mt-4">
               <button onClick={() => { setRejectInv(null); setRejectReason(''); }} className="px-4 py-2 text-sm text-body hover:text-heading">Cancel</button>
               <button onClick={handleReject} disabled={acting || !rejectReason.trim()} className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:bg-red-600/50 text-white text-sm rounded-lg">

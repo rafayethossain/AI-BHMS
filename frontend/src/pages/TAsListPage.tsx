@@ -2,59 +2,41 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { merchApi } from '../api/client';
 import type { TA } from '../api/client';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import Layout from '../components/Layout';
 import { useToast } from '../contexts/ToastContext';
-
-const STATUS_COLORS: Record<string, string> = {
-  active: 'bg-blue-500/20 text-badge-blue',
-  completed: 'bg-emerald-500/20 text-badge-emerald',
-  delayed: 'bg-red-500/20 text-badge-red',
-};
 
 export default function TAsListPage() {
   const navigate = useNavigate();
   const [tas, setTAs] = useState<TA[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [filters, setFilters] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
-      Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
-      const res = await merchApi.getTAs(params);
+      const res = await merchApi.getTAs({ page_size: '10000' });
       setTAs(res.data.results); setCount(res.data.count);
     } catch { toast('error', 'Failed to load T&As'); } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, [page, sortField, sortOrder, filters]);
+  useEffect(() => { fetchData(); }, []);
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
-  const handleFilterChange = (f: Record<string, string>) => { setFilters(f); setPage(1); };
-
-  const columns: Column[] = [
-    { key: 'po_number', label: 'PO #', sortable: true, render: (v) => <span className="font-mono text-emerald-400">{String(v)}</span> },
-    { key: 'delivery_date', label: 'Delivery Date', sortable: true },
-    { key: 'status', label: 'Status', sortable: true, filterable: true, filterOptions: ['active', 'completed', 'delayed'],
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v)}</span> },
-    { key: 'milestones', label: 'Milestones', className: 'text-center', render: (v) => {
-      const ms = v as unknown as { status: string }[];
-      if (!Array.isArray(ms)) return <span className="text-muted">0</span>;
-      const done = ms.filter(m => m.status === 'completed').length;
-      return <span className="text-body">{done}/{ms.length}</span>;
-    }},
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => (
-      <button onClick={(e) => { e.stopPropagation(); navigate(`/tas/${String(row.id)}`); }} className="text-sm text-blue-400 hover:text-blue-300">View</button>
-    )},
+  const columns: SpreadsheetColumn[] = [
+    { title: 'PO #', field: 'po_number', headerFilter: true, frozen: true, hozAlign: 'left' },
+    { title: 'Delivery Date', field: 'delivery_date', headerFilter: true },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'Milestones', field: 'milestones_display', hozAlign: 'center' },
   ];
+
+  const gridData = tas.map((ta) => ({
+    ...ta,
+    milestones_display: Array.isArray(ta.milestones)
+      ? `${ta.milestones.filter((m) => m.status === 'completed').length}/${ta.milestones.length}`
+      : '0',
+  })) as unknown as Record<string, unknown>[];
 
   return (
     <Layout>
@@ -66,18 +48,17 @@ export default function TAsListPage() {
           </div>
         </div>
 
-        <DataTable
-          data={tas as unknown as Record<string, unknown>[]}
+        <SpreadsheetGrid
+          data={gridData}
           columns={columns}
-          totalCount={count}
-          page={page}
-          pageSize={25}
-          onPageChange={setPage}
-          onSort={handleSort}
-          sortField={sortField}
-          sortOrder={sortOrder}
-          filters={filters}
-          onFilterChange={handleFilterChange}
+          height={480}
+          toolbar
+          title="Time & Action"
+          exportable
+          columnChooser
+          paginationSize={25}
+          actionColumn
+          onView={(row) => navigate(`/tas/${String(row.id)}`)}
           onRowClick={(row) => navigate(`/tas/${String(row.id)}`)}
           loading={loading}
         />

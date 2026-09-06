@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { helpApi } from '../api/client';
 
 interface TourStep {
   title: string;
@@ -51,6 +52,11 @@ export default function GuidedTour() {
   const complete = () => {
     localStorage.setItem(TOUR_KEY, 'true');
     setShow(false);
+    try {
+      helpApi.createTourCompletion('welcome-tour').catch(() => {});
+    } catch {
+      // Non-critical — tour completion is best-effort
+    }
   };
 
   const skip = () => {

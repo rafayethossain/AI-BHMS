@@ -1,16 +1,10 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { commercialApi } from '../api/client';
 import type { DebitNote, DebitNoteDashboard, OverToleranceCandidate } from '../api/client';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import { useToast } from '../contexts/ToastContext';
 import Layout from '../components/Layout';
-
-const STATUS_COLORS: Record<string, string> = {
-  pro_forma: 'bg-amber-500/20 text-badge-amber',
-  issued: 'bg-blue-500/20 text-badge-blue',
-  paid: 'bg-emerald-500/20 text-badge-emerald',
-};
 
 const DEBIT_TYPE_OPTIONS = [
   { value: 'fabric_over_tolerance', label: 'Fabric Over-Tolerance' },
@@ -38,11 +32,6 @@ export default function DebitNotesPage() {
   const [notes, setNotes] = useState<DebitNote[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [dashboard, setDashboard] = useState<DebitNoteDashboard | null>(null);
   const [overTolerance, setOverTolerance] = useState<OverToleranceCandidate[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -50,16 +39,11 @@ export default function DebitNotesPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [acting, setActing] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
-      if (statusFilter) params.status = statusFilter;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
-      const res = await commercialApi.getDebitNotes(params);
+      const res = await commercialApi.getDebitNotes({ page_size: '10000' });
       setNotes(res.data.results);
       setCount(res.data.count);
     } catch { toast('error', 'Failed to load debit notes'); } finally { setLoading(false); }
@@ -79,7 +63,7 @@ export default function DebitNotesPage() {
     } catch { /* non-critical */ }
   };
 
-  useEffect(() => { fetchData(); }, [search, statusFilter, page, sortField, sortOrder]);
+  useEffect(() => { fetchData(); }, []);
   useEffect(() => { fetchDashboard(); fetchOverTolerance(); }, []);
 
   const refresh = () => { fetchData(); fetchDashboard(); fetchOverTolerance(); };
@@ -127,16 +111,6 @@ export default function DebitNotesPage() {
     try { await commercialApi.deleteDebitNote(id); setDeleteId(null); toast('success', 'Debit note deleted'); refresh(); } catch { toast('error', 'Failed to delete debit note'); }
   };
 
-  const handleIssue = async (dn: DebitNote) => {
-    setActing(true);
-    try { await commercialApi.issueDebitNote(dn.id); toast('success', `Issued ${dn.debit_number} via compliance email`); refresh(); } catch { toast('error', 'Failed to issue debit note'); } finally { setActing(false); }
-  };
-
-  const handleMarkPaid = async (dn: DebitNote) => {
-    setActing(true);
-    try { await commercialApi.markDebitNotePaid(dn.id); toast('success', `${dn.debit_number} marked paid`); refresh(); } catch { toast('error', 'Failed to mark debit note paid'); } finally { setActing(false); }
-  };
-
   const handleExport = async () => {
     try {
       const res = await commercialApi.exportDebitNotes();
@@ -152,37 +126,24 @@ export default function DebitNotesPage() {
     } catch { toast('error', 'Failed to export debit notes CSV'); }
   };
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
-
-  const columns: Column[] = [
-    { key: 'debit_number', label: 'Debit #', sortable: true, render: (v) => <span className="font-mono text-emerald-400">{String(v)}</span> },
-    { key: 'po_number', label: 'PO #', sortable: true, render: (v) => <span className="font-mono text-body">{v ? String(v) : '—'}</span> },
-    { key: 'buyer_name', label: 'Buyer', sortable: true, render: (v) => <span className="text-body">{v ? String(v) : '—'}</span> },
-    { key: 'debit_type_display', label: 'Type', sortable: false },
-    { key: 'amount', label: 'Amount', sortable: true, render: (v, row) => {
-      const dn = row as unknown as DebitNote;
-      return <span className="text-body">{String(v)} {dn.currency_code || ''}</span>;
-    } },
-    { key: 'status', label: 'Status', sortable: true,
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v)}</span> },
-    { key: 'compliance_email_sent', label: 'Compliance', sortable: false, render: (v) => (v ? <span className="text-xs text-badge-blue font-medium">sent</span> : <span className="text-xs text-muted">pending</span>) },
-    { key: 'raised_at', label: 'Raised', sortable: true, render: (v) => (v ? new Date(String(v)).toLocaleDateString() : '—') },
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => {
-      const dn = row as unknown as DebitNote;
-      return (
-        <div className="flex justify-end gap-1.5">
-          {dn.status === 'pro_forma' && (
-            <button onClick={(e) => { e.stopPropagation(); handleIssue(dn); }} disabled={acting} className="text-xs px-2 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-badge-blue rounded transition-colors">Issue</button>
-          )}
-          {dn.status === 'issued' && (
-            <button onClick={(e) => { e.stopPropagation(); handleMarkPaid(dn); }} disabled={acting} className="text-xs px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-badge-emerald rounded transition-colors">Mark Paid</button>
-          )}
-          <button onClick={(e) => { e.stopPropagation(); openEdit(dn); }} className="text-xs px-2 py-1 bg-surface-alt hover:bg-surface-alt text-heading rounded transition-colors">Edit</button>
-          <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(dn.id)); }} className="text-xs px-2 py-1 bg-red-900/50 hover:bg-red-800 text-red-400 rounded transition-colors">Del</button>
-        </div>
-      );
-    }},
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Debit #', field: 'debit_number', headerFilter: true },
+    { title: 'PO #', field: 'po_number' },
+    { title: 'Buyer', field: 'buyer_name', headerFilter: true },
+    { title: 'Type', field: 'debit_type_display' },
+    { title: 'Amount', field: 'amount', hozAlign: 'right' },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'Compliance', field: 'compliance_email_sent' },
+    { title: 'Raised', field: 'raised_at' },
   ];
+
+  const gridData = notes.map((dn) => ({
+    ...dn,
+    status: String(dn.status).replace('_', ' '),
+    amount: `${Number(dn.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} ${dn.currency_code || ''}`.trim(),
+    raised_at: dn.raised_at ? new Date(dn.raised_at).toLocaleDateString() : '—',
+    compliance_email_sent: dn.compliance_email_sent ? 'yes' : 'no',
+  }));
 
   const cards = [
     { label: 'Total', value: dashboard?.total ?? 0, color: 'text-heading' },
@@ -247,29 +208,21 @@ export default function DebitNotesPage() {
           </div>
         )}
 
-        <div className="bg-surface rounded-xl border border-border p-3 mb-4 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted">Filter:</span>
-          {[{ value: '', label: 'All' }, ...Object.keys(STATUS_COLORS).map((s) => ({ value: s, label: s.replace('_', ' ') }))].map((opt) => (
-            <button key={opt.value || 'all'} onClick={() => { setStatusFilter(opt.value); setPage(1); }}
-              className={`text-xs px-3 py-1 rounded-full transition-colors ${statusFilter === opt.value ? 'bg-emerald-600/20 text-badge-emerald' : 'bg-surface-alt text-muted hover:text-heading'}`}>
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        <DataTable
-          data={notes as unknown as Record<string, unknown>[]}
+        <SpreadsheetGrid
+          data={gridData as unknown as Record<string, unknown>[]}
           columns={columns}
-          totalCount={count}
-          page={page}
-          pageSize={25}
-          onPageChange={setPage}
-          searchValue={search}
-          onSearchChange={(v) => { setSearch(v); setPage(1); }}
-          searchPlaceholder="Search debit notes..."
-          onSort={handleSort}
-          sortField={sortField}
-          sortOrder={sortOrder}
+          height={480}
+          toolbar
+          title="Debit Notes"
+          exportable
+          columnChooser
+          paginationSize={25}
+          actionColumn
+          onAdd={() => openCreate()}
+          onEdit={(row) => openEdit(row as unknown as DebitNote)}
+          onView={(row) => openEdit(row as unknown as DebitNote)}
+          onDelete={(row) => setDeleteId(String(row.id))}
+          onRowClick={(row) => openEdit(row as unknown as DebitNote)}
           loading={loading}
         />
       </main>

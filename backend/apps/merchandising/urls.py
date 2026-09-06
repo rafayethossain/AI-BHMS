@@ -9,6 +9,7 @@ from .views import (
     BOMViewSet,
     CostingLineViewSet,
     CostingViewSet,
+    DesignCostingViewSet,
     DesignImageViewSet,
     DesignJobRequestViewSet,
     DesignSheetViewSet,
@@ -44,6 +45,7 @@ router.register(r"boms", BOMViewSet)
 router.register(r"bom-items", BOMItemViewSet)
 router.register(r"costings", CostingViewSet)
 router.register(r"costing-lines", CostingLineViewSet)
+router.register(r"design-costings", DesignCostingViewSet)
 router.register(r"tas", TAViewSet)
 router.register(r"ta-milestones", TAMilestoneViewSet)
 router.register(r"design-sheets", DesignSheetViewSet)

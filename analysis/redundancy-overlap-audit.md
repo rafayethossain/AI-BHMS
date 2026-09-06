@@ -2,13 +2,13 @@
 
 **Scope**: Read-only analysis of redundant, overlapping, or unnecessary features across the BHMS codebase, prioritised by business value for a Bangladesh apparel buying house.
 **Date**: 2026-08-06
-**Method**: Static analysis of `backend/apps/**` + `frontend/src/**`, cross-referenced against `master-backlog.md` (RQ/GC requirements) and the GC Manual gap analyses in `analysis/`.
+**Method**: Static analysis of `backend/apps/**` + `frontend/src/**`, cross-referenced against `master-backlog.md` (RQ/target requirements) and the target manual gap analyses in `analysis/`.
 
 ---
 
 ## Executive Summary
 
-The codebase is **intentionally feature-rich**: most models map 1:1 to GC Manual requirements (RQ-010 Hits, RQ-021 Booking Schedule, RQ-027 Final Hit Reconciliation, RQ-031 Paperwork Comparison, etc.). Genuine **redundancy is concentrated in six places**:
+The codebase is **intentionally feature-rich**: most models map 1:1 to target manual requirements (RQ-010 Hits, RQ-021 Booking Schedule, RQ-027 Final Hit Reconciliation, RQ-031 Paperwork Comparison, etc.). Genuine **redundancy is concentrated in six places**:
 
 1. **`Hit` vs `PurchaseOrderItem`** — the business entities are distinct and must BOTH stay, but `Hit.colour` (free-text) duplicates `PurchaseOrderItem.color` (FK → `setup.ColorCode`) with no referential integrity. **Primary finding.**
 2. **Two executive-dashboard KPI endpoints** compute the same numbers from the same models.
@@ -28,12 +28,12 @@ Plus a naming collision (`delivery_mode`) and an unreachable page (`/dashboard/e
 ### Why both must exist (business reality)
 
 - `PurchaseOrderItem` is the **commercial contract line** at colour×size granularity: `purchase_order`, `color` (FK → `setup.ColorCode`), `size`, `quantity`, `unit_price` — `backend/apps/merchandising/models.py:400-414`.
-- `Hit` is the **production commitment per colour** (aggregate across all sizes of that colour), carrying the *production system key* used by the factory: `hit_number` + `colour` — `backend/apps/merchandising/models.py:427-461`. This is a GC requirement (GC-010 "Breakdown Tab", §6.2.5), not an artifact.
+- `Hit` is the **production commitment per colour** (aggregate across all sizes of that colour), carrying the *production system key* used by the factory: `hit_number` + `colour` — `backend/apps/merchandising/models.py:427-461`. This is a target requirement (target-010 "Breakdown Tab", §6.2.5), not an artifact.
 - The codebase **already went through this exact refactor**: migration `backend/apps/merchandising/migrations/0016_hit_reparent_to_purchase_order.py` reparented `Hit` from `po_item` to `purchase_order` and deduplicated on `(tenant, purchase_order, colour)`. The backlog records it: *"Sprint 2.6 — Hit model; Sprint 2.10 — reparented to PO (was PO item)"* — `master-backlog.md:3394`.
-- The original gap analysis proposed putting hit fields **on** `PurchaseOrderItem` (`analysis/02-gap-analysis-bhms-vs-gc.md:122`), but the implemented shape (separate PO-child model) is the better design. **Do not re-merge** — merging would require either duplicating sizes per hit or losing colour-level execution tracking.
+- The original gap analysis proposed putting hit fields **on** `PurchaseOrderItem` (`analysis/02-gap-analysis-bhms-vs-target.md:122`), but the implemented shape (separate PO-child model) is the better design. **Do not re-merge** — merging would require either duplicating sizes per hit or losing colour-level execution tracking.
 - `Hit` is load-bearing across the pipeline:
   - `logistics.BookingScheduleItem.hit` FK — `backend/apps/logistics/models.py:189`.
-  - Delivered booking item → auto-raises `FinalHitReconciliation` (GC-021) — `backend/apps/logistics/views.py:272-277`.
+  - Delivered booking item → auto-raises `FinalHitReconciliation` (target-021) — `backend/apps/logistics/views.py:272-277`.
   - `FinalHitReconciliation` (per delivered hit, >20-unit shortage ⇒ debit) — `backend/apps/logistics/models.py:303-365`.
   - Frontend: `BookingSchedulePage` hit column (`frontend/src/pages/BookingSchedulePage.tsx:145`), hits API `frontend/src/api/client.ts:1525-1533`, `PurchaseOrderDetailPage` hit tab.
 
@@ -45,7 +45,7 @@ Plus a naming collision (`delivery_mode`) and an unreachable page (`/dashboard/e
 | Master data | none (typos create phantom colours) | `setup.ColorCode` code/name/hex — `backend/apps/setup/models.py:300` |
 | Uniqueness | `(tenant, purchase_order, colour)` — `models.py:458` | n/a (colour×size) |
 
-The seed command **derives hit colours directly from the PO's item colours** — `backend/apps/setup/management/commands/seed_demo_data.py:2075-2118` — proving the colour set is not independent. The gap analysis even calls colour the "system key" (`analysis/01-gc-feature-catalog.md:110`), so it cannot drift from master data.
+The seed command **derives hit colours directly from the PO's item colours** — `backend/apps/setup/management/commands/seed_demo_data.py:2075-2118` — proving the colour set is not independent. The gap analysis even calls colour the "system key" (`analysis/01-feature-catalog.md:110`), so it cannot drift from master data.
 
 **Recommendation**: make `Hit.colour` a `ForeignKey` to `setup.ColorCode` (mirroring `PurchaseOrderItem.color`) with a `validate` on create restricting hits to the PO's item colours. Data-clean the existing free-text values against `ColorCode`. This is a migration + serializer change, no UI change (both already render `colour`).
 
@@ -53,13 +53,13 @@ The seed command **derives hit colours directly from the PO's item colours** —
 
 `Hit.delivery_type` = `sea`/`air` only — `merchandising/models.py:422-424`. `Shipment.MODE_CHOICES` = sea/air/road/rail/multi — `backend/apps/logistics/models.py:44`, applied at `models.py:72`. The shipment that eventually carries a hit (via `BookingScheduleItem`) already records the true mode.
 
-**Recommendation**: keep the field for the production screen (GC requires per-hit sea/air for the breakdown tab) but treat `Shipment.mode` as the source of truth at execution; drop the extra `HitDeliveryType` choices or widen them to match `Shipment.MODE_CHOICES` so values can't disagree.
+**Recommendation**: keep the field for the production screen (target requires per-hit sea/air for the breakdown tab) but treat `Shipment.mode` as the source of truth at execution; drop the extra `HitDeliveryType` choices or widen them to match `Shipment.MODE_CHOICES` so values can't disagree.
 
 ### Concrete overlap #3 — `Hit.delivery_mode` naming collision (LOW, but confusing)
 
 `Hit.delivery_mode` = **boxed/hanging** packing mode — `merchandising/models.py:417-420, 440-442`. `setup.DeliveryMode` = **FOB/CIF/CM commercial terms** — `backend/apps/setup/models.py:130`; `PurchaseOrder.delivery_mode` FK → it — `merchandising/models.py:338`. Two different concepts sharing one field name; any reader/analyst (and any future AI agent) will conflate them.
 
-**Recommendation**: rename the `Hit` field to `packing_mode` (GC calls it "Boxed/Hanging delivery mode"). Keeps the concept, kills the collision.
+**Recommendation**: rename the `Hit` field to `packing_mode` (target calls it "Boxed/Hanging delivery mode"). Keeps the concept, kills the collision.
 
 ### Blast radius (if you touch Hit)
 
@@ -111,7 +111,7 @@ Both aggregate PO-by-status, shipment in-transit/delivered, inspection counts, a
 - `BookingScheduleItem` (per hit/shipment, week-ending, cut/ready qty, risk) — `logistics/models.py:170-215`.
 - `ProductionPlan` (per PO/factory, dates, qty, status) — `production/models.py:9-37`.
 
-None references the others; all three carry overlapping "when does this order move" data and the DashboardSummary "tasks" section only reads `TAMilestone` (`core/views.py:135-150`). **Not removable** — each serves a GC requirement — but the report should note the intentional gap so the client doesn't expect them to reconcile. Lowest-risk action: leave as-is, document.
+None references the others; all three carry overlapping "when does this order move" data and the DashboardSummary "tasks" section only reads `TAMilestone` (`core/views.py:135-150`). **Not removable** — each serves a target requirement — but the report should note the intentional gap so the client doesn't expect them to reconcile. Lowest-risk action: leave as-is, document.
 
 ### O6 — Fragmented change-audit story (MEDIUM)
 
@@ -121,7 +121,7 @@ The amendments/CAPs/approvals are genuine **workflow** entities (approval gates,
 
 ### O7 — Commercial documents overlap (LOW, informational)
 
-`SalesConfirmation` (GC-025 48h dispute window — `commercial/models.py:192-256`), `ProformaInvoice` (`models.py:116-151`), `SalesContract` (`models.py:154-189`), and `LC` (`models.py:14-56`) all key on PO+buyer+amount+currency+status. `SalesConfirmation` (48h workflow) and `LC` (banking) are distinct. **PI vs SalesContract are the closest pair** (both one-per-PO, both record amount/currency/status) — worth a client question: does this buying house issue both, or is one of them GC drift? **Do not merge** without business confirmation.
+`SalesConfirmation` (target-025 48h dispute window — `commercial/models.py:192-256`), `ProformaInvoice` (`models.py:116-151`), `SalesContract` (`models.py:154-189`), and `LC` (`models.py:14-56`) all key on PO+buyer+amount+currency+status. `SalesConfirmation` (48h workflow) and `LC` (banking) are distinct. **PI vs SalesContract are the closest pair** (both one-per-PO, both record amount/currency/status) — worth a client question: does this buying house issue both, or is one of them target drift? **Do not merge** without business confirmation.
 
 ### O8 — Delivery-mode & delivery-type vocabulary (covered in §1, #2/#3)
 

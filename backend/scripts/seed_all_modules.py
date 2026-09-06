@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.development")
 django.setup()
 
-from apps.commercial.models import LC, Bank, LCAmendment
-from apps.logistics.models import FreightForwarder, Shipment
+from apps.commercial.models import LC, Bank, LCAmendment, ForwardOrder
+from apps.logistics.models import CostReconciliation, ExportRecap, FreightForwarder, ImportRecap, Shipment, SupplierPayment
 from apps.merchandising.models import (
     BOM,
     TA,
@@ -22,6 +22,7 @@ from apps.merchandising.models import (
     Costing,
     CostingLine,
     FileOpening,
+    Hit,
     PurchaseOrder,
     PurchaseOrderItem,
     Style,
@@ -240,6 +241,32 @@ for i, po in enumerate(po_objects):
             )
             po_item_count += 1
 print(f"[OK] PO Items: {po_item_count}")
+
+# ──────────────────────────────────────────────
+# 5.5 HITS (production breakdown, per PO colour)
+# Feeds the Order List "Actual completion date" column:
+# shipped/delivered POs get an actual_delivery_date; in-flight stay blank.
+# ──────────────────────────────────────────────
+hit_count = 0
+for i, po in enumerate(po_objects):
+    color_codes = color_selections[i % len(color_selections)]
+    for j, cc in enumerate(color_codes):
+        color = colors.get(cc)
+        if not color:
+            continue
+        original = po.delivery_date
+        actual = original + timedelta(days=7) if po.status in ("shipped", "delivered") else None
+        _, created = Hit.objects.get_or_create(
+            tenant=tenant, purchase_order=po, colour=color,
+            defaults={
+                "hit_number": f"HT-{i + 1:03d}-{j + 1}",
+                "original_delivery_date": original,
+                "actual_delivery_date": actual,
+            }
+        )
+        if created:
+            hit_count += 1
+print(f"[OK] Hits: {hit_count}")
 
 # ──────────────────────────────────────────────
 # 6. BOM (Bill of Materials)
@@ -623,6 +650,188 @@ for i, po in enumerate(po_objects[:6]):
     ship_count += 1
 print(f"[OK] Shipments: {ship_count}")
 
+# ──────────────────────────────────────────────
+# 15b. IMPORT RECAPS (RQ-043 / B2 demo rows)
+# ──────────────────────────────────────────────
+imp_statuses = ["in_transit", "arrived", "unstuffed"]
+imp_modes = ["sea", "air", "sea"]
+imp_foc = ["lc", "lc", "foc"]
+imp_cats = ["fabric", "fabric", "trims"]
+imp_count = 0
+vendor_list = list(vendors.values())
+factory_list = list(factories.values())
+for i in range(3):
+    etd = date.today() - timedelta(days=35 + i)
+    eta = etd + timedelta(days=18)
+    ImportRecap.objects.get_or_create(
+        tenant=tenant, s_c_number=f"SC-2026-{4100 + i}",
+        defaults={
+            "supplier": vendor_list[i % len(vendor_list)] if vendor_list else None,
+            "factory": factory_list[i % len(factory_list)] if factory_list else None,
+            "invoice_value": Decimal("18500.00") + Decimal(i) * Decimal("1250.00"),
+            "item_category": imp_cats[i],
+            "quantity": Decimal("4200.00") + Decimal(i) * Decimal("800.00"),
+            "rolls_bales": 120 + i * 36,
+            "container": f"TCNU{9000000 + i}",
+            "bl_hawb": f"OOLU2312{400000 + i}",
+            "mode": imp_modes[i],
+            "lc_foc": imp_foc[i],
+            "vessel": f"MV Bay Trader {chr(65 + i)}",
+            "pcd_date": etd - timedelta(days=6),
+            "etd_date": etd,
+            "eta_date": eta,
+            "atb_date": eta + timedelta(days=2) if i < 2 else None,
+            "unstuffed_date": eta + timedelta(days=5) if i < 2 else None,
+            "in_house_date": eta + timedelta(days=7) if i == 0 else None,
+            "agent": "Progressive Clearing & Forwarding",
+            "docs_received": i < 2,
+            "status": imp_statuses[i],
+            "remarks": "Priority trims lot" if i == 2 else "Standard fabric lot",
+        }
+    )
+    imp_count += 1
+print(f"[OK] Import Recaps: {imp_count}")
+
+# ──────────────────────────────────────────────
+# 15c. EXPORT RECAPS (RQ-044 / B3 demo rows)
+# ──────────────────────────────────────────────
+exp_modes = ["sea", "sea", "air"]
+exp_count = 0
+po_export_list = list(PurchaseOrder.objects.filter(tenant=tenant)[:3])
+for i in range(3):
+    inv_date = date.today() - timedelta(days=45 + i)
+    on_board = inv_date + timedelta(days=5)
+    eta = on_board + timedelta(days=28)
+    fob_val = Decimal("85000.00") + Decimal(i) * Decimal("12500.00")
+    ExportRecap.objects.get_or_create(
+        tenant=tenant, fob_no=f"FOB-2026-{101 + i}",
+        defaults={
+            "purchase_order": po_export_list[i % len(po_export_list)] if po_export_list else None,
+            "factory": factory_list[i % len(factory_list)] if factory_list else None,
+            "forwarder": ff_objects[i % len(ff_objects)] if ff_objects else None,
+            "s_c_number": f"SC-2026-{4200 + i}",
+            "factory_invoice": f"F-INV-{2600 + i}",
+            "factory_invoice_date": inv_date,
+            "customer_invoice": f"C-INV-{1800 + i}",
+            "customer_invoice_date": inv_date + timedelta(days=2),
+            "quantity": Decimal("10000.00") + Decimal(i) * Decimal("2500.00"),
+            "fob_value": fob_val,
+            "cmpt_value": fob_val * Decimal("0.506"),
+            "cost_value": fob_val * Decimal("0.447"),
+            "service_pct": Decimal("3.000"),
+            "ex_factory_date": inv_date,
+            "mode": exp_modes[i],
+            "hbl": f"OONL2026HBL{880 + i}",
+            "on_board_date": on_board,
+            "eta_date": eta,
+            "container": f"TCLU{7799000 + i}",
+            "bl_number": f"OOLU202609{8700 + i}",
+            "courier": "DHL Express" if i == 2 else "",
+            "factory_pay_terms": "60 days",
+            "factory_amount": fob_val * Decimal("0.588"),
+            "factory_due_date": on_board + timedelta(days=60),
+            "factory_paid_date": None,
+            "customer_pay_terms": "30 days",
+            "customer_received_amount": fob_val,
+            "customer_due_date": on_board + timedelta(days=30),
+            "customer_payment_date": on_board + timedelta(days=27) if i == 0 else None,
+            "remarks": "Full FOB lot to London" if i == 0 else ("CMPT lot with L/C docs" if i == 1 else "Air export sample lot"),
+        }
+    )
+    exp_count += 1
+print(f"[OK] Export Recaps: {exp_count}")
+
+# ──────────────────────────────────────────────
+# 15d. SUPPLIER PAYMENTS (RQ-045 / B4 demo rows)
+# ──────────────────────────────────────────────
+sp_payment_methods = ["TT", "LC", "TT"]
+sp_status = [0, 0, 1]  # released flags (0 unreleased, 1 released)
+sp_count = 0
+po_sp_list = list(PurchaseOrder.objects.filter(tenant=tenant)[:3])
+for i in range(3):
+    due = date.today() + timedelta(days=20 + i * 10)
+    if sp_status[i]:
+        due = date.today() - timedelta(days=5)
+    SupplierPayment.objects.get_or_create(
+        tenant=tenant, payment_ref=f"SP-2026-{201 + i}",
+        defaults={
+            "supplier": vendor_list[i % len(vendor_list)] if vendor_list else None,
+            "purchase_order": po_sp_list[i % len(po_sp_list)] if po_sp_list else None,
+            "invoice_no": f"SP-INV-{300 + i}",
+            "fn_ref": f"FO-2026-0{100 + i}",
+            "allocated_amount": Decimal("4800.00") + Decimal(i) * Decimal("200.00"),
+            "amount": Decimal("4800.00") + Decimal(i) * Decimal("200.00"),
+            "currency": "USD",
+            "payment_date": (date.today() - timedelta(days=10)) if sp_status[i] else None,
+            "due_date": due,
+            "payment_method": sp_payment_methods[i],
+            "released": bool(sp_status[i]),
+            "released_at": (date.today() - timedelta(days=8)) if sp_status[i] else None,
+            "remarks": "LC-backed fabric settlement" if sp_payment_methods[i] == "LC" else "TT fabric settlement",
+        }
+    )
+    sp_count += 1
+print(f"[OK] Supplier Payments: {sp_count}")
+
+# ──────────────────────────────────────────────
+# 15e. COST RECONCILIATIONS (RQ-046 / B5 demo rows)
+# ──────────────────────────────────────────────
+cr_count = 0
+cr_po_list = list(PurchaseOrder.objects.filter(tenant=tenant)[:3])
+cr_statuses = ["pending", "resolved", "disputed"]
+for i, po in enumerate(cr_po_list):
+    live_cost = Costing.objects.filter(tenant=tenant, purchase_order=po, is_live=True).first()
+    recap = ExportRecap.objects.filter(tenant=tenant, purchase_order=po).first()
+    factory_amt = Decimal(str(recap.factory_amount)) if recap else Decimal("2000.00") + Decimal(i) * Decimal("150.00")
+    cm_amt = Decimal(str(live_cost.cm_cost * po.quantity)) if live_cost else Decimal("1800.00") + Decimal(i) * Decimal("100.00")
+    # one row flagged as a mismatch (factory > planning), one matching, one disputed
+    if i == 1:
+        factory_amt = cm_amt
+    CostReconciliation.objects.get_or_create(
+        tenant=tenant, purchase_order=po,
+        defaults={
+            "export_recap": recap,
+            "costing": live_cost,
+            "factory_inv_amount": factory_amt,
+            "factory_inv_qty": Decimal(str(po.quantity)),
+            "planning_cm_amount": cm_amt,
+            "planning_cm_qty": Decimal(str(po.quantity)),
+            "status": cr_statuses[i],
+            "notes": "Factory Inv vs Planning CM for PO cost reconciliation.",
+        }
+    )
+    cr_count += 1
+print(f"[OK] Cost Reconciliations: {cr_count}")
+
+# ──────────────────────────────────────────────
+# 15e. FORWARD ORDERS (RQ-048 / B7 demo rows)
+# ──────────────────────────────────────────────
+fo_count = 0
+fo_buyers = list(buyers.values())
+po_reference = po_objects[0] if po_objects else None
+for i in range(3):
+    month_date = (date.today().replace(day=1) + timedelta(days=30 * i)).replace(day=1)
+    fo_buyer = fo_buyers[i % len(fo_buyers)] if fo_buyers else None
+    fo_factory = factory_list[i % len(factory_list)] if factory_list else None
+    fo_po = po_reference if (i == 0 and po_reference) else None
+    ForwardOrder.objects.get_or_create(
+        tenant=tenant,
+        month=month_date,
+        buyer=fo_buyer,
+        factory=fo_factory,
+        defaults={
+            "purchase_order": fo_po,
+            "quantity": Decimal("1000.00") + Decimal(i) * Decimal("700.00"),
+            "unit_cost": Decimal("3.00") + Decimal("0.50") * Decimal(i),
+            "service_pct": Decimal("3.00"),
+            "in_hand_units": Decimal("200.00") + Decimal(i) * Decimal("150.00"),
+            "status": ["confirmed", "in_production", "draft"][i],
+            "remarks": f"Forward commitment {i + 1} (Order In-hand tracked)",
+        },
+    )
+    fo_count += 1
+print(f"[OK] Forward Orders: {fo_count}")
+
 # ══════════════════════════════════════════════
 # SUMMARY
 # ══════════════════════════════════════════════
@@ -653,3 +862,8 @@ print(f"  Inspection Items:  {InspectionItem.objects.filter(tenant=tenant).count
 print("\nLogistics:")
 print(f"  Freight Forwarders:{FreightForwarder.objects.filter(tenant=tenant).count()}")
 print(f"  Shipments:         {Shipment.objects.filter(tenant=tenant).count()}")
+print(f"  Import Recaps:     {ImportRecap.objects.filter(tenant=tenant).count()}")
+print(f"  Export Recaps:     {ExportRecap.objects.filter(tenant=tenant).count()}")
+print(f"  Supplier Payments: {SupplierPayment.objects.filter(tenant=tenant).count()}")
+print(f"  Cost Reconciliations: {CostReconciliation.objects.filter(tenant=tenant).count()}")
+print(f"  Forward Orders:    {ForwardOrder.objects.filter(tenant=tenant).count()}")

@@ -14,6 +14,11 @@ import type { UserOption } from '../components/DesignSheetJobRequests';
 import type { DesignSheet } from '../api/client';
 import type { DesignImage } from '../api/client';
 
+const DEFAULT_BLOCK_ORDER = [
+  'header', 'sketch', 'material', 'fit_specs',
+  'images', 'job_requests',
+];
+
 export default function DesignSheetPage() {
   const { id } = useParams<{ id: string }>();
   const [sheet, setSheet] = useState<DesignSheet | null>(null);
@@ -264,6 +269,25 @@ export default function DesignSheetPage() {
       .catch(() => setDesignImages([]));
   };
 
+  const handleMoveBlock = (key: string, direction: 'up' | 'down') => {
+    if (!sheet) return;
+    const order = sheet.layout_order.length > 0
+      ? [...sheet.layout_order]
+      : [...DEFAULT_BLOCK_ORDER];
+    const index = order.indexOf(key);
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (index < 0 || target < 0 || target >= order.length) return;
+    const next = [...order];
+    [next[index], next[target]] = [next[target], next[index]];
+    setError(null);
+    merchApi
+      .updateDesignSheet(sheet.id, { layout_order: next })
+      .then(() =>
+        setSheet((prev) => (prev ? { ...prev, layout_order: next } : prev)),
+      )
+      .catch(() => setError('Failed to reorder blocks'));
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -307,47 +331,96 @@ export default function DesignSheetPage() {
                 Print Design Sheet
               </Link>
             </div>
-            <DesignSheetHeader sheet={sheet} onStatusChange={setSheet} />
-            <DesignSheetSketch
-              techpackId={sheet.tech_pack}
-              designSheetId={sheet.id}
-              sketchUrl={sheet.sketch_url}
-              annotations={sheet.sketch_annotations}
-              onAnnotationsChange={(annotations) => setSheet({ ...sheet, sketch_annotations: annotations })}
-              onSketchChange={(url) => setSheet({ ...sheet, sketch_url: url })}
-            />
-            <DesignSheetMaterial
-              bomItems={materialItems}
-              onItemEdit={handleMaterialEdit}
-              onItemAdd={handleMaterialAdd}
-              onItemDelete={handleMaterialDelete}
-            />
-            <DesignSheetFitSpecs
-              fitSpecs={sheet.fit_specs}
-              onCreateFitSpec={handleFitSpecCreate}
-              onSelectFitSpec={handleFitSpecSelect}
-              onAddFitImage={handleFitImageAdd}
-              onDeleteFitImage={handleFitImageDelete}
-              onReorderFitImage={handleFitImageReorder}
-              onCopyFromBase={handleFitSpecCopyFromBase}
-              onCopyFromOtherStyle={handleFitSpecCopyFromOtherStyle}
-              onUpdateFitSpec={handleFitSpecUpdate}
-              otherSheets={fitCopySources.filter((s) => s.id !== sheet.id)}
-            />
-            <DesignSheetImages
-              images={designImages}
-              styleId={sheet.style_id || undefined}
-              onUpload={handleDesignImageUpload}
-              onSetMain={handleDesignImageSetMain}
-              onSetRole={handleDesignImageSetRole}
-              onDelete={handleDesignImageDelete}
-            />
-            <DesignSheetJobRequests
-              jobRequests={sheet.job_requests}
-              users={userOptions}
-              onCreateJobRequest={handleJobCreate}
-              onAllocateUser={handleJobAllocate}
-            />
+            {(() => {
+              const blockKeys = sheet.layout_order.length > 0
+                ? sheet.layout_order
+                : DEFAULT_BLOCK_ORDER;
+              const blocks = new Map<string, React.ReactNode>([
+                ['header',
+                  <DesignSheetHeader key="header" sheet={sheet} onStatusChange={setSheet} />],
+                ['sketch',
+                  <DesignSheetSketch
+                    key="sketch"
+                    techpackId={sheet.tech_pack}
+                    designSheetId={sheet.id}
+                    sketchUrl={sheet.sketch_url}
+                    annotations={sheet.sketch_annotations}
+                    onAnnotationsChange={(annotations) => setSheet({ ...sheet, sketch_annotations: annotations })}
+                    onSketchChange={(url) => setSheet({ ...sheet, sketch_url: url })}
+                  />],
+                ['material',
+                  <DesignSheetMaterial
+                    key="material"
+                    bomItems={materialItems}
+                    onItemEdit={handleMaterialEdit}
+                    onItemAdd={handleMaterialAdd}
+                    onItemDelete={handleMaterialDelete}
+                  />],
+                ['fit_specs',
+                  <DesignSheetFitSpecs
+                    key="fit_specs"
+                    fitSpecs={sheet.fit_specs}
+                    onCreateFitSpec={handleFitSpecCreate}
+                    onSelectFitSpec={handleFitSpecSelect}
+                    onAddFitImage={handleFitImageAdd}
+                    onDeleteFitImage={handleFitImageDelete}
+                    onReorderFitImage={handleFitImageReorder}
+                    onCopyFromBase={handleFitSpecCopyFromBase}
+                    onCopyFromOtherStyle={handleFitSpecCopyFromOtherStyle}
+                    onUpdateFitSpec={handleFitSpecUpdate}
+                    otherSheets={fitCopySources.filter((s) => s.id !== sheet.id)}
+                  />],
+                ['images',
+                  <DesignSheetImages
+                    key="images"
+                    images={designImages}
+                    styleId={sheet.style_id || undefined}
+                    onUpload={handleDesignImageUpload}
+                    onSetMain={handleDesignImageSetMain}
+                    onSetRole={handleDesignImageSetRole}
+                    onDelete={handleDesignImageDelete}
+                  />],
+                ['job_requests',
+                  <DesignSheetJobRequests
+                    key="job_requests"
+                    jobRequests={sheet.job_requests}
+                    users={userOptions}
+                    onCreateJobRequest={handleJobCreate}
+                    onAllocateUser={handleJobAllocate}
+                  />],
+              ]);
+              return blockKeys.map((key, index) => {
+                const node = blocks.get(key);
+                if (!node) return null;
+                return (
+                  <div key={key} data-testid={`block-${key}`} className="space-y-2">
+                    <div className="flex justify-end gap-1">
+                      <button
+                        type="button"
+                        data-testid={`move-up-${key}`}
+                        disabled={index === 0}
+                        aria-label={`Move ${key} section up`}
+                        onClick={() => handleMoveBlock(key, 'up')}
+                        className="px-2 py-1 rounded-md text-xs text-muted border border-border hover:border-emerald-500/40 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        Move up
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`move-down-${key}`}
+                        disabled={index === blockKeys.length - 1}
+                        aria-label={`Move ${key} section down`}
+                        onClick={() => handleMoveBlock(key, 'down')}
+                        className="px-2 py-1 rounded-md text-xs text-muted border border-border hover:border-emerald-500/40 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        Move down
+                      </button>
+                    </div>
+                    {node}
+                  </div>
+                );
+              });
+            })()}
           </div>
         )}
       </main>

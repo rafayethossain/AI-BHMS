@@ -1,25 +1,13 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { merchApi, setupApi } from '../api/client';
-import type { PurchaseOrder, FileOpening, Factory, Currency, Country } from '../api/client';
+import type { PurchaseOrder, FileOpening, Factory, Currency, Country, OrderRisk } from '../api/client';
 import SearchableSelect from '../components/SearchableSelect';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import EntityCard, { CardListToggle } from '../components/EntityCard';
 import { useToast } from '../contexts/ToastContext';
 import Layout from '../components/Layout';
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-surface-alt/20 text-muted',
-  open: 'bg-blue-500/20 text-badge-blue',
-  confirmed: 'bg-emerald-500/20 text-badge-emerald',
-  in_production: 'bg-amber-500/20 text-badge-amber',
-  quality_check: 'bg-purple-500/20 text-badge-purple',
-  ready: 'bg-cyan-500/20 text-cyan-400',
-  shipped: 'bg-indigo-500/20 text-indigo-400',
-  delivered: 'bg-green-500/20 text-badge-green',
-  cancelled: 'bg-red-500/20 text-badge-red',
-};
 
 export default function PurchaseOrdersListPage() {
   const navigate = useNavigate();
@@ -27,11 +15,6 @@ export default function PurchaseOrdersListPage() {
   const [pos, setPOs] = useState<PurchaseOrder[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [filters, setFilters] = useState<Record<string, string>>({});
   const [showCreate, setShowCreate] = useState(false);
   const [view, setView] = useState<'grid' | 'list'>('list');
   const [creating, setCreating] = useState(false);
@@ -50,11 +33,7 @@ export default function PurchaseOrdersListPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
-      Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
-      const res = await merchApi.getPOs(params);
+      const res = await merchApi.getPOs({ page_size: '10000' });
       setPOs(res.data.results); setCount(res.data.count);
     } catch { toast('error', 'Failed to load purchase orders'); } finally { setLoading(false); }
   };
@@ -66,7 +45,7 @@ export default function PurchaseOrdersListPage() {
     } catch { toast('error', 'Failed to load form data'); }
   };
 
-  useEffect(() => { fetchData(); }, [search, page, sortField, sortOrder, filters]);
+  useEffect(() => { fetchData(); }, []);
   useEffect(() => { fetchFormData(); }, []);
 
   const handleCreate = async (e: FormEvent) => {
@@ -99,9 +78,6 @@ export default function PurchaseOrdersListPage() {
     const fid = String(foId || ''); const fo = fileOpenings.find(f => f.id === fid);
     setCreateForm({ ...createForm, file_opening: fid, buyer: fo?.buyer || '', factory: fo?.factory || '' });
   };
-
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
-  const handleFilterChange = (f: Record<string, string>) => { setFilters(f); setPage(1); };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -150,25 +126,47 @@ export default function PurchaseOrdersListPage() {
     URL.revokeObjectURL(url);
   };
 
-  const columns: Column[] = [
-    { key: 'po_number', label: 'PO #', sortable: true, render: (v) => <span className="font-mono text-emerald-400">{String(v)}</span> },
-    { key: 'factory_name', label: 'Factory', sortable: true },
-    { key: 'buyer_name', label: 'Buyer', sortable: true },
-    { key: 'risk_level_detail', label: 'Risk', sortable: false,
-      render: (v) => v ? <span className="px-2 py-1 rounded-full text-xs font-medium text-white" style={{ backgroundColor: String((v as { color: string }).color) }}>{String((v as { code: string }).code)}</span> : <span className="text-faint">—</span> },
-    { key: 'delivery_date', label: 'Delivery', sortable: true },
-    { key: 'quantity', label: 'Qty', sortable: true, className: 'text-right', render: (v) => Number(v).toLocaleString() },
-    { key: 'total_value', label: 'Value', sortable: true, className: 'text-right', render: (v) => `$${parseFloat(String(v)).toLocaleString()}` },
-    { key: 'status', label: 'Status', sortable: true, filterable: true,
-      filterOptions: ['draft', 'confirmed', 'in_production', 'quality_check', 'ready', 'shipped', 'delivered', 'cancelled'],
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v).replace('_', ' ')}</span> },
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => (
-      <div className="flex justify-end gap-3">
-        <button onClick={(e) => { e.stopPropagation(); navigate(`/purchase-orders/${row.id}`); }} className="text-sm text-blue-400 hover:text-blue-300">View</button>
-        <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(row.id)); }} className="text-sm text-red-400 hover:text-red-300">Delete</button>
-      </div>
-    )},
+  const columns: SpreadsheetColumn[] = [
+    { title: 'PO #', field: 'po_number', headerFilter: true },
+    { title: 'FN', field: 'file_number', headerFilter: true },
+    { title: 'Style', field: 'style_number', headerFilter: true },
+    { title: 'Factory', field: 'factory_name', headerFilter: true },
+    { title: 'Buyer', field: 'buyer_name', headerFilter: true },
+    { title: 'Fab', field: 'risk_fabric', width: 70 },
+    { title: 'Trims', field: 'risk_trims', width: 80 },
+    { title: 'Labels', field: 'risk_labels', width: 80 },
+    { title: 'Tech', field: 'risk_technical', width: 70 },
+    { title: 'Overall', field: 'risk_overall', width: 80 },
+    { title: 'Delivery', field: 'delivery_date', headerFilter: true },
+    { title: 'Actual', field: 'actual_completion_date' },
+    { title: 'Qty', field: 'quantity', hozAlign: 'right' },
+    { title: 'Value', field: 'total_value', hozAlign: 'right' },
+    { title: 'Origin', field: 'destination_country_name', headerFilter: true },
+    { title: 'Status', field: 'status', headerFilter: true },
   ];
+
+  const riskLabel = (area: OrderRisk[keyof OrderRisk] | undefined) =>
+    area && area.code !== 'none' ? area.label : '—';
+  const riskNumber = (area: OrderRisk[keyof OrderRisk] | undefined) =>
+    area && area.code !== 'none' ? Number(area.numeric) : 0;
+
+  const gridData = pos.map((po) => {
+    return {
+      ...po,
+      risk_fabric: riskLabel(po.risk?.fabric),
+      risk_trims: riskLabel(po.risk?.trims),
+      risk_labels: riskLabel(po.risk?.labels),
+      risk_technical: riskLabel(po.risk?.technical),
+      risk_overall: riskLabel(po.risk?.overall),
+      total_value: Number(po.total_value).toLocaleString(),
+      quantity: Number(po.quantity).toLocaleString(),
+      status: String(po.status).replace('_', ' '),
+      file_number: po.file_number ?? '—',
+      style_number: po.style_number ?? '—',
+      actual_completion_date: po.actual_completion_date ?? '—',
+      destination_country_name: po.destination_country_name ?? '—',
+    };
+  });
 
   return (
     <Layout>
@@ -196,21 +194,33 @@ export default function PurchaseOrdersListPage() {
         </div>
 
         {view === 'list' ? (
-          <DataTable
-            data={pos as unknown as Record<string, unknown>[]}
+          <SpreadsheetGrid
+            data={gridData as unknown as Record<string, unknown>[]}
             columns={columns}
-            totalCount={count}
-            page={page}
-            pageSize={25}
-            onPageChange={setPage}
-            searchValue={search}
-            onSearchChange={(v) => { setSearch(v); setPage(1); }}
-            searchPlaceholder="Search by PO number..."
-            onSort={handleSort}
-            sortField={sortField}
-            sortOrder={sortOrder}
-            filters={filters}
-            onFilterChange={handleFilterChange}
+            height={480}
+            toolbar
+            title="Purchase Orders"
+            exportable
+            numericExport={(row) => {
+              const po = pos.find((p) => String(p.id) === String(row.id));
+              const r = po?.risk;
+              return {
+                ...row,
+                risk_fabric: riskNumber(r?.fabric),
+                risk_trims: riskNumber(r?.trims),
+                risk_labels: riskNumber(r?.labels),
+                risk_technical: riskNumber(r?.technical),
+                risk_overall: riskNumber(r?.overall),
+              };
+            }}
+            printable
+            printTitle="Purchase Orders"
+            columnChooser
+            paginationSize={25}
+            actionColumn
+            onAdd={() => setShowCreate(true)}
+            onView={(row) => navigate(`/purchase-orders/${String(row.id)}`)}
+            onDelete={(row) => setDeleteId(String(row.id))}
             onRowClick={(row) => navigate(`/purchase-orders/${String(row.id)}`)}
             loading={loading}
           />

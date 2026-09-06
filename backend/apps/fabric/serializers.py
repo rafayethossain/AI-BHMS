@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 
 from rest_framework import serializers
 
@@ -16,6 +17,7 @@ from .models import (
     RFQResponse,
     RFQResponseItem,
 )
+from .services import tolerance_engine
 
 
 class FabricCategorySerializer(serializers.ModelSerializer):
@@ -136,8 +138,12 @@ class FabricOrderSerializer(serializers.ModelSerializer):
             "status",
             "lab_dip_required_date", "lab_dip_actual_date",
             "lab_dip_approval_date", "lab_dip_notes",
+            "strike_off_required_date", "strike_off_actual_date",
+            "strike_off_approval_date",
             "bulk_approved_date", "bulk_approved_by", "bulk_approved_by_name",
-            "onboard_date", "eta_date", "clearance_date",
+            "bulk_approved_notes",
+            "onboard_date", "eta_date", "actual_arrival_date",
+            "paperwork_date", "clearance_date",
             "risk_level", "risk_level_code", "risk_level_name",
             "risk_notes", "date_owners", "effective_owners",
             "notes", "is_active", "created_at", "updated_at",
@@ -176,6 +182,11 @@ class FabricUtilizationSerializer(serializers.ModelSerializer):
     accounted_meters = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     excess_meters = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     efficiency_pct = serializers.DecimalField(max_digits=6, decimal_places=2, read_only=True)
+    tolerance_pct = serializers.SerializerMethodField()
+    tolerance_upper_meters = serializers.SerializerMethodField()
+    tolerance_lower_meters = serializers.SerializerMethodField()
+    tolerance_status = serializers.SerializerMethodField()
+    over_tolerance = serializers.SerializerMethodField()
     recorded_by_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -186,9 +197,31 @@ class FabricUtilizationSerializer(serializers.ModelSerializer):
             "wasted_meters", "damaged_meters",
             "ordered_meters", "over_under_meters", "over_under_pct",
             "accounted_meters", "excess_meters", "efficiency_pct",
+            "tolerance_pct", "tolerance_upper_meters", "tolerance_lower_meters",
+            "tolerance_status", "over_tolerance",
             "notes", "recorded_by", "recorded_by_name", "recorded_at",
         ]
         read_only_fields = ["id", "recorded_by", "recorded_at"]
+
+    def _get_tolerance(self, obj):
+        ordered = Decimal(str(obj.order.quantity_meters)) if obj.order else Decimal("0")
+        received = Decimal(str(obj.received_meters))
+        return tolerance_engine.classify("other", ordered, received)
+
+    def get_tolerance_pct(self, obj):
+        return str(self._get_tolerance(obj)["tolerance_pct"])
+
+    def get_tolerance_upper_meters(self, obj):
+        return str(self._get_tolerance(obj)["allowed_upper"])
+
+    def get_tolerance_lower_meters(self, obj):
+        return str(self._get_tolerance(obj)["allowed_lower"])
+
+    def get_tolerance_status(self, obj):
+        return self._get_tolerance(obj)["status"]
+
+    def get_over_tolerance(self, obj):
+        return self._get_tolerance(obj)["over_tolerance"]
 
     def validate_period(self, value):
         if not re.match(r"^\d{4}-(0[1-9]|1[0-2])$", value):

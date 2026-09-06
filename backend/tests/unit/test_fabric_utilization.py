@@ -455,3 +455,83 @@ class TestFabricUtilizationAPI:
         )
         assert len(resp.data["mills"]) == 1
         assert resp.data["summary"]["orders_count"] == 1
+
+
+class TestFabricUtilizationToleranceFields:
+    """B10: tolerance fields surfaced on reconciliation via ToleranceEngine."""
+
+    def test_tolerance_fields_present_in_list(self, editor_client, seed_util):
+        """List endpoint returns tolerance_pct, tolerance_status, over_tolerance."""
+        resp = editor_client.get("/api/v1/fabric/utilizations/")
+        assert resp.status_code == status.HTTP_200_OK
+        row = resp.data["results"][0]
+        assert "tolerance_pct" in row
+        assert "tolerance_upper_meters" in row
+        assert "tolerance_lower_meters" in row
+        assert "tolerance_status" in row
+        assert "over_tolerance" in row
+
+    def test_tolerance_fields_present_in_detail(self, editor_client, seed_util):
+        """Detail endpoint returns tolerance fields."""
+        resp = editor_client.get(f"/api/v1/fabric/utilizations/{seed_util.id}/")
+        assert resp.status_code == status.HTTP_200_OK
+        assert "tolerance_pct" in resp.data
+        assert "tolerance_status" in resp.data
+        assert "over_tolerance" in resp.data
+
+    def test_within_tolerance_other_default(self, editor_client, seed_order):
+        """3000m ordered, 3100m received = +3.33% — within 5% default for 'other' tier."""
+        util = FabricUtilization.objects.create(
+            tenant=seed_order.tenant, order=seed_order,
+            period="2026-09", received_meters="3100", used_meters="2950",
+        )
+        resp = editor_client.get(f"/api/v1/fabric/utilizations/{util.id}/")
+        assert resp.data["tolerance_pct"] == "5.00"
+        assert resp.data["tolerance_status"] == "within"
+        assert resp.data["over_tolerance"] is False
+        assert resp.data["tolerance_upper_meters"] == "3150.00"
+        assert resp.data["tolerance_lower_meters"] == "2850.00"
+
+    def test_over_tolerance_flag_surfaced(self, editor_client, seed_order):
+        """3000m ordered, 3200m received = +6.67% — over 5% default for 'other' tier."""
+        util = FabricUtilization.objects.create(
+            tenant=seed_order.tenant, order=seed_order,
+            period="2026-10", received_meters="3200", used_meters="3100",
+        )
+        resp = editor_client.get(f"/api/v1/fabric/utilizations/{util.id}/")
+        assert resp.data["tolerance_status"] == "over"
+        assert resp.data["over_tolerance"] is True
+        assert resp.data["tolerance_pct"] == "5.00"
+
+    def test_under_tolerance_flag_surfaced(self, editor_client, seed_order):
+        """3000m ordered, 2800m received = -6.67% — under 5% default for 'other' tier."""
+        util = FabricUtilization.objects.create(
+            tenant=seed_order.tenant, order=seed_order,
+            period="2026-11", received_meters="2800", used_meters="2800",
+        )
+        resp = editor_client.get(f"/api/v1/fabric/utilizations/{util.id}/")
+        assert resp.data["tolerance_status"] == "under"
+        assert resp.data["over_tolerance"] is False
+
+    def test_tolerance_fields_in_create_response(self, editor_client, seed_order):
+        """Create response includes tolerance fields."""
+        resp = editor_client.post("/api/v1/fabric/utilizations/", {
+            "order": str(seed_order.id),
+            "period": "2026-12",
+            "received_meters": "3200",
+            "used_meters": "3100",
+        })
+        assert resp.status_code == status.HTTP_201_CREATED
+        assert resp.data["tolerance_status"] == "over"
+        assert resp.data["over_tolerance"] is True
+        assert resp.data["tolerance_pct"] == "5.00"
+
+    def test_tolerance_fields_in_update_response(self, editor_client, seed_util):
+        """Patch response includes updated tolerance fields."""
+        resp = editor_client.patch(
+            f"/api/v1/fabric/utilizations/{seed_util.id}/",
+            {"received_meters": "3200"},
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.data["tolerance_status"] == "over"
+        assert resp.data["over_tolerance"] is True

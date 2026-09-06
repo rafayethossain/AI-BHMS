@@ -1,28 +1,17 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { productionApi, setupApi, merchApi } from '../api/client';
 import type { ProductionPlan } from '../api/client';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import SearchableSelect from '../components/SearchableSelect';
 import { useToast } from '../contexts/ToastContext';
 import Layout from '../components/Layout';
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-surface-alt/20 text-muted',
-  planned: 'bg-blue-500/20 text-badge-blue',
-  in_progress: 'bg-amber-500/20 text-badge-amber',
-  completed: 'bg-emerald-500/20 text-badge-emerald',
-};
 
 export default function ProductionPlansPage() {
   const { toast } = useToast();
   const [plans, setPlans] = useState<ProductionPlan[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('plan_date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showModal, setShowModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<ProductionPlan | null>(null);
   const [saving, setSaving] = useState(false);
@@ -40,22 +29,16 @@ export default function ProductionPlansPage() {
     remarks: '',
   });
 
-  const [filters, setFilters] = useState<Record<string, string>>({});
-
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
-      if (filters.status) params.status = filters.status;
-      const res = await productionApi.getPlans(params);
+      const res = await productionApi.getPlans({ page_size: '10000' });
       setPlans(res.data.results);
       setCount(res.data.count);
     } catch { toast('error', 'Failed to load production plans'); } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, [search, page, sortField, sortOrder, filters]);
+  useEffect(() => { fetchData(); }, []);
 
   useEffect(() => {
     setupApi.getFactories({ page_size: '500' }).then(r => {
@@ -131,22 +114,22 @@ export default function ProductionPlansPage() {
     try { await productionApi.deletePlan(id); setDeleteId(null); toast('success', 'Plan deleted'); fetchData(); } catch { toast('error', 'Failed to delete plan'); }
   };
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
-
-  const columns: Column[] = [
-    { key: 'po_number', label: 'PO #', sortable: true, render: (v) => <span className="font-mono text-emerald-400">{String(v)}</span> },
-    { key: 'factory_name', label: 'Factory', sortable: true },
-    { key: 'plan_date', label: 'Plan Date', sortable: true },
-    { key: 'quantity', label: 'Quantity', sortable: true, className: 'text-right', render: (v) => <span className="text-right block">{String(v)}</span> },
-    { key: 'status', label: 'Status', sortable: true,
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v).replace('_', ' ')}</span> },
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => (
-      <div className="flex justify-end gap-3">
-        <button onClick={(e) => { e.stopPropagation(); openEdit(row as unknown as ProductionPlan); }} className="text-sm text-blue-400 hover:text-blue-300">View</button>
-        <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(row.id)); }} className="text-sm text-red-400 hover:text-red-300">Delete</button>
-      </div>
-    )},
+  const columns: SpreadsheetColumn[] = [
+    { title: 'PO #', field: 'po_number', headerFilter: true },
+    { title: 'Factory', field: 'factory_name', headerFilter: true },
+    { title: 'Plan Date', field: 'plan_date', headerFilter: true },
+    { title: 'Quantity', field: 'quantity', hozAlign: 'right' },
+    { title: 'Status', field: 'status', headerFilter: true },
   ];
+
+  const gridData = plans.map(p => ({
+    id: p.id,
+    po_number: p.po_number,
+    factory_name: p.factory_name,
+    plan_date: p.plan_date ?? '—',
+    quantity: p.quantity.toLocaleString(),
+    status: p.status.replace('_', ' '),
+  }));
 
   return (
     <Layout>
@@ -161,22 +144,25 @@ export default function ProductionPlansPage() {
           </button>
         </div>
 
-        <DataTable
-          data={plans as unknown as Record<string, unknown>[]}
+        <SpreadsheetGrid
+          data={gridData}
           columns={columns}
-          totalCount={count}
-          page={page}
-          pageSize={25}
-          onPageChange={setPage}
-          searchValue={search}
-          onSearchChange={(v) => { setSearch(v); setPage(1); }}
-          searchPlaceholder="Search plans..."
-          onSort={handleSort}
-          sortField={sortField}
-          sortOrder={sortOrder}
+          height={480}
+          toolbar
+          title="Production Plans"
+          exportable
+          printable
+          printTitle="Production Plans"
+          columnChooser
+          paginationSize={25}
+          actionColumn
           loading={loading}
-          filters={filters}
-          onFilterChange={(f) => { setFilters(f); setPage(1); }}
+          onAdd={openCreate}
+          onEdit={(row) => {
+            const p = plans.find(x => x.id === row.id);
+            if (p) openEdit(p);
+          }}
+          onDelete={(row) => setDeleteId(String(row.id))}
         />
       </main>
 

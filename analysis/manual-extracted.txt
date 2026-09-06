@@ -1,21 +1,21 @@
 
 ===== PAGE 1 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 1 
  
 Contents 
-GC installation ......................................................................................................................................... 4 
-How to Save information to the server/GC ........................................................................................ 4 
+target installation ......................................................................................................................................... 4 
+How to Save information to the server/target ........................................................................................ 4 
 ∙ Tips .............................................................................................................................................. 5 
 ∙ Design .......................................................................................................................................... 5 
 ∙ Order ........................................................................................................................................... 5 
-GC Basics ................................................................................................................................................. 5 
+target Basics ................................................................................................................................................. 5 
 Printing .................................................................................................................................................... 8 
 Quick Print ........................................................................................................................................... 8 
-How GC Tables work ........................................................................................................................... 9 
+How target Tables work ........................................................................................................................... 9 
 New Feature - if you right-click, you can select a report and go directly to that report for that 
 particular file. .................................................................................................................................... 11 
-What does * (Asterix) mean on some GC columns? ......................................................................... 12 
+What does * (Asterix) mean on some target columns? ......................................................................... 12 
 What is a tick box for  ................................................................................................................... 12 
 BEFORE SAVING ................................................................................................................................ 12 
 Notes boxes........................................................................................................................................... 12 
@@ -24,7 +24,7 @@ FileShare ......................................................................
 Risk Assessment (Has Issue) .................................................................................................................. 14 
 Order current Risk Level ................................................................................................................... 14 
 Design Tab ............................................................................................................................................. 15 
-Creating a Style in GC ........................................................................................................................ 17 
+Creating a Style in target ........................................................................................................................ 17 
 Designs .................................................................................................................................................. 19 
 Carmel Make Manual ........................................................................................................................ 19 
 ∙ Design Sheet ......................................................................................................................... 19 
@@ -41,7 +41,7 @@ Key areas ......................................................................
 
 
 ===== PAGE 2 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 2 
  
 ∙ New Designs must be reviewed before sending to pattern! If it's not going to be used, 
@@ -82,7 +82,7 @@ o Planning......................................................................
 o Logistics ................................................................................................................................. 39 
 
 ===== PAGE 3 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 3 
  
 o Accounts ................................................................................................................................ 39 
@@ -122,10 +122,10 @@ New Compliance Internal Audit Team. ............................................
  
 
 ===== PAGE 4 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 4 
  
-GC installation 
+target installation 
 http://ccl-soap.acuutechcloud.com:8889/Client/publish.htm 
 Copy the above link into your browser and follow the installation guide.  
 It will then ask if you want to choose to "not run" the program, click the underlined help text and 
@@ -133,12 +133,12 @@ click proceed.
 If there is an updated version, a pop up will appear and ask if you want to skip or proceed to install 
 the new version, ALWAYS select the option to proceed and DO NOT click the skip button. Once its 
 downloaded: 
-How to Save information to the server/GC 
+How to Save information to the server/target 
 ● All documents belong in one of 2 places. Either they have a design number, or they have a FN 
 number (which would include the style). 
 ● To save ANYTHING which has a related style, it must be saved in the following way: 
-o In the K drive you will see highlighted below Designs (Garment Control). 
-o Every time a style is created GC will generate a unique style code, when it does this it 
+o In the K drive you will see highlighted below Designs (target buying-house reference). 
+o Every time a style is created target will generate a unique style code, when it does this it 
 creates a folder structure in the K drive. 
         
 You will see I have gone into the Design folder and I can either click through to my desired number 
@@ -154,7 +154,7 @@ labelled in the same way.
 
 
 ===== PAGE 5 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 5 
  
  
@@ -192,15 +192,15 @@ o Customer-Carmel department-brief description-date-Version- example:
 ▪ Morrison-Director-OH agreement-20-08-20 
 ▪ Morrison-Logistics-hit 1 paperwork-20-08-20 
 ▪  
-GC Basics 
-● You can have more than one GC program open. 
+target Basics 
+● You can have more than one target program open. 
 
 ===== PAGE 6 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 6 
  
-o Once yo u have GC open, right-click on the 
-Icon, and then proceed to click on "Garment Control-1" and another program will load. 
+o Once yo u have target open, right-click on the 
+Icon, and then proceed to click on "target buying-house system-1" and another program will load. 
 o Doing this then makes it useful to be using different reports or if you are doing 2 things 
 at once. You have as many open as you need. 
 ▪  
@@ -213,7 +213,7 @@ with ease.
 
 
 ===== PAGE 7 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 7 
  
  
@@ -235,7 +235,7 @@ o Type in what you are looking for, here we will search for a specific style.
 
 
 ===== PAGE 8 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 8 
  
   
@@ -258,7 +258,7 @@ and it's an older item, please select "Include Archive" in your search
 
 
 ===== PAGE 9 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 9 
  
 Printing 
@@ -275,7 +275,7 @@ this and it will open 6 printing options.
  
 o If you are in an order, it will print that file and the relevant section, so in this 
 example it will print the order you are in. 
-How GC Tables work 
+How target Tables work 
 ▪ All tables work the same throughout the system. 
 ▪ To Show what options are available: 
 ▪ Right Click: 
@@ -292,7 +292,7 @@ Assessment."
 
 
 ===== PAGE 10 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 10 
  
  
@@ -316,7 +316,7 @@ groupings.
 
 
 ===== PAGE 11 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 11 
  
  
@@ -332,13 +332,13 @@ Report" and then gone to the booking Schedule.
 
 
 ===== PAGE 12 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 12 
  
   
 I have gone directly from one report to another within the same FN.
  
-What does * (Asterix) mean on some GC columns? 
+What does * (Asterix) mean on some target columns? 
 ● If you see an Asterix * on any report, it means you can edit directly onto the report. 
 ● In the Design and Order tabs, you can create and manage the specific areas, and you can 
 then manage that process through the reporting tools. 
@@ -355,7 +355,7 @@ left unticked if the supplier has confirmed the dates.
 
 
 ===== PAGE 13 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 13 
  
 BEFORE SAVING 
@@ -378,18 +378,18 @@ display it all on one page making it easier to reference.
 
 
 ===== PAGE 14 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 14 
  
  
  
 FileShare 
-● Every Design has a folder for it as described (How to Save information to the server/GC) as 
+● Every Design has a folder for it as described (How to Save information to the server/target) as 
 well as every section within each order. 
-● You can also access the same folder from within GC. 
+● You can also access the same folder from within target. 
 o In the specific style towards the end at the bottom will be its Sharefile page. This is 
 the same as the folders above, just a different way to view it. So, the information is 
-exactly the same, whether you go into it through the folder method or the GC 
+exactly the same, whether you go into it through the folder method or the target 
 method. 
  
 o Here is where anything to do with the style should be saved. Please ensure it is 
@@ -404,7 +404,7 @@ but will be represented on the excel sheet as a number:
 
 
 ===== PAGE 15 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 15 
  
 1. Green- 
@@ -432,7 +432,7 @@ potential issue could be the fabric because all the other areas are 1-Green
  
  
 Design Tab 
-● As a default, when you search, it will use the images stored in GC. 
+● As a default, when you search, it will use the images stored in target. 
  
  
 ● You can see: 
@@ -440,7 +440,7 @@ o The style number (unique to the style).
 
 
 ===== PAGE 16 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 16 
  
 o In brackets you can see the style it was created from. If it's blank, it's been created 
@@ -465,28 +465,28 @@ only design which do not have a File number against it.
 
 
 ===== PAGE 17 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 17 
  
  
  
  
  
-● GC will show the searched items as a list format, but don't forget to click the search button 
+● target will show the searched items as a list format, but don't forget to click the search button 
 again to refresh the page. 
  
  
  
  
  
-Creating a Style in GC 
+Creating a Style in target 
 ● Once you are on the Design List tab , Click on the Plus Icon on the top left of 
 the screen       
 ● A new Design window will appear. 
 
 
 ===== PAGE 18 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 18 
  
   
@@ -506,7 +506,7 @@ the "include" box.
 
 
 ===== PAGE 19 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 19 
  
  
@@ -528,7 +528,7 @@ show in the printout.
 
 
 ===== PAGE 20 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 20 
  
 ● Further notes can be added in the notes section. 
@@ -553,7 +553,7 @@ o The Dev Spec which should have the key measurements input.
 
 
 ===== PAGE 21 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 21 
  
  
@@ -573,7 +573,7 @@ as necessary to the correct fit number and date.
 
 
 ===== PAGE 22 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 22 
  
  
@@ -604,7 +604,7 @@ stated.
 
 
 ===== PAGE 23 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 23 
  
  
@@ -623,7 +623,7 @@ be pulled through to the FN costing sheet when its created.
 
 
 ===== PAGE 24 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 24 
  
  
@@ -650,7 +650,7 @@ Pattern sample room, costing team.
 
 
 ===== PAGE 25 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 25 
  
  
@@ -679,7 +679,7 @@ an example for explanation purposes.
 
 
 ===== PAGE 26 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 26 
  
 ▪ The trouser does not have a block reference, you can see this due to no 
@@ -701,7 +701,7 @@ Order List -
 
 
 ===== PAGE 27 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 27 
  
 ● This area is where you can load and view all orders. 
@@ -746,7 +746,7 @@ o If the design sheet ends off wrong, the costing sheet will start off wrong.
 
 
 ===== PAGE 28 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 28 
  
 ● Critical information, in order to be able to save: 
@@ -784,7 +784,7 @@ Merch teams.
 
 
 ===== PAGE 29 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 29 
  
 Quick lead time orders 
@@ -821,11 +821,11 @@ o
 
 
 ===== PAGE 30 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 30 
  
-● Each department MUST confirm on GC that it's a direct repeat. 
-o Technical must green GC and confirm it's a repeat of FN****. 
+● Each department MUST confirm on target that it's a direct repeat. 
+o Technical must green target and confirm it's a repeat of FN****. 
 o Trims should also confirm it's the same trims as well as FN ****. 
 ● Even though the order is a repeat, it should be treated as a new order and follow the same 
 process, all this should mean is that it's quicker to process the order, but it ensures each 
@@ -865,7 +865,7 @@ unachievable.
 
 
 ===== PAGE 31 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 31 
  
 o If customers contract to delivery date is over five months raise a query with Finance 
@@ -873,7 +873,7 @@ for approval.
  
 Costing Tab (Costing Sheet) 
 Filling in the Costing Sheet 
-● Before a costing sheet is created, the Design sheet should be made to be correct as GC will 
+● Before a costing sheet is created, the Design sheet should be made to be correct as target will 
 pull this data through to the new cost sheet. 
 ● Every costing sheet MUST have an item description of Label and Making Price, or the costing 
 sheet will be unable to save. It cannot be abbreviated either. 
@@ -905,10 +905,10 @@ into the rating column.
 
 
 ===== PAGE 32 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 32 
  
-● If you are doing a landed order, the exchange rate must be input so GC can convert the USD 
+● If you are doing a landed order, the exchange rate must be input so target can convert the USD 
 costings int GBP. 
 ● There is a quick link to the Design sheet towards the bottom of the page, which will take you 
 directly to the costing section of the design sheet . 
@@ -942,7 +942,7 @@ planning. You cannot delete this tab.
 
 
 ===== PAGE 33 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 33 
  
 ● When orders have multiple colours, the "Orders Colour Ref"
@@ -986,7 +986,7 @@ unusable. That should be debited, but it won't always be possible.
 
 
 ===== PAGE 34 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 34 
  
  
@@ -994,7 +994,7 @@ GC Manual and Ways of Working. Version 1
 ● There is a defect notes box where you can leave the breakdown, and within the main notes 
 section on the fabric tab, you can then put a simple and clear explanation. 
 ● You must then keep any and all correspondence of the debits in the fabric section of the share 
-file as details above  (How to save information to the server/GC- click here to go to this section). 
+file as details above  (How to save information to the server/target- click here to go to this section). 
 ● Consumption - must be filled in no later than PP approval stage. 
  
  
@@ -1023,7 +1023,7 @@ tolerances without prior approval or automatic debits will follow from the compl
 
 
 ===== PAGE 35 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 35 
  
 Trims/Label Tabs 
@@ -1033,12 +1033,12 @@ to enter these tabs and fill in.
 where the item should go. I.E. black on the under the collar of the beige garment, as an 
 example. 
 ● "Supplier" once again is a drop-down list. If your supplier is not there, you will need to 
-contact your manager and GC for it to be added to the drop-down options. 
+contact your manager and target for it to be added to the drop-down options. 
 ● Its important to set these areas up correctly so they can be managed from the trims and 
 labels schedules. Note: You can edit items that have been created in the tabs, but you 
 cannot add missing items directly to the reports itself. 
 ● The Items USD price must be updated.  
-● The price in GC MUST be the actual price form the invoice, it should be used as a check 
+● The price in target MUST be the actual price form the invoice, it should be used as a check 
 against the supplier's invoice. 
 ● Higher price - If the item is more than the cost priced it must be approved by management 
 and the costing sheet should be updated, please see (Changes to costs.) 
@@ -1069,7 +1069,7 @@ o Completed - The status for the item should show as completed once the goods ar
 in the factory and nothing further needs to be done.  
 
 ===== PAGE 36 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 36 
  
 ▪ PLEASE NOTE if it states" Completed", the trims/label will not appear on the 
@@ -1107,7 +1107,7 @@ linked to the design area via the Carmel style number at the top of the tab.
 
 
 ===== PAGE 37 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 37 
  
  
@@ -1132,7 +1132,7 @@ the style letter code  added T, S, D, J etc.
 
 
 ===== PAGE 38 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 38 
  
  
@@ -1151,7 +1151,7 @@ Job Queue
 ● All Job requests are managed by the "Job Queue." 
 ● There are two ways to manage this. 
 ● The original job queue which is not a dynamic table (not as per the other tables you will 
-encounter on GC)
+encounter on target)
  
 OR from the reporting tool, which is as per the dynamic tables. 
  
@@ -1160,7 +1160,7 @@ Ways of working-Reporting Schedules
 
 
 ===== PAGE 39 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 39 
  
 Booking Schedule 
@@ -1204,7 +1204,7 @@ date by the customer.
 
 
 ===== PAGE 40 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 40 
  
 o Box or hanging- the merchandiser must put the method the goods are to be delivered to 
@@ -1252,7 +1252,7 @@ o IF at any point there is a major delivery issue due to dates, quality or anyth
 should be changed to a RED risk. 
 
 ===== PAGE 41 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 41 
  
 Fabric issue in the factory 
@@ -1284,7 +1284,7 @@ Fabric, trims, customer tolerances
 
 
 ===== PAGE 42 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 42 
  
 Fabric Policy Carmel Clothing:  
@@ -1322,7 +1322,7 @@ Order manager
 
 
 ===== PAGE 43 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 43 
  
 ● It will fit on average 2 orders per page, so print double-sided. 
@@ -1356,7 +1356,7 @@ the below example, you can see there is an extract from 08/19 of samples made.
 
 
 ===== PAGE 44 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 44 
  
 ▪ You can see which styles have one or more file numbers against it and which do 
@@ -1371,9 +1371,9 @@ Pass rate.
  
 Invoice approvals 
 ● Fabric and trimmings:  
-● Quantity – Date – Price must match the information on GC.  
+● Quantity – Date – Price must match the information on target.  
 ● Over-tolerance fabric quantities should have debit raised corresponding.  
-● New updates coming on auto approvals between GC and the accounts 
+● New updates coming on auto approvals between target and the accounts 
 package and we will review in later updates. 
 ● See Booking Schedule (link accounts - Booking Schedule) 
 Debits 
@@ -1393,7 +1393,7 @@ Reconciliation procedures
  
 Each production base will have staff in charge of: 
 1) Shipping Paperwork: 
-o Shipped quantity is inputted in GC on receipt of paperwork.  
+o Shipped quantity is inputted in target on receipt of paperwork.  
 o Compare what's been ordered with what has been shipped.  
 o If fabric shipped is more than 5% or 2% (Primark and Penney's) and immediate debit 
 should be raised and we ask the supplier to pick up the fabric.  Please use the 
@@ -1401,7 +1401,7 @@ compliance email address, if you need help with this, please Mail IT to sort it 
 will CC yourself when raising it. 
 
 ===== PAGE 45 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 45 
  
 o  
@@ -1447,7 +1447,7 @@ Do not be an E-mail warrior, use Teams.
 NB - Any communication should be done after the job request via Teams. 
 
 ===== PAGE 46 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 46 
  
 ● There is already a team called Mini-Markers VN and within this you can create sub groups 
@@ -1481,7 +1481,7 @@ full support.
 
 
 ===== PAGE 47 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 47 
  
 ● Alina Hinterreiter 
@@ -1489,7 +1489,7 @@ GC Manual and Ways of Working. Version 1
 Many of these measures are already being undertaken by the teams, so much as this will be 
 clarifying and re-iterating existing rules and ensuring they are adhered to. There are some changes 
 to tolerances we allow, and we will go through these in more detail. Most of the information will be 
-available to the team through GC, and so only orders that don't meet efficiency rates will require 
+available to the team through target, and so only orders that don't meet efficiency rates will require 
 further explanations/information's.  
  
 We currently have to review all orders from the 1st July 2020, and so there will be some backlog to 
@@ -1516,20 +1516,20 @@ mail.
  
  
  
-Garment Control and ways of working. 
+target buying-house system and ways of working. 
  
 Please be aware that if your area of responsibility becomes out of dates, you will be issued two 
 warnings. On the 3rd warning, you may be asked to leave. 
 Please make your Manager aware of any issues that may cause you to fall behind. 
 
 ===== PAGE 48 =====
-GC Manual and Ways of Working. Version 1 
+target manual and Ways of Working. Version 1 
 48 
  
  
  
 I confirm I have read and understand how to update the areas I have been given responsibility over 
-within Garment Control. 
+within target buying-house system. 
 Name: 
  
 Job Title: 

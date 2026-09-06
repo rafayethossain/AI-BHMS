@@ -242,8 +242,14 @@ class FabricOrder(TenantModel):
         "users.User", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="bulk_approved_orders",
     )
+    bulk_approved_notes = models.TextField(blank=True)
+    strike_off_required_date = models.DateField(null=True, blank=True)
+    strike_off_actual_date = models.DateField(null=True, blank=True)
+    strike_off_approval_date = models.DateField(null=True, blank=True)
     onboard_date = models.DateField(null=True, blank=True)
     eta_date = models.DateField(null=True, blank=True)
+    actual_arrival_date = models.DateField(null=True, blank=True)
+    paperwork_date = models.DateField(null=True, blank=True)
     clearance_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
     risk_level = models.ForeignKey(
@@ -253,7 +259,7 @@ class FabricOrder(TenantModel):
     risk_notes = models.TextField(blank=True)
     date_owners = models.JSONField(default=dict, blank=True)
 
-    FABRIC_DATE_KEYS = ["lab_dip", "onboard", "eta", "clearance"]
+    FABRIC_DATE_KEYS = ["lab_dip", "strike_off", "onboard", "eta", "actual_arrival", "paperwork", "clearance"]
 
     class Meta:
         ordering = ["-created_at"]
@@ -266,13 +272,14 @@ class FabricOrder(TenantModel):
 
     def effective_owner(self, date_key):
         """Role responsible for a schedule date, per the GC handoff chain:
-        sales (pre-dip) -> merchandising (dip->bulk) -> planning (bulk+); clearance = logistics."""
+        sales (pre-dip) -> merchandising (dip->bulk) -> planning (bulk+);
+        clearance + arrival/paperwork = logistics."""
         override = (self.date_owners or {}).get(date_key)
         if override:
             return override
-        if date_key == "clearance":
+        if date_key in ("clearance", "actual_arrival", "paperwork"):
             return "logistics"
-        if date_key == "lab_dip":
+        if date_key in ("lab_dip", "strike_off"):
             return "merchandising" if self.bulk_approved_date else "sales"
         if date_key in ("onboard", "eta"):
             if self.bulk_approved_date:
@@ -287,8 +294,11 @@ class FabricOrder(TenantModel):
 
     OWNER_CHAIN = {
         "lab_dip": ["sales", "merchandising"],
+        "strike_off": ["sales", "merchandising"],
         "onboard": ["sales", "merchandising", "planning"],
         "eta": ["sales", "merchandising", "planning"],
+        "actual_arrival": ["logistics"],
+        "paperwork": ["logistics"],
         "clearance": ["logistics"],
     }
 

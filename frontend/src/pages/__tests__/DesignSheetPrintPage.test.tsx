@@ -34,6 +34,7 @@ const baseSheet: DesignSheet = {
   description: 'Relaxed shirt',
   note: 'Reversible collar',
   sketch_annotations: [],
+  layout_order: [],
   fit_specs: [],
   job_requests: [],
   created_at: '2026-08-27T10:00:00Z',

@@ -40,22 +40,23 @@ export interface EntityCardProps {
   date?: string;
   url: string;
   actions?: { label: string; onClick: () => void; color?: string }[];
+  compact?: boolean;
 }
 
-export default function EntityCard({ code, title, subtitle, status, image, metrics, date, url, actions }: EntityCardProps) {
+export default function EntityCard({ code, title, subtitle, status, image, metrics, date, url, actions, compact }: EntityCardProps) {
   const navigate = useNavigate();
 
   return (
     <div onClick={() => navigate(url)}
       className="bg-surface rounded-xl border border-border overflow-hidden hover:border-emerald-500/30 transition-all cursor-pointer group">
       {image && (
-        <div className="h-44 bg-surface-alt overflow-hidden">
+        <div className={`${compact ? 'h-24' : 'h-44'} bg-surface-alt overflow-hidden`}>
           <img src={image} alt={title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
         </div>
       )}
-      <div className="p-4">
+      <div className={`${compact ? 'p-3' : 'p-4'}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -71,18 +72,18 @@ export default function EntityCard({ code, title, subtitle, status, image, metri
         </div>
 
         {metrics && metrics.length > 0 && (
-          <div className="flex gap-4 mt-3 pt-3 border-t border-border/50">
+          <div className={`${compact ? 'mt-2 pt-2 gap-3' : 'mt-3 pt-3 gap-4'} flex border-t border-border/50`}>
             {metrics.map((m, idx) => (
               <div key={idx} className="min-w-0">
                 <p className="text-xs text-faint">{m.label}</p>
-                <p className={`text-sm font-medium ${m.color || 'text-heading'} truncate`}>{m.value}</p>
+                <p className={`${compact ? 'text-xs' : 'text-sm'} font-medium ${m.color || 'text-heading'} truncate`}>{m.value}</p>
               </div>
             ))}
           </div>
         )}
 
         {actions && actions.length > 0 && (
-          <div className="flex gap-2 mt-3 pt-3 border-t border-border/50 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className={`${compact ? 'mt-2 pt-2' : 'mt-3 pt-3'} flex gap-2 border-t border-border/50 opacity-0 group-hover:opacity-100 transition-opacity`}>
             {actions.map((a, idx) => (
               <button key={idx} onClick={(e) => { e.stopPropagation(); a.onClick(); }}
                 className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${a.color || 'bg-surface-alt hover:bg-surface-alt text-body'}`}>
@@ -99,13 +100,13 @@ export default function EntityCard({ code, title, subtitle, status, image, metri
 export function CardListToggle({ view, onChange }: { view: 'grid' | 'list'; onChange: (v: 'grid' | 'list') => void }) {
   return (
     <div className="flex bg-surface-alt rounded-lg p-0.5">
-      <button onClick={() => onChange('grid')}
+      <button aria-label="Grid view" aria-pressed={view === 'grid'} onClick={() => onChange('grid')}
         className={`p-1.5 rounded-md transition-colors ${view === 'grid' ? 'bg-surface text-heading shadow-sm' : 'text-muted hover:text-body'}`}>
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
         </svg>
       </button>
-      <button onClick={() => onChange('list')}
+      <button aria-label="List view" aria-pressed={view === 'list'} onClick={() => onChange('list')}
         className={`p-1.5 rounded-md transition-colors ${view === 'list' ? 'bg-surface text-heading shadow-sm' : 'text-muted hover:text-body'}`}>
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />

@@ -359,3 +359,74 @@ class TestFabricScheduleAPI:
         assert seed_order.effective_owner("onboard") == "planning"
         assert seed_order.effective_owner("lab_dip") == "merchandising"
         assert seed_order.schedule_handoffs.filter(trigger="bulk_approved").count() == 3
+
+
+class TestFabricSchedule16_2Alignment:
+    """Roadmap 16.2 Fabric Schedule alignment (RQ-049 continuance, B8 Part 3):
+    strike-off dates (required/actual/approved), actual arrival, paperwork date and
+    bulk approval notes must be captured on FabricOrder and managed via the schedule API
+    with the same ownership discipline as the existing onboard/eta/clearance dates."""
+
+    def test_16_2_dates_writable_via_order_api(self, fs_client, seed_order):
+        resp = fs_client.patch(
+            f"/api/v1/fabric/orders/{seed_order.id}/",
+            {
+                "strike_off_required_date": "2026-04-15",
+                "strike_off_actual_date": "2026-04-20",
+                "strike_off_approval_date": "2026-04-25",
+                "actual_arrival_date": "2026-08-05",
+                "paperwork_date": "2026-08-18",
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        seed_order.refresh_from_db()
+        assert str(seed_order.strike_off_required_date) == "2026-04-15"
+        assert str(seed_order.strike_off_actual_date) == "2026-04-20"
+        assert str(seed_order.strike_off_approval_date) == "2026-04-25"
+        assert str(seed_order.actual_arrival_date) == "2026-08-05"
+        assert str(seed_order.paperwork_date) == "2026-08-18"
+
+    def test_16_2_dates_serialized_in_response(self, fs_client, seed_order):
+        resp = fs_client.get(f"/api/v1/fabric/orders/{seed_order.id}/")
+        assert resp.status_code == status.HTTP_200_OK
+        for field in (
+            "strike_off_required_date", "strike_off_actual_date",
+            "strike_off_approval_date", "actual_arrival_date", "paperwork_date",
+            "bulk_approved_notes",
+        ):
+            assert field in resp.data, f"expected '{field}' in FabricOrder serializer output"
+
+    def test_china_office_update_schedule_for_new_dates(self, fs_china_client, seed_order):
+        resp = fs_china_client.post(
+            f"/api/v1/fabric/orders/{seed_order.id}/update_schedule_dates/",
+            {
+                "dates": {
+                    "strike_off_required_date": "2026-04-15",
+                    "actual_arrival_date": "2026-08-05",
+                    "paperwork_date": "2026-08-18",
+                }
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        seed_order.refresh_from_db()
+        assert str(seed_order.strike_off_required_date) == "2026-04-15"
+        assert str(seed_order.actual_arrival_date) == "2026-08-05"
+        assert str(seed_order.paperwork_date) == "2026-08-18"
+
+    def test_effective_owner_new_dates(self, seed_order):
+        assert seed_order.effective_owner("strike_off") == "sales"
+        assert seed_order.effective_owner("actual_arrival") == "logistics"
+        assert seed_order.effective_owner("paperwork") == "logistics"
+
+    def test_approve_bulk_records_notes(self, fs_client, seed_order):
+        resp = fs_client.post(
+            f"/api/v1/fabric/orders/{seed_order.id}/approve_bulk/",
+            {"bulk_approved_notes": "Strike-off approved; bulk confirmed with check samples"},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        seed_order.refresh_from_db()
+        assert seed_order.bulk_approved_notes == "Strike-off approved; bulk confirmed with check samples"
+        assert seed_order.bulk_approved_date is not None

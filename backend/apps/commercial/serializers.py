@@ -7,6 +7,7 @@ from .models import (
     LC,
     Bank,
     DebitNote,
+    ForwardOrder,
     InvoiceApproval,
     LCAmendment,
     ProformaInvoice,
@@ -218,3 +219,19 @@ class InvoiceApprovalSerializer(serializers.ModelSerializer):
 
     def get_mismatch_reasons(self, obj):
         return obj.mismatch_reasons
+
+
+class ForwardOrderSerializer(serializers.ModelSerializer):
+    buyer_name = serializers.CharField(source="buyer.name", read_only=True)
+    factory_name = serializers.CharField(source="factory.name", read_only=True)
+    po_number = serializers.CharField(source="purchase_order.po_number", read_only=True)
+
+    class Meta:
+        model = ForwardOrder
+        fields = [
+            "id", "tenant", "month", "buyer", "buyer_name", "factory", "factory_name",
+            "purchase_order", "po_number", "quantity", "unit_cost",
+            "total_cost", "service_pct", "service_charge",
+            "in_hand_units", "status", "remarks", "created_at",
+        ]
+        read_only_fields = ["id", "tenant", "created_at", "total_cost", "service_charge"]

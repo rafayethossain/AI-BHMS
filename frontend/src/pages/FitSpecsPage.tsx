@@ -1,17 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import DataTable from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import SearchableSelect from '../components/SearchableSelect';
 import { merchApi } from '../api/client';
 import type { FitSpec, PurchaseOrder } from '../api/client';
-import type { Column } from '../components/DataTable';
 import { useToast } from '../contexts/ToastContext';
-
-const STAGE_COLORS: Record<string, string> = {
-  dev: 'bg-surface-alt/20 text-muted', '1st': 'bg-blue-500/20 text-badge-blue',
-  '2nd': 'bg-purple-500/20 text-badge-purple', '3rd': 'bg-amber-500/20 text-badge-amber',
-  pp: 'bg-emerald-500/20 text-badge-emerald',
-};
 
 const STAGES = [
   { value: 'dev', label: 'Dev Spec' },
@@ -32,22 +26,19 @@ export default function FitSpecsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showCopy, setShowCopy] = useState(false);
   const [copyForm, setCopyForm] = useState({ source_order: '', target_order: '' });
-  const pageSize = 10;
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { setPage(1); }, [search]);
   useEffect(() => {
     merchApi.getPOs({ page_size: '100' }).then(r => setPOs(r.data.results)).catch(() => {});
   }, []);
 
   const load = async () => {
+    setLoading(true);
     try {
-      const res = await merchApi.getFitSpecs({ page_size: '200' });
+      const res = await merchApi.getFitSpecs({ page_size: '10000' });
       setItems(res.data.results);
     } catch { toast('error', 'Failed to load fit specs');
     } finally { setLoading(false); }
@@ -83,11 +74,6 @@ export default function FitSpecsPage() {
     } finally { setSaving(false); }
   };
 
-  const handleSetCurrent = async (item: FitSpec) => {
-    try { await merchApi.setCurrentFitSpec(item.id); toast('success', 'Marked as current'); load(); }
-    catch { toast('error', 'Failed to set current'); }
-  };
-
   const handleDelete = async (id: string) => { setDeleteId(id); };
   const confirmDelete = async () => {
     if (!deleteId) return;
@@ -111,33 +97,20 @@ export default function FitSpecsPage() {
 
   const poOptions = pos.map(p => ({ value: p.id, label: `${p.po_number}`, description: p.buyer_name }));
 
-  const filtered = useMemo(() => items.filter(i =>
-    i.po_number.toLowerCase().includes(search.toLowerCase()) || i.notes.toLowerCase().includes(search.toLowerCase())
-  ), [items, search]);
-  const pagedData = useMemo(() => { const s = (page - 1) * pageSize; return filtered.slice(s, s + pageSize); }, [filtered, page]);
-
-  const columns: Column[] = [
-    { key: 'po_number', label: 'PO #', sortable: true, render: (v) => <span className="font-mono text-heading">{String(v)}</span> },
-    { key: 'fit_stage', label: 'Stage', sortable: true, render: (_v, row) => {
-      const s = row.fit_stage as string;
-      return <span className={`px-2 py-1 rounded-full text-xs font-medium ${STAGE_COLORS[s] || 'bg-surface-alt text-muted'}`}>v{String(row.version)} · {STAGES.find(st => st.value === s)?.label || s}</span>;
-    }},
-    { key: 'is_current', label: 'Current', render: (v) => v ? <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-badge-emerald">Current</span> : <span className="text-faint text-sm">—</span> },
-    { key: 'notes', label: 'Notes', render: (v) => <span className="text-muted">{v ? String(v) : '-'}</span> },
-    { key: 'created_at', label: 'Created', render: (v) => <span className="text-muted">{v ? String(v).slice(0, 10) : '-'}</span> },
-    { key: 'actions', label: 'Actions', className: 'text-right', render: (_v, row) => {
-      const item = row as unknown as FitSpec;
-      return (
-        <>
-          {!item.is_current && <button onClick={(e) => { e.stopPropagation(); handleSetCurrent(item); }} className="text-emerald-700 hover:text-emerald-500 mr-3 text-sm">Set Current</button>}
-          <button onClick={(e) => { e.stopPropagation(); handleOpenModal(item); }} className="text-heading hover:text-emerald-500 mr-3 text-sm">Edit</button>
-          <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} className="text-red-500 hover:text-red-400 text-sm">Delete</button>
-        </>
-      );
-    }},
+  const columns: SpreadsheetColumn[] = [
+    { title: 'PO #', field: 'po_number', headerFilter: true },
+    { title: 'Stage', field: 'fit_stage_label', headerFilter: true },
+    { title: 'Current', field: 'is_current' },
+    { title: 'Notes', field: 'notes' },
+    { title: 'Created', field: 'created_at' },
   ];
 
-  if (loading) return <Layout><div className="p-6 flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-2 border-emerald-400 border-t-transparent rounded-full" /></div></Layout>;
+  const gridData = items.map((item) => ({
+    ...item,
+    fit_stage_label: `v${item.version} · ${STAGES.find(st => st.value === item.fit_stage)?.label || item.fit_stage}`,
+    is_current: item.is_current ? 'Current' : '—',
+    created_at: item.created_at ? String(item.created_at).slice(0, 10) : '—',
+  }));
 
   return (
     <Layout>
@@ -152,7 +125,23 @@ export default function FitSpecsPage() {
             <button onClick={() => handleOpenModal()} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors">+ New Fit Spec</button>
           </div>
         </div>
-        <DataTable data={pagedData as unknown as Record<string, unknown>[]} columns={columns} totalCount={filtered.length} page={page} pageSize={pageSize} onPageChange={setPage} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search by PO or notes..." loading={loading} onRowClick={(row) => handleOpenModal(row as unknown as FitSpec)} />
+
+        <SpreadsheetGrid
+          data={gridData as unknown as Record<string, unknown>[]}
+          columns={columns}
+          height={480}
+          toolbar
+          title="Fit Specs"
+          exportable
+          columnChooser
+          paginationSize={10}
+          actionColumn
+          onAdd={() => handleOpenModal()}
+          onEdit={(row) => handleOpenModal(row as unknown as FitSpec)}
+          onDelete={(row) => handleDelete(String(row.id))}
+          onRowClick={(row) => handleOpenModal(row as unknown as FitSpec)}
+          loading={loading}
+        />
       </div>
 
       {showModal && (

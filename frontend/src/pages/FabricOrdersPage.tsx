@@ -1,20 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import DataTable from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn, SpreadsheetMenuItem } from '../components/SpreadsheetGrid';
 import SearchableSelect from '../components/SearchableSelect';
 import { fabricApi, setupApi } from '../api/client';
 import { FABRIC_ORDER_STATUSES } from '../api/client';
 import type { FabricOrder, FabricSupplier, FabricCategory, FabricRiskStatus, FabricScheduleStatus, RiskLevel } from '../api/client';
-import type { Column } from '../components/DataTable';
 import { useToast } from '../contexts/ToastContext';
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-surface-alt text-muted', submitted: 'bg-blue-500/20 text-blue-400',
-  lab_dip_pending: 'bg-amber-500/20 text-amber-400', lab_dip_approved: 'bg-emerald-500/20 text-badge-emerald',
-  bulk_approved: 'bg-emerald-500/20 text-badge-emerald', in_production: 'bg-violet-500/20 text-violet-400',
-  shipped: 'bg-cyan-500/20 text-cyan-400', delivered: 'bg-emerald-500/20 text-badge-emerald',
-  cancelled: 'bg-red-500/20 text-badge-red',
-};
 
 const RISK_COLORS: Record<string, string> = {
   none: 'bg-surface-alt text-muted', green: 'bg-emerald-500/20 text-badge-emerald',
@@ -24,15 +16,27 @@ const RISK_COLORS: Record<string, string> = {
 
 const SCHEDULE_DATE_LABELS: Record<string, string> = {
   lab_dip_required_date: 'Lab Dip Required', lab_dip_actual_date: 'Lab Dip Actual',
-  lab_dip_approval_date: 'Lab Dip Approval', onboard_date: 'Onboard', eta_date: 'ETA', clearance_date: 'Clearance',
+  lab_dip_approval_date: 'Lab Dip Approval', strike_off_required_date: 'Strike-Off Required',
+  strike_off_actual_date: 'Strike-Off Actual', strike_off_approval_date: 'Strike-Off Approval',
+  onboard_date: 'Onboard', eta_date: 'ETA', actual_arrival_date: 'Actual Arrival',
+  paperwork_date: 'Paperwork', clearance_date: 'Clearance',
+  lab_dip: 'Lab Dip', strike_off: 'Strike-Off', onboard: 'Onboard', eta: 'ETA',
+  actual_arrival: 'Actual Arrival', paperwork: 'Paperwork', clearance: 'Clearance',
 };
 
-const SCHEDULE_DATE_FIELDS = ['lab_dip_required_date', 'lab_dip_actual_date', 'lab_dip_approval_date', 'onboard_date', 'eta_date', 'clearance_date'] as const;
+const SCHEDULE_DATE_FIELDS = [
+  'lab_dip_required_date', 'lab_dip_actual_date', 'lab_dip_approval_date',
+  'strike_off_required_date', 'strike_off_actual_date', 'strike_off_approval_date',
+  'onboard_date', 'eta_date', 'actual_arrival_date', 'paperwork_date', 'clearance_date',
+] as const;
 
 const OWNER_CHAIN: Record<string, string[]> = {
   lab_dip: ['sales', 'merchandising'],
+  strike_off: ['sales', 'merchandising'],
   onboard: ['sales', 'merchandising', 'planning'],
   eta: ['sales', 'merchandising', 'planning'],
+  actual_arrival: ['logistics'],
+  paperwork: ['logistics'],
   clearance: ['logistics'],
 };
 
@@ -55,8 +59,6 @@ export default function FabricOrdersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [riskOrderId, setRiskOrderId] = useState<string | null>(null);
   const [riskStatus, setRiskStatus] = useState<FabricRiskStatus | null>(null);
@@ -67,10 +69,8 @@ export default function FabricOrdersPage() {
   const [scheduleDates, setScheduleDates] = useState<Record<string, string>>({});
   const [scheduleStatus, setScheduleStatus] = useState<FabricScheduleStatus | null>(null);
   const [handoffNotes, setHandoffNotes] = useState('');
-  const pageSize = 10;
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { setPage(1); }, [search]);
   useEffect(() => {
     fabricApi.getSuppliers({ page_size: '200' }).then(r => setSuppliers(r.data.results)).catch(() => {});
     fabricApi.getCategories({ page_size: '200' }).then(r => setCategories(r.data.results)).catch(() => {});
@@ -192,29 +192,31 @@ export default function FabricOrdersPage() {
     } finally { setRiskSaving(false); }
   };
 
-  const filtered = useMemo(() => items.filter(i => i.order_number.toLowerCase().includes(search.toLowerCase())), [items, search]);
-  const pagedData = useMemo(() => { const s = (page - 1) * pageSize; return filtered.slice(s, s + pageSize); }, [filtered, page]);
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Order #', field: 'order_number', headerFilter: true },
+    { title: 'Supplier', field: 'supplier_name', headerFilter: true },
+    { title: 'Category', field: 'fabric_category_name', headerFilter: true },
+    { title: 'Qty (m)', field: 'quantity_meters', hozAlign: 'right' },
+    { title: 'Total', field: 'total_price', hozAlign: 'right' },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'Risk', field: 'risk_level', headerFilter: true },
+    { title: 'ETA', field: 'eta_date', headerFilter: true },
+  ];
 
-  const columns: Column[] = [
-    { key: 'order_number', label: 'Order #', sortable: true, render: (v) => <span className="font-mono text-heading">{String(v)}</span> },
-    { key: 'supplier_name', label: 'Supplier', sortable: true },
-    { key: 'fabric_category_name', label: 'Category', render: (v) => <span className="text-muted">{v ? String(v) : '-'}</span> },
-    { key: 'quantity_meters', label: 'Qty (m)', render: (v) => <span className="font-mono">{String(v)}</span> },
-    { key: 'total_price', label: 'Total', render: (v) => <span className="font-mono text-emerald-700">{v ? `$${Number(v).toFixed(2)}` : '-'}</span> },
-    { key: 'status', label: 'Status', render: (_v, row) => {
-      const s = row.status as string;
-      return <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[s] || 'bg-surface-alt text-muted'}`}>{s.replace(/_/g, ' ')}</span>;
-    }},
-    { key: 'risk_level_code', label: 'Risk', render: (v, row) => {
-      const code = v ? String(v) : 'none';
-      const item = row as unknown as FabricOrder;
-      return <span className={`px-2 py-1 rounded-full text-xs font-medium ${RISK_COLORS[code] || 'bg-surface-alt text-muted'}`} title={item.risk_notes || ''}>{item.risk_level_name || code}</span>;
-    }},
-    { key: 'eta_date', label: 'ETA', render: (v) => <span className="text-muted">{v ? String(v) : '-'}</span> },
-    { key: 'actions', label: 'Actions', className: 'text-right', render: (_v, row) => {
-      const item = row as unknown as FabricOrder;
-      return <><button onClick={(e) => { e.stopPropagation(); openRisk(item.id); }} className="text-heading hover:text-amber-500 mr-3 text-sm">Risk</button><button onClick={(e) => { e.stopPropagation(); handleOpenModal(item); }} className="text-heading hover:text-emerald-500 mr-3 text-sm">Edit</button><button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} className="text-red-500 hover:text-red-400 text-sm">Delete</button></>;
-    }},
+  const gridData = items.map(o => ({
+    id: o.id,
+    order_number: o.order_number,
+    supplier_name: o.supplier_name || '—',
+    fabric_category_name: o.fabric_category_name || '—',
+    quantity_meters: o.quantity_meters,
+    total_price: o.total_price ? `$${Number(o.total_price).toFixed(2)}` : '—',
+    status: o.status.replace(/_/g, ' '),
+    risk_level: o.risk_level_name || o.risk_level_code || 'none',
+    eta_date: o.eta_date || '—',
+  }));
+
+  const rowActions = (row: Record<string, unknown>): SpreadsheetMenuItem[] => [
+    { label: 'Risk & Schedule', action: () => openRisk(String(row.id)) },
   ];
 
   if (loading) return <Layout><div className="p-6 flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-2 border-emerald-400 border-t-transparent rounded-full" /></div></Layout>;
@@ -232,7 +234,27 @@ export default function FabricOrdersPage() {
           </div>
           <button onClick={() => handleOpenModal()} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors">+ New Order</button>
         </div>
-        <DataTable data={pagedData as unknown as Record<string, unknown>[]} columns={columns} totalCount={filtered.length} page={page} pageSize={pageSize} onPageChange={setPage} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search by order number..." loading={loading} onRowClick={(row) => handleOpenModal(row as unknown as FabricOrder)} />
+        <SpreadsheetGrid
+          data={gridData}
+          columns={columns}
+          height={480}
+          toolbar
+          title="Fabric Orders"
+          exportable
+          printable
+          printTitle="Fabric Orders"
+          columnChooser
+          paginationSize={10}
+          actionColumn
+          loading={loading}
+          rowActions={rowActions}
+          onAdd={() => handleOpenModal()}
+          onEdit={(row) => {
+            const it = items.find(x => x.id === row.id);
+            if (it) handleOpenModal(it);
+          }}
+          onDelete={(row) => handleDelete(String(row.id))}
+        />
       </div>
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

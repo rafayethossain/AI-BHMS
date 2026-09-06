@@ -40,6 +40,7 @@ const sheet: DesignSheet = {
   description: 'Wide leg pant',
   note: 'Front pocket change',
   sketch_annotations: [],
+  layout_order: [],
   fit_specs: [],
   job_requests: [],
   created_at: '2026-08-27T10:00:00Z',

@@ -321,6 +321,61 @@ class TestDesignSheetAPI:
         assert detail.data["sketch_annotations"] == []
 
 
+# ===================================== DESIGN SHEET BLOCK LAYOUT ORDER
+
+
+@pytest.mark.django_db
+class TestDesignSheetLayoutOrder:
+    """DesignSheet content-block layout order (tech-pack builder, Phase 1).
+
+    The design sheet page is a content-block document (sketch / material /
+    fit specs / images / job requests). ``layout_order`` persists the
+    designer's arrangement so the block order is stable across reloads and
+    is rendered in exactly the saved sequence (like a built-in template).
+    """
+
+    def test_layout_order_defaults_to_all_blocks(self, ds_client, ds_design_sheet):
+        resp = ds_client.get(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/"
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        order = resp.data["layout_order"]
+        assert order == [
+            "header", "sketch", "material", "fit_specs",
+            "images", "job_requests",
+        ]
+        assert len(order) == len(set(order))
+
+    def test_layout_order_is_writable_and_round_trips(self, ds_client, ds_design_sheet):
+        url = f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/"
+        new_order = [
+            "images", "header", "sketch", "material",
+            "fit_specs", "job_requests",
+        ]
+        resp = ds_client.patch(url, {"layout_order": new_order}, format="json")
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.data["layout_order"] == new_order
+
+        detail = ds_client.get(url)
+        assert detail.data["layout_order"] == new_order
+
+    def test_layout_order_with_unknown_block_names_is_rejected(
+        self, ds_client, ds_design_sheet
+    ):
+        url = f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/"
+        resp = ds_client.patch(
+            url,
+            {"layout_order": ["sketch", "nope-not-a-block"]},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_layout_order_must_be_a_list(self, ds_client, ds_design_sheet):
+        url = f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/"
+        resp = ds_client.patch(url, {"layout_order": "header,sketch"}, format="json")
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
 # ============================================================= SKETCH/NOTES
 
 

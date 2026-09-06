@@ -754,6 +754,98 @@ class CostingLine(TenantModel):
         super().clean()
 
 
+class DesignCosting(TenantModel):
+    """
+    Style-level single-piece design costing (RQ-013 / G-12).
+
+    The design cost is the source of truth for how much one garment costs,
+    computed per Style (not per PurchaseOrder). It is the reference a PO
+    costing is prepared from (see ``DesignCostingViewSet.prepare_po_costing``).
+    Reuses the same 8 standardized cost categories / sheet types / pattern and
+    single-size options as the order-level ``Costing``.
+    """
+
+    COST_CATEGORIES = Costing.COST_CATEGORIES
+    SHEET_TYPES = Costing.SHEET_TYPES
+    PATTERN_OPTIONS = Costing.PATTERN_OPTIONS
+
+    style = models.ForeignKey(Style, on_delete=models.CASCADE, related_name="design_costings")
+    version = models.IntegerField(default=1)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("draft", "Draft"),
+            ("pending", "Pending Approval"),
+            ("approved", "Approved"),
+            ("rejected", "Rejected"),
+        ],
+        default="draft"
+    )
+    sheet_type = models.CharField(max_length=10, choices=SHEET_TYPES, default="bd")
+    is_live = models.BooleanField(default=True, help_text="Ticked live design costing for this style")
+    target_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    fabric_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    trim_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cm_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    overhead_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    margin = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    is_single_size = models.BooleanField(default=False)
+    size_ratio = models.JSONField(default=list, blank=True)
+    is_patterned = models.BooleanField(default=False)
+    patterned_fabric_options = models.JSONField(default=list, blank=True)
+    approved_by = models.ForeignKey("users.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_design_costings")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-version"]
+        unique_together = ["tenant", "style", "version"]
+
+    def __str__(self):
+        return f"{self.style.style_number} - Design Costing V{self.version}"
+
+    def save(self, *args, **kwargs):
+        fabric = Decimal(str(self.fabric_cost or 0))
+        trim = Decimal(str(self.trim_cost or 0))
+        cm = Decimal(str(self.cm_cost or 0))
+        overhead = Decimal(str(self.overhead_cost or 0))
+        self.total_cost = (fabric + trim + cm + overhead).quantize(Decimal("0.01"))
+        super().save(*args, **kwargs)
+
+    @property
+    def margin_percent(self):
+        if self.total_cost and self.target_price and self.total_cost > 0:
+            return round(float((self.target_price - self.total_cost) / self.total_cost * 100), 2)
+        return None
+
+
+class DesignCostingLine(TenantModel):
+    """
+    Line item on a Style-level design costing.
+
+    Belongs to one of the 8 standardized cost categories; total cost is
+    cached on the parent ``DesignCosting`` by the serializer / prepare action.
+    """
+    costing = models.ForeignKey(DesignCosting, on_delete=models.CASCADE, related_name="lines")
+    category = models.CharField(max_length=20, choices=DesignCosting.COST_CATEGORIES)
+    description = models.CharField(max_length=255)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    consumption = models.DecimalField(max_digits=10, decimal_places=4, default=0)
+    size_width = models.CharField(max_length=50, blank=True)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ["sort_order", "created_at"]
+
+    def __str__(self):
+        return f"{self.costing} - {self.description}"
+
+    @property
+    def line_total(self):
+        return (self.unit_price * self.consumption).quantize(Decimal("0.01"))
+
+
 class TA(TenantModel):
     """
     Time & Action model.
@@ -896,6 +988,17 @@ class StyleTechPack(TenantModel):
     issue_date = models.DateField(null=True, blank=True)
     block = models.CharField(max_length=100, blank=True)
     based_on = models.CharField(max_length=100, blank=True)
+
+    class Relationship(models.TextChoices):
+        BASED_ON = "based_on", "Based on"
+        NA = "na", "NA"
+        RECUT = "recut", "Recut"
+        NEW = "new", "New"
+
+    relationship = models.CharField(
+        max_length=20, choices=Relationship.choices, default="new", blank=True,
+        help_text="Relationship of this design to a base (Based on / NA / Recut / New)",
+    )
     customer = models.CharField(max_length=100, blank=True)
     style_number = models.CharField(max_length=50, blank=True)
     size = models.CharField(max_length=50, blank=True)
@@ -907,6 +1010,21 @@ class StyleTechPack(TenantModel):
     sketch = models.CharField(max_length=255, blank=True)
     description = models.TextField(blank=True)
     note = models.TextField(blank=True)
+
+    # Design register columns (unified Style + Design Sheet list)
+    product_type = models.ForeignKey(
+        "setup.ProductType", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="tech_packs",
+    )
+    buyer = models.ForeignKey(
+        "setup.Buyer", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="tech_packs",
+    )
+    style_code = models.CharField(max_length=50, blank=True)
+    style_type = models.CharField(max_length=100, blank=True)
+    contains = models.CharField(max_length=255, blank=True)
+    risk_date = models.DateField(null=True, blank=True)
+    pattern_request_date = models.DateField(null=True, blank=True)
 
     # Design Sheet enhancement fields (Day 1)
     sketch_image = models.ImageField(
@@ -922,6 +1040,14 @@ class StyleTechPack(TenantModel):
     class Meta:
         ordering = ["-created_at"]
         unique_together = ["tenant", "techpack_number"]
+
+    def buyer_display_name(self):
+        """Buyer name for register/export: style buyer → tech-pack buyer → customer."""
+        if self.style_id and self.style.buyer_id:
+            return self.style.buyer.name
+        if self.buyer_id:
+            return self.buyer.name
+        return self.customer or ""
 
     def __str__(self):
         number = self.style_number or (self.style.style_number if self.style else "") or "unlinked"
@@ -940,6 +1066,20 @@ class StyleTechPack(TenantModel):
             if match:
                 max_num = max(max_num, int(match.group(1)))
         return f"TP-{max_num + 1:04d}"
+
+    @classmethod
+    def next_style_code(cls, tenant):
+        """Return the next DS-XXXX unique style code for a tenant."""
+        import re
+        existing = cls.objects.filter(
+            tenant=tenant, style_code__startswith="DS-"
+        ).values_list("style_code", flat=True)
+        max_num = 1000
+        for code in existing:
+            match = re.match(r"^DS-(\d+)$", code)
+            if match:
+                max_num = max(max_num, int(match.group(1)))
+        return f"DS-{max_num + 1:04d}"
 
     def mark_extracted(self, data):
         """Store the extraction payload and move draft → extracted."""
@@ -974,7 +1114,17 @@ class DesignSheet(TenantModel):
     """
     Design sheet linked to StyleTechPack.
     Provides status workflow and links to fit specs and job requests.
+
+    ``layout_order`` persists the designer's content-block arrangement
+    (header/sketch/material/fit_specs/images/job_requests). The design-sheet
+    page renders the blocks in exactly this order; changing it reorders the
+    on-screen and printed tech pack without touching the data.
     """
+
+    BLOCK_KEYS = [
+        "header", "sketch", "material", "fit_specs",
+        "images", "job_requests",
+    ]
 
     class Status(models.TextChoices):
         NEW = "new", "New"
@@ -994,12 +1144,29 @@ class DesignSheet(TenantModel):
         default=list, blank=True,
         help_text="List of {id, x, y, text} sketch annotations (percentages 0-100)",
     )
+    layout_order = models.JSONField(
+        default=list, blank=True,
+        help_text="Ordered list of content-block keys rendered on the design-sheet page",
+    )
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
         return f"DesignSheet - {self.tech_pack}"
+
+    def clean(self):
+        super().clean()
+        if self.layout_order and set(self.layout_order) != set(self.BLOCK_KEYS):
+            raise ValidationError(
+                "layout_order must contain exactly the design-sheet blocks "
+                f"{self.BLOCK_KEYS}, got {self.layout_order}"
+            )
+
+    def save(self, *args, **kwargs):
+        if not self.layout_order:
+            self.layout_order = list(self.BLOCK_KEYS)
+        super().save(*args, **kwargs)
 
     def transition_to(self, status):
         """

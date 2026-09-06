@@ -7,6 +7,7 @@ from decimal import Decimal
 from io import StringIO
 
 from django.http import HttpResponse
+from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -18,19 +19,27 @@ from apps.core.permissions import HasPermission
 
 from .models import (
     BookingScheduleItem,
+    CostReconciliation,
     Docket,
+    ExportRecap,
     FinalHitReconciliation,
     FreightForwarder,
+    ImportRecap,
     Shipment,
     ShippingDocument,
+    SupplierPayment,
 )
 from .serializers import (
     BookingScheduleItemSerializer,
+    CostReconciliationSerializer,
     DocketSerializer,
+    ExportRecapSerializer,
     FinalHitReconciliationSerializer,
     FreightForwarderSerializer,
+    ImportRecapSerializer,
     ShipmentSerializer,
     ShippingDocumentSerializer,
+    SupplierPaymentSerializer,
 )
 from .services.paperwork_comparison import PaperworkComparisonService
 
@@ -234,6 +243,24 @@ class BookingScheduleItemViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(tenant=self.request.tenant, created_by=self.request.user)
+        self._stamp_snapshot(serializer.instance)
+
+    def perform_update(self, serializer):
+        serializer.save()
+        self._stamp_snapshot(serializer.instance)
+
+    def _stamp_snapshot(self, item):
+        """Capture the point-in-time snapshot at save time (B8 / 16.1 snapshot columns)."""
+        snapshot = {
+            "status": item.status,
+            "cut_qty": str(item.cut_qty) if item.cut_qty is not None else None,
+            "garments_ready_qty": str(item.garments_ready_qty) if item.garments_ready_qty is not None else None,
+            "ex_factory_date": item.ex_factory_date.isoformat() if item.ex_factory_date else None,
+            "week_ending": item.week_ending.isoformat(),
+        }
+        item.snapshot_data = snapshot
+        item.snapshot_date = timezone.now()
+        item.save(update_fields=["snapshot_data", "snapshot_date", "updated_at"])
 
     @action(detail=True, methods=["post"])
     def transition(self, request, pk=None):
@@ -348,6 +375,324 @@ class DocketViewSet(viewsets.ModelViewSet):
         })
 
 
+class ImportRecapViewSet(viewsets.ModelViewSet):
+    """
+    RQ-043 (B2): Import Recap — fabric/trims inbound tracking.
+
+    CRUD with tenant isolation and logistics permission gating.  The grid
+    columns mirror the reference Import Recap tracker.
+    """
+    queryset = ImportRecap.objects.all()
+    serializer_class = ImportRecapSerializer
+    pagination_class = StandardResultsSetPagination
+    search_fields = [
+        "s_c_number",
+        "container",
+        "bl_hawb",
+        "vessel",
+        "supplier__name",
+        "factory__name",
+        "agent",
+    ]
+    filterset_fields = [
+        "status", "mode", "lc_foc", "item_category",
+        "docs_received", "supplier", "factory",
+    ]
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permissions = {
+        "list": "logistics:view", "retrieve": "logistics:view",
+        "create": "logistics:create", "update": "logistics:edit",
+        "partial_update": "logistics:edit", "destroy": "logistics:delete",
+        "recap_summary": "logistics:view",
+    }
+
+    def get_queryset(self):
+        return ImportRecap.objects.filter(tenant=self.request.tenant)
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.tenant, created_by=self.request.user)
+
+    @action(detail=False, methods=["get"])
+    def recap_summary(self, request):
+        """B6 (RQ-047): inbound Import Recap report, groups per supplier /
+        factory / item-category with invoice-value and quantity totals."""
+        recaps = self.get_queryset()
+        suppliers = []
+        for row in (
+            recaps.exclude(supplier=None)
+            .values("supplier__name")
+            .annotate(
+                invoice_value=Sum("invoice_value"),
+                quantity=Sum("quantity"),
+            )
+        ):
+            suppliers.append({
+                "supplier": row["supplier__name"],
+                "invoice_value": str(row["invoice_value"] or 0),
+                "quantity": str(row["quantity"] or 0),
+            })
+        factories = []
+        for row in (
+            recaps.exclude(factory=None)
+            .values("factory__name")
+            .annotate(
+                invoice_value=Sum("invoice_value"),
+                quantity=Sum("quantity"),
+            )
+        ):
+            factories.append({
+                "factory": row["factory__name"],
+                "invoice_value": str(row["invoice_value"] or 0),
+                "quantity": str(row["quantity"] or 0),
+            })
+        categories = []
+        for row in recaps.values("item_category").annotate(
+            invoice_value=Sum("invoice_value"),
+            quantity=Sum("quantity"),
+        ):
+            categories.append({
+                "item_category": row["item_category"],
+                "invoice_value": str(row["invoice_value"] or 0),
+                "quantity": str(row["quantity"] or 0),
+            })
+        agg = recaps.aggregate(
+            invoice_value=Sum("invoice_value"),
+            quantity=Sum("quantity"),
+        )
+        return Response({
+            "suppliers": suppliers,
+            "factories": factories,
+            "categories": categories,
+            "total": {
+                "invoice_value": str(agg["invoice_value"] or 0),
+                "quantity": str(agg["quantity"] or 0),
+            },
+        })
+
+
+class ExportRecapViewSet(viewsets.ModelViewSet):
+    """
+    RQ-044 (B3): Export Recap — per-hit landed economics.
+
+    CRUD with tenant isolation and logistics permission gating.  The grid
+    columns mirror the reference Export Recap tracker (identifiers, landed
+    values, logistics, and the payment-to-factory / payment-from-customer
+    pipelines).
+    """
+    queryset = ExportRecap.objects.all()
+    serializer_class = ExportRecapSerializer
+    pagination_class = StandardResultsSetPagination
+    search_fields = [
+        "fob_no",
+        "s_c_number",
+        "factory_invoice",
+        "customer_invoice",
+        "container",
+        "hbl",
+        "bl_number",
+        "courier",
+        "factory__name",
+        "forwarder__name",
+    ]
+    filterset_fields = [
+        "mode", "factory", "forwarder", "purchase_order",
+        "factory_paid_date", "customer_payment_date",
+    ]
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permissions = {
+        "list": "logistics:view", "retrieve": "logistics:view",
+        "create": "logistics:create", "update": "logistics:edit",
+        "partial_update": "logistics:edit", "destroy": "logistics:delete",
+        "sales_summary": "logistics:view", "recap_summary": "logistics:view",
+    }
+
+    def get_queryset(self):
+        return ExportRecap.objects.filter(tenant=self.request.tenant)
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.tenant, created_by=self.request.user)
+
+    @action(detail=False, methods=["get"])
+    def sales_summary(self, request):
+        """B6 (RQ-047): Sales Summary report — per-buyer and per-factory
+        groupings over the export recap figures plus a grand total."""
+        recaps = self.get_queryset()
+        buyers = []
+        for row in (
+            recaps.exclude(purchase_order=None)
+            .exclude(purchase_order__buyer=None)
+            .values("purchase_order__buyer__name")
+            .annotate(
+                quantity=Sum("quantity"),
+                fob_value=Sum("fob_value"),
+                cmpt_value=Sum("cmpt_value"),
+                cost_value=Sum("cost_value"),
+                factory_amount=Sum("factory_amount"),
+                customer_received_amount=Sum("customer_received_amount"),
+            )
+        ):
+            buyers.append({
+                "buyer": row["purchase_order__buyer__name"],
+                "quantity": str(row["quantity"] or 0),
+                "fob_value": str(row["fob_value"] or 0),
+                "cmpt_value": str(row["cmpt_value"] or 0),
+                "cost_value": str(row["cost_value"] or 0),
+                "factory_amount": str(row["factory_amount"] or 0),
+                "customer_received_amount": str(row["customer_received_amount"] or 0),
+            })
+        factories = []
+        for row in (
+            recaps.exclude(factory=None)
+            .values("factory__name")
+            .annotate(
+                quantity=Sum("quantity"),
+                fob_value=Sum("fob_value"),
+                cmpt_value=Sum("cmpt_value"),
+                cost_value=Sum("cost_value"),
+                factory_amount=Sum("factory_amount"),
+                customer_received_amount=Sum("customer_received_amount"),
+            )
+        ):
+            factories.append({
+                "factory": row["factory__name"],
+                "quantity": str(row["quantity"] or 0),
+                "fob_value": str(row["fob_value"] or 0),
+                "cmpt_value": str(row["cmpt_value"] or 0),
+                "cost_value": str(row["cost_value"] or 0),
+                "factory_amount": str(row["factory_amount"] or 0),
+                "customer_received_amount": str(row["customer_received_amount"] or 0),
+            })
+        total = recaps.aggregate(
+            quantity=Sum("quantity"),
+            fob_value=Sum("fob_value"),
+            cmpt_value=Sum("cmpt_value"),
+            cost_value=Sum("cost_value"),
+            factory_amount=Sum("factory_amount"),
+            customer_received_amount=Sum("customer_received_amount"),
+        )
+        return Response({
+            "buyers": buyers,
+            "factories": factories,
+            "total": {k: str(v or 0) for k, v in total.items()},
+        })
+
+    @action(detail=False, methods=["get"])
+    def recap_summary(self, request):
+        """B6 (RQ-047): Export Recap report — per-factory grouping plus a
+        grand total (quantity + landed values)."""
+        recaps = self.get_queryset()
+        factories = []
+        for row in (
+            recaps.exclude(factory=None)
+            .values("factory__name")
+            .annotate(
+                quantity=Sum("quantity"),
+                fob_value=Sum("fob_value"),
+                cmpt_value=Sum("cmpt_value"),
+                cost_value=Sum("cost_value"),
+            )
+        ):
+            factories.append({
+                "factory": row["factory__name"],
+                "quantity": str(row["quantity"] or 0),
+                "fob_value": str(row["fob_value"] or 0),
+                "cmpt_value": str(row["cmpt_value"] or 0),
+                "cost_value": str(row["cost_value"] or 0),
+            })
+        total = recaps.aggregate(
+            quantity=Sum("quantity"),
+            fob_value=Sum("fob_value"),
+            cmpt_value=Sum("cmpt_value"),
+            cost_value=Sum("cost_value"),
+        )
+        return Response({
+            "factories": factories,
+            "total": {k: str(v or 0) for k, v in total.items()},
+        })
+
+
+class SupplierPaymentViewSet(viewsets.ModelViewSet):
+    """
+    RQ-045 (B4): Supplier Payment + Due — SP log.
+
+    CRUD with tenant isolation and logistics permission gating plus two
+    behaviour actions: `release` stamps the payment as released
+    (release workflow) and `due_pivot` returns an aggregate per
+    supplier x due-month (due pivot used by the grid/report).
+    """
+    queryset = SupplierPayment.objects.all()
+    serializer_class = SupplierPaymentSerializer
+    pagination_class = StandardResultsSetPagination
+    search_fields = [
+        "payment_ref",
+        "invoice_no",
+        "fn_ref",
+        "supplier__name",
+        "purchase_order__po_number",
+        "lc__lc_number",
+    ]
+    filterset_fields = [
+        "supplier", "purchase_order", "lc", "released", "payment_method",
+        "payment_date", "due_date",
+    ]
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permissions = {
+        "list": "logistics:view", "retrieve": "logistics:view",
+        "create": "logistics:create", "update": "logistics:edit",
+        "partial_update": "logistics:edit", "destroy": "logistics:delete",
+        "release": "logistics:edit",
+    }
+
+    def get_queryset(self):
+        queryset = SupplierPayment.objects.filter(tenant=self.request.tenant)
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            today = timezone.localdate()
+            if status_filter == "released":
+                queryset = queryset.filter(released=True)
+            elif status_filter == "overdue":
+                queryset = queryset.filter(released=False, due_date__lt=today)
+            elif status_filter == "to_be_released":
+                queryset = queryset.filter(released=False).exclude(due_date__lt=today)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.tenant, created_by=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def release(self, request, pk=None):
+        payment = self.get_object()
+        payment.release(user=request.user)
+        return Response(SupplierPaymentSerializer(payment, context={"request": request}).data)
+
+    @action(detail=False, methods=["get"])
+    def due_pivot(self, request):
+        payments = self.get_queryset()
+        month = request.query_params.get("month")
+        if month:
+            payments = payments.filter(due_date__year=int(month[:4]), due_date__month=int(month[5:7]))
+        rows = (
+            payments.exclude(supplier=None)
+            .exclude(due_date=None)
+            .values("supplier__name")
+            .annotate(
+                total=Sum("amount"),
+                released_total=Sum("amount", filter=Q(released=True)),
+                overdue_due=Sum("amount", filter=Q(released=False, due_date__lt=timezone.localdate())),
+            )
+        )
+        pivoted = []
+        for row in rows:
+            pivoted.append({
+                "supplier": row["supplier__name"],
+                "month": month or "ALL",
+                "total": str(row["total"] or 0),
+                "released_total": str(row["released_total"] or 0),
+                "overdue_due": str(row["overdue_due"] or 0),
+            })
+        return Response({"results": pivoted})
+
+
 class FinalHitReconciliationViewSet(viewsets.ModelViewSet):
     """
     GC-021 Final Hit Reconciliation.
@@ -422,3 +767,78 @@ class FinalHitReconciliationViewSet(viewsets.ModelViewSet):
             "count": len(flagged),
             "results": serializer.data,
         })
+
+
+class CostReconciliationViewSet(viewsets.ModelViewSet):
+    """
+    RQ-046 (B5): Cost update / reconcile.
+
+    Compares the Factory Invoice (MP) against the Planning CM for an order,
+    deriving a Saving/Loss per unit and total, flagging a mismatch, and exposing
+    a status workflow (compare / resolve actions) on a Tabulator grid.
+    """
+    queryset = CostReconciliation.objects.all()
+    serializer_class = CostReconciliationSerializer
+    pagination_class = StandardResultsSetPagination
+    search_fields = [
+        "purchase_order__po_number",
+        "purchase_order__buyer__name",
+        "purchase_order__factory__name",
+        "notes",
+    ]
+    filterset_fields = ["purchase_order", "export_recap", "costing", "status"]
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permissions = {
+        "list": "logistics:view", "retrieve": "logistics:view",
+        "create": "logistics:create", "update": "logistics:edit",
+        "partial_update": "logistics:edit", "destroy": "logistics:delete",
+        "compare": "logistics:edit", "resolve": "logistics:edit",
+    }
+
+    def get_queryset(self):
+        qs = CostReconciliation.objects.filter(tenant=self.request.tenant)
+        mismatch = self.request.query_params.get("mismatch")
+        if mismatch is not None:
+            want = str(mismatch).strip().lower() in ("1", "true", "yes", "on")
+            qs = qs.filter(is_mismatch=want)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.tenant, created_by=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def compare(self, request, pk=None):
+        """Update Factory Inv / Planning CM inputs and re-run the comparison."""
+        rec = self.get_object()
+        amt_factory = request.data.get("factory_inv_amount")
+        amt_cm = request.data.get("planning_cm_amount")
+        qty_factory = request.data.get("factory_inv_qty")
+        qty_cm = request.data.get("planning_cm_qty")
+
+        def _dec(v):
+            if v in (None, ""):
+                return None
+            return Decimal(str(v))
+
+        rec.compare(
+            factory_inv_amount=_dec(amt_factory),
+            planning_cm_amount=_dec(amt_cm),
+            factory_inv_qty=_dec(qty_factory),
+            planning_cm_qty=_dec(qty_cm),
+            user=request.user,
+        )
+        return Response(self.get_serializer(rec).data)
+
+    @action(detail=True, methods=["post"])
+    def resolve(self, request, pk=None):
+        """Set a workflow status (reconciled / disputed / resolved)."""
+        rec = self.get_object()
+        new_status = request.data.get("status", "resolved")
+        if new_status not in dict(CostReconciliation.STATUS_CHOICES):
+            return Response(
+                {"error": "invalid status"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        rec.status = new_status
+        rec.resolve_status(status=new_status, user=request.user)
+        return Response(self.get_serializer(rec).data)

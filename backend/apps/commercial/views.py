@@ -4,6 +4,7 @@ Commercial views for BHMS.
 from decimal import Decimal
 
 from django.http import HttpResponse
+from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -19,6 +20,7 @@ from .models import (
     LC,
     Bank,
     DebitNote,
+    ForwardOrder,
     InvoiceApproval,
     LCAmendment,
     ProformaInvoice,
@@ -29,6 +31,7 @@ from .pdf_utils import generate_invoice_pdf
 from .serializers import (
     BankSerializer,
     DebitNoteSerializer,
+    ForwardOrderSerializer,
     InvoiceApprovalSerializer,
     LCAmendmentSerializer,
     LCSerializer,
@@ -723,3 +726,63 @@ class InvoiceApprovalViewSet(viewsets.ModelViewSet):
         response = HttpResponse(output.getvalue(), content_type="text/csv")
         response["Content-Disposition"] = 'attachment; filename="invoice_approvals.csv"'
         return response
+
+
+class ForwardOrderViewSet(viewsets.ModelViewSet):
+    """
+    RQ-048 (B7): Forward Order / Order In-hand book.
+
+    CRUD with tenant isolation and commercial permission gating.  `monthly_forward`
+    returns the monthly forward book grouped by commitment month/buyer with
+    quantity, total-cost and service-charge totals (the 3% service charge is the
+    default on each forward order).
+    """
+    queryset = ForwardOrder.objects.all()
+    serializer_class = ForwardOrderSerializer
+    pagination_class = StandardResultsSetPagination
+    search_fields = [
+        "buyer__name",
+        "factory__name",
+        "purchase_order__po_number",
+        "remarks",
+    ]
+    filterset_fields = ["status", "month", "buyer", "factory", "purchase_order"]
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permissions = {
+        "list": "commercial:view", "retrieve": "commercial:view",
+        "create": "commercial:create", "update": "commercial:edit",
+        "partial_update": "commercial:edit", "destroy": "commercial:delete",
+        "monthly_forward": "commercial:view",
+    }
+
+    def get_queryset(self):
+        return ForwardOrder.objects.filter(tenant=self.request.tenant)
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.tenant, created_by=self.request.user)
+
+    @action(detail=False, methods=["get"])
+    def monthly_forward(self, request):
+        """Monthly forward book grouped by month x buyer with qty/cost/service totals."""
+        from django.db.models import Count
+
+        results = []
+        for row in (
+            self.get_queryset()
+            .values("month", "buyer__name")
+            .annotate(
+                count=Count("id"),
+                quantity=Sum("quantity"),
+                total_cost=Sum("total_cost"),
+                service_charge=Sum("service_charge"),
+            )
+        ):
+            results.append({
+                "month": row["month"].isoformat(),
+                "buyer": row["buyer__name"],
+                "count": row["count"],
+                "quantity": str(row["quantity"] or 0),
+                "total_cost": str(row["total_cost"] or 0),
+                "service_charge": str(row["service_charge"] or 0),
+            })
+        return Response({"results": results})

@@ -79,6 +79,10 @@ graphify-out-*/   # if any suffix variants exist
 backend_be.out.log
 backend_be.err.log
 backend_be.pid.log
+be_new.out.log
+be_new.err.log
+fe_new.out.log
+fe_new.err.log
 *.pid
 
 # ===== IDE / OS =====

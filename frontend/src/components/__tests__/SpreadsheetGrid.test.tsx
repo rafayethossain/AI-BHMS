@@ -25,6 +25,9 @@ vi.mock('tabulator-tables/dist/js/tabulator_esm.js', () => {
       this.options = options;
       this.headerEl = this.renderHeader();
       this.element.appendChild(this.headerEl);
+      if (Array.isArray(options.data)) {
+        this.setData(options.data as Record<string, unknown>[]);
+      }
       tabulatorCapture.instances.push(this);
     }
 

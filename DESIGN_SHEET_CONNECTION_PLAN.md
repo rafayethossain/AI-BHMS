@@ -1,7 +1,7 @@
 # Design Sheet ↔ Tech Pack Connection Plan
 
 **Project:** AI-BHMS
-**Objective:** Connect the existing Tech Pack PDF extractor to the GC Design Sheet workflow
+**Objective:** Connect the existing Tech Pack PDF extractor to the target Design Sheet workflow
 **Status:** PLANNING
 
 ---
@@ -26,9 +26,9 @@ Buyer PDF → Extract → Excel → Edit → Import → Style + BOM
 | **Frontend Wizard** | `TechPackImportWizardPage.tsx` (259 lines) | ✅ Complete |
 | **Tests** | 6 test files, ~110 tests | ✅ Complete |
 
-### 1.2 What's Missing (GC Design Sheet)
+### 1.2 What's Missing (target Design Sheet)
 
-| GC Feature | Current State | Gap |
+| target Feature | Current State | Gap |
 |------------|---------------|-----|
 | **Design Sheet View** | No standalone view | Need `DesignSheetPage.tsx` |
 | **Image/Sketch** | `sketch` field is CharField (text only) | Need image upload + display |
@@ -735,7 +735,7 @@ def create_design_sheets(apps, schema_editor):
 > (partial `UniqueConstraint` — one selected fit spec per design sheet
 > enforced at the DB, not just the `select` endpoint).
 >
-> **2026-08-31 (GC gap closure):** `test_design_sheet_api.py` →25
+> **2026-08-31 (target gap closure):** `test_design_sheet_api.py` →25
 > (transition issuer/designer guard, `season`/`style_id` on detail),
 > `test_design_sheet_fit_spec_copy.py` →10 (annotations include flag).
 > Full design-sheet subset **92 passed**. Frontend: new

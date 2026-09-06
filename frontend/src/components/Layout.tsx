@@ -16,17 +16,22 @@ interface DropdownConfig {
 
 const DROPDOWNS: DropdownConfig[] = [
   {
+    label: 'Design',
+    items: [
+      { label: 'Design', path: '/design' },
+      { label: 'Tech Pack Import', path: '/styles/techpack-import' },
+      { label: 'Fit Specs', path: '/fit-specs' },
+      { label: 'Job Requests', path: '/jobs' },
+      { label: 'Design Costings', path: '/design-costings' },
+      { label: 'Costings', path: '/costings' },
+    ],
+  },
+  {
     label: 'Merchandising',
     items: [
-      { label: 'Styles', path: '/styles' },
       { label: 'File Openings', path: '/file-openings' },
       { label: 'Purchase Orders', path: '/purchase-orders' },
       { label: 'BOMs', path: '/boms' },
-      { label: 'Costings', path: '/costings' },
-      { label: 'Fit Specs', path: '/fit-specs' },
-      { label: 'Design Sheets', path: '/design-sheets' },
-      { label: 'Job Requests', path: '/jobs' },
-      { label: 'Tech Pack Import', path: '/styles/techpack-import' },
     ],
   },
   {
@@ -80,6 +85,11 @@ const DROPDOWNS: DropdownConfig[] = [
       { label: 'Freight Forwarders', path: '/logistics/forwarders' },
       { label: 'Paperwork Comparison', path: '/paperwork-comparison' },
       { label: 'Final Hit Reconciliation', path: '/logistics/reconciliations' },
+      { label: 'Import Recaps', path: '/logistics/import-recaps' },
+      { label: 'Export Recaps', path: '/logistics/export-recaps' },
+      { label: 'Supplier Payments', path: '/logistics/supplier-payments' },
+      { label: 'Cost Reconciliations', path: '/logistics/cost-reconciliations' },
+    { label: 'Summary Reports', path: '/logistics/summary-reports' },
       { label: 'Dashboard', path: '/logistics/dashboard' },
     ],
   },
@@ -92,6 +102,7 @@ const DROPDOWNS: DropdownConfig[] = [
       { label: 'Sales Confirmations', path: '/sales-confirmations' },
       { label: 'Debit Notes', path: '/debit-notes' },
       { label: 'Invoice Approvals', path: '/invoice-approvals' },
+      { label: 'Forward Order Book', path: '/forward-order-book' },
       { label: 'Banks', path: '/banks' },
     ],
   },

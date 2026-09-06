@@ -1,6 +1,7 @@
 """
 Merchandising serializers for BHMS.
 """
+from datetime import date
 from decimal import Decimal
 
 from django.utils import timezone
@@ -9,12 +10,15 @@ from rest_framework.exceptions import ValidationError
 
 from apps.setup.serializers import RiskLevelSerializer
 
+from . import risk_engine
 from .models import (
     BOM,
     TA,
     BOMItem,
     Costing,
     CostingLine,
+    DesignCosting,
+    DesignCostingLine,
     DesignImage,
     DesignJobRequest,
     DesignSheet,
@@ -405,19 +409,40 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     payment_terms_name = serializers.CharField(source="payment_terms.name", read_only=True)
     delivery_mode_name = serializers.CharField(source="delivery_mode.name", read_only=True)
     risk_level_detail = RiskLevelSerializer(source="risk_level", read_only=True)
+    risk = serializers.SerializerMethodField()
+    file_number = serializers.SerializerMethodField()
+    style_number = serializers.SerializerMethodField()
+    actual_completion_date = serializers.SerializerMethodField()
+
+    def get_risk(self, obj):
+        return risk_engine.compute_order_risk(obj)
+
+    def get_file_number(self, obj):
+        return obj.file_opening.file_number if obj.file_opening else None
+
+    def get_style_number(self, obj):
+        return obj.file_opening.style.style_number if obj.file_opening and obj.file_opening.style else None
+
+    def get_actual_completion_date(self, obj):
+        dates = obj.hits.exclude(actual_delivery_date=None).values_list(
+            "actual_delivery_date", flat=True
+        )
+        return max(dates).isoformat() if dates else None
 
     class Meta:
         model = PurchaseOrder
         fields = [
-            "id", "po_number", "file_opening", "buyer", "buyer_name",
+            "id", "po_number", "file_number", "style_number",
+            "file_opening", "buyer", "buyer_name",
             "brand", "brand_name", "factory", "factory_name", "po_date", "delivery_date",
+            "actual_completion_date",
             "destination_country", "destination_country_name", "destination_port",
             "quantity", "unit_price", "total_value",
             "currency", "currency_name", "currency_code",
             "payment_terms", "payment_terms_name",
             "delivery_mode", "delivery_mode_name",
             "status", "remarks", "items", "created_at",
-            "risk_level", "risk_level_detail"
+            "risk_level", "risk_level_detail", "risk"
         ]
         read_only_fields = ["id", "created_at", "po_number", "total_value"]
 
@@ -626,6 +651,82 @@ class CostingSerializer(serializers.ModelSerializer):
         return super().save(**kwargs)
 
 
+class DesignCostingLineSerializer(serializers.ModelSerializer):
+    line_total = serializers.SerializerMethodField()
+    category_label = serializers.CharField(source="get_category_display", read_only=True)
+
+    class Meta:
+        model = DesignCostingLine
+        fields = [
+            "id", "costing", "category", "category_label", "description",
+            "unit_price", "consumption", "size_width", "sort_order", "line_total", "created_at"
+        ]
+        read_only_fields = ["id", "created_at"]
+
+    def get_line_total(self, obj):
+        return str(obj.line_total)
+
+
+class DesignCostingSerializer(serializers.ModelSerializer):
+    """Style-level single-piece design costing (RQ-013 / G-12)."""
+    style_number = serializers.CharField(source="style.style_number", read_only=True)
+    style_name = serializers.CharField(source="style.name", read_only=True)
+    sheet_type_label = serializers.CharField(source="get_sheet_type_display", read_only=True)
+    margin_percent = serializers.SerializerMethodField()
+    is_live = serializers.BooleanField(default=True)
+    lines = DesignCostingLineSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DesignCosting
+        fields = [
+            "id", "style", "style_number", "style_name",
+            "version", "status", "sheet_type", "sheet_type_label", "is_live",
+            "target_price", "fabric_cost", "trim_cost", "cm_cost",
+            "overhead_cost", "total_cost", "margin", "margin_percent",
+            "is_single_size", "size_ratio", "is_patterned", "patterned_fabric_options",
+            "approved_by", "approved_at", "created_at", "lines", "notes",
+        ]
+        read_only_fields = ["id", "created_at", "total_cost", "approved_by", "approved_at"]
+
+    def get_margin_percent(self, obj):
+        return obj.margin_percent
+
+    def validate_patterned_fabric_options(self, value):
+        allowed = {option for option, _ in DesignCosting.PATTERN_OPTIONS}
+        invalid = set(value) - allowed
+        if invalid:
+            raise serializers.ValidationError(
+                f"Unknown pattern option(s): {sorted(invalid)}"
+            )
+        return value
+
+    def validate_size_ratio(self, value):
+        for entry in value:
+            if not isinstance(entry, dict) or not entry.get("size", "").strip():
+                raise serializers.ValidationError(
+                    "Each size ratio entry requires a non-empty size."
+                )
+            ratio = entry.get("ratio")
+            if not isinstance(ratio, (int, float)) or ratio <= 0:
+                raise serializers.ValidationError(
+                    "Each size ratio entry requires a positive numeric ratio."
+                )
+        return value
+
+    def validate(self, attrs):
+        is_patterned = attrs.get("is_patterned", self.instance.is_patterned if self.instance else False)
+        options = attrs.get("patterned_fabric_options", self.instance.patterned_fabric_options if self.instance else [])
+        if is_patterned and not options:
+            raise serializers.ValidationError({
+                "patterned_fabric_options": "A patterned fabric requires at least one of the 4 pattern options."
+            })
+        if not is_patterned and options:
+            raise serializers.ValidationError({
+                "patterned_fabric_options": "Pattern options can only be set when is_patterned is true."
+            })
+        return attrs
+
+
 class TAMilestoneSerializer(serializers.ModelSerializer):
     assigned_to_name = serializers.CharField(source="assigned_to.get_full_name", read_only=True)
 
@@ -782,7 +883,84 @@ class OrderManagerSerializer(serializers.Serializer):
             "reconciliation": reconciliation_tile,
             "schedule": schedule_tile,
             "gold_seal": gold_seal_tile,
+            "critical_path": self._critical_path(po, today),
             "risk": {"level": level, "flags": flags},
+        }
+
+    def _critical_path(self, po, today):
+        """Per-PO T&A critical-path milestone summary for the Order Manager.
+
+        Derives on-track/off-track status from the authoritative T&A milestone
+        plan (TAMilestone). No TA -> 'no-ta'; all milestones completed ->
+        'complete'; any delayed or overdue-critical milestone -> 'off-track';
+        otherwise 'on-track'.
+        """
+        ta = getattr(po, "ta", None)
+        if ta is None or not ta.pk:
+            return {
+                "has_ta": False,
+                "status": "no-ta",
+                "milestones_total": 0,
+                "milestones_completed": 0,
+                "milestones_delayed": 0,
+                "critical_milestones_total": 0,
+                "critical_milestones_completed": 0,
+                "next_milestone": None,
+            }
+
+        milestones = sorted(
+            list(ta.milestones.all()),
+            key=lambda m: (m.sort_order, m.planned_date or date.max, m.name),
+        )
+        total = len(milestones)
+        completed = sum(1 for m in milestones if m.status == "completed")
+        delayed = sum(1 for m in milestones if m.status == "delayed")
+        critical_total = sum(1 for m in milestones if m.is_critical)
+        critical_completed = sum(
+            1 for m in milestones if m.is_critical and m.status == "completed"
+        )
+
+        overdue_critical = any(
+            m.is_critical
+            and m.status != "completed"
+            and m.planned_date
+            and m.planned_date < today
+            for m in milestones
+        )
+        incomplete = [m for m in milestones if m.status != "completed"]
+        next_milestone = min(
+            incomplete,
+            key=lambda m: (m.planned_date or date.max, m.name),
+        ) if incomplete else None
+
+        if total and completed == total:
+            status = "complete"
+        elif delayed or overdue_critical:
+            status = "off-track"
+        else:
+            status = "on-track"
+
+        return {
+            "has_ta": True,
+            "status": status,
+            "milestones_total": total,
+            "milestones_completed": completed,
+            "milestones_delayed": delayed,
+            "critical_milestones_total": critical_total,
+            "critical_milestones_completed": critical_completed,
+            "next_milestone": (
+                {
+                    "name": next_milestone.name,
+                    "planned_date": next_milestone.planned_date.isoformat()
+                    if next_milestone.planned_date else None,
+                    "is_critical": next_milestone.is_critical,
+                    "days_until": (
+                        (next_milestone.planned_date - today).days
+                        if next_milestone.planned_date else None
+                    ),
+                }
+                if next_milestone else None
+            ),
         }
 
 
@@ -829,9 +1007,8 @@ class DesignJobRequestSerializer(serializers.ModelSerializer):
 class DesignSheetSerializer(serializers.ModelSerializer):
     fit_specs = FitSpecificationSerializer(many=True, read_only=True)
     job_requests = DesignJobRequestSerializer(many=True, read_only=True)
-    style_code = serializers.CharField(source="tech_pack.style.style_number", read_only=True, default="")
     style_id = serializers.CharField(source="tech_pack.style_id", read_only=True, default="")
-    buyer_name = serializers.CharField(source="tech_pack.style.buyer.name", read_only=True, default="")
+    buyer_name = serializers.SerializerMethodField()
     file_number = serializers.CharField(source="tech_pack.techpack_number", read_only=True)
     sketch_url = serializers.SerializerMethodField()
     material_items = serializers.SerializerMethodField()
@@ -851,6 +1028,32 @@ class DesignSheetSerializer(serializers.ModelSerializer):
     sketch = serializers.CharField(source="tech_pack.sketch", read_only=True, default="")
     description = serializers.CharField(source="tech_pack.description", read_only=True, default="")
     note = serializers.CharField(source="tech_pack.note", read_only=True, default="")
+    style_name = serializers.CharField(source="tech_pack.style.name", read_only=True, default="")
+    department = serializers.CharField(
+        source="tech_pack.style.department.name", read_only=True, default=""
+    )
+    style_type = serializers.CharField(source="tech_pack.style_type", read_only=True, default="")
+    style_code = serializers.CharField(source="tech_pack.style_code", read_only=True, default="")
+    product_type_id = serializers.CharField(
+        source="tech_pack.product_type_id", read_only=True, default=""
+    )
+    product_type_name = serializers.CharField(
+        source="tech_pack.product_type.name", read_only=True, default=""
+    )
+    buyer_id = serializers.CharField(source="tech_pack.buyer_id", read_only=True, default="")
+    relationship = serializers.CharField(
+        source="tech_pack.relationship", read_only=True, default="new"
+    )
+    contains = serializers.CharField(source="tech_pack.contains", read_only=True, default="")
+    risk_date = serializers.DateField(
+        source="tech_pack.risk_date", read_only=True, default=None, allow_null=True
+    )
+    pattern_request_date = serializers.DateField(
+        source="tech_pack.pattern_request_date", read_only=True, default=None, allow_null=True
+    )
+    live_orders_count = serializers.SerializerMethodField()
+    completed_orders_count = serializers.SerializerMethodField()
+    layout_order = serializers.JSONField(required=False)
 
     class Meta:
         model = DesignSheet
@@ -861,9 +1064,42 @@ class DesignSheetSerializer(serializers.ModelSerializer):
             "issue_date", "block", "based_on", "customer", "style_number",
             "size", "designer", "pattern_cutter", "issuer", "cloth_code",
             "length", "sketch", "description", "note", "sketch_annotations",
-            "created_at", "updated_at",
+            "layout_order", "created_at", "updated_at",
+            "style_name", "department", "style_type", "contains",
+            "risk_date", "pattern_request_date", "relationship",
+            "style_code", "product_type_id", "product_type_name", "buyer_id",
+            "live_orders_count", "completed_orders_count",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate_layout_order(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError(
+                "layout_order must be a list of block keys"
+            )
+        if set(value) != set(DesignSheet.BLOCK_KEYS):
+            raise serializers.ValidationError(
+                "layout_order must contain exactly the design-sheet blocks "
+                f"{DesignSheet.BLOCK_KEYS}"
+            )
+        return value
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not data.get("layout_order"):
+            data["layout_order"] = list(DesignSheet.BLOCK_KEYS)
+        if not data.get("style_code"):
+            style = (
+                instance.tech_pack.style
+                if instance.tech_pack and instance.tech_pack.style_id
+                else None
+            )
+            if style:
+                data["style_code"] = style.style_number
+        return data
+
+    def get_buyer_name(self, obj):
+        return obj.tech_pack.buyer_display_name()
 
     def get_sketch_url(self, obj):
         if obj.tech_pack.sketch_image:
@@ -872,6 +1108,18 @@ class DesignSheetSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.tech_pack.sketch_image.url)
             return obj.tech_pack.sketch_image.url
         return None
+
+    def get_live_orders_count(self, obj):
+        from apps.merchandising.design_register import order_counts_for_style
+
+        live, _ = order_counts_for_style(obj.tech_pack.style)
+        return live
+
+    def get_completed_orders_count(self, obj):
+        from apps.merchandising.design_register import order_counts_for_style
+
+        _, completed = order_counts_for_style(obj.tech_pack.style)
+        return completed
 
     def get_material_items(self, obj):
         """Material Breakdown grid rows (BOMItems) in grid field names.
@@ -917,3 +1165,20 @@ class DesignSheetSerializer(serializers.ModelSerializer):
             }
             for item in items
         ]
+
+
+class DesignInitSerializer(serializers.Serializer):
+    """Paylod for the Design register "+ New Design" flow."""
+
+    mode = serializers.ChoiceField(choices=["fresh", "copy"])
+    source_design_sheet = serializers.UUIDField(required=False, allow_null=True)
+    product_type = serializers.UUIDField(required=False, allow_null=True)
+    buyer = serializers.UUIDField(required=False, allow_null=True)
+    relationship = serializers.ChoiceField(
+        choices=StyleTechPack.Relationship.choices, default=StyleTechPack.Relationship.NEW,
+        required=False,
+    )
+    block_reference = serializers.CharField(required=False, allow_blank=True, default="")
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    include_annotation = serializers.BooleanField(required=False, default=False)
+    include_notes = serializers.BooleanField(required=False, default=False)

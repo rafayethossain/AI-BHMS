@@ -1,27 +1,16 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { commercialApi } from '../api/client';
 import type { SalesContract } from '../api/client';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import { useToast } from '../contexts/ToastContext';
 import Layout from '../components/Layout';
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-surface-alt/20 text-muted',
-  active: 'bg-blue-500/20 text-badge-blue',
-  completed: 'bg-emerald-500/20 text-badge-emerald',
-  cancelled: 'bg-red-500/20 text-badge-red',
-};
 
 export default function SalesContractsPage() {
   const { toast } = useToast();
   const [scs, setSCs] = useState<SalesContract[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('contract_number');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showModal, setShowModal] = useState(false);
   const [editingSC, setEditingSC] = useState<SalesContract | null>(null);
   const [form, setForm] = useState({ purchase_order: '', buyer: '', total_amount: '', currency: 'USD', delivery_terms: '', remarks: '' });
@@ -31,16 +20,14 @@ export default function SalesContractsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
+      const params: Record<string, string> = { page: '1', page_size: '10000' };
       const res = await commercialApi.getSCs(params);
       setSCs(res.data.results);
       setCount(res.data.count);
     } catch { toast('error', 'Failed to load sales contracts'); } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, [search, page, sortField, sortOrder]);
+  useEffect(() => { fetchData(); }, []);
 
   const openCreate = () => {
     setEditingSC(null);
@@ -89,24 +76,25 @@ export default function SalesContractsPage() {
     } catch { toast('error', 'Failed to export PDF'); }
   };
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
+  const gridData = scs.map(sc => ({
+    id: sc.id,
+    contract_number: sc.contract_number,
+    po_number: sc.po_number,
+    buyer_name: sc.buyer_name,
+    total_amount: Number(sc.total_amount).toLocaleString(),
+    currency: sc.currency,
+    status: sc.status,
+    contract_date: sc.contract_date,
+  }));
 
-  const columns: Column[] = [
-    { key: 'contract_number', label: 'Contract #', sortable: true, render: (v) => <span className="font-mono text-emerald-400">{String(v)}</span> },
-    { key: 'po_number', label: 'PO #', sortable: true, render: (v) => <span className="font-mono text-body">{String(v)}</span> },
-    { key: 'buyer_name', label: 'Buyer', sortable: true },
-    { key: 'total_amount', label: 'Amount', sortable: true, render: (v) => <span className="text-heading font-medium">{Number(v).toLocaleString()}</span> },
-    { key: 'currency', label: 'Currency', sortable: false },
-    { key: 'status', label: 'Status', sortable: true,
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v)}</span> },
-    { key: 'contract_date', label: 'Date', sortable: true },
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => (
-      <div className="flex justify-end gap-2">
-        <button onClick={(e) => { e.stopPropagation(); handleExportPDF(String(row.id), String(row.contract_number)); }} className="text-xs px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded transition-colors" title="Export PDF">PDF</button>
-        <button onClick={(e) => { e.stopPropagation(); openEdit(row as unknown as SalesContract); }} className="text-xs px-2 py-1 bg-surface-alt hover:bg-surface-alt text-heading rounded transition-colors">Edit</button>
-        <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(row.id)); }} className="text-xs px-2 py-1 bg-red-900/50 hover:bg-red-800 text-red-400 rounded transition-colors">Del</button>
-      </div>
-    )},
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Contract #', field: 'contract_number', headerFilter: true },
+    { title: 'PO #', field: 'po_number', headerFilter: true },
+    { title: 'Buyer', field: 'buyer_name', headerFilter: true },
+    { title: 'Amount', field: 'total_amount' },
+    { title: 'Currency', field: 'currency' },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'Date', field: 'contract_date' },
   ];
 
   return (
@@ -122,20 +110,41 @@ export default function SalesContractsPage() {
           </button>
         </div>
 
-        <DataTable
-          data={scs as unknown as Record<string, unknown>[]}
-          columns={columns}
-          totalCount={count}
-          page={page}
-          pageSize={25}
-          onPageChange={setPage}
-          searchValue={search}
-          onSearchChange={(v) => { setSearch(v); setPage(1); }}
-          searchPlaceholder="Search contracts..."
-          onSort={handleSort}
-          sortField={sortField}
-          sortOrder={sortOrder}
+        {scs.length > 0 && (
+          <div className="bg-surface rounded-xl border border-border p-5 mb-6">
+            <h2 className="text-sm font-semibold text-heading mb-3">Register Actions</h2>
+            <p className="text-xs text-muted mb-3">Export each contract as a PDF. Create, edit and delete are available via the grid row actions.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {scs.map(sc => (
+                <div key={sc.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-heading truncate">{sc.contract_number} — {sc.buyer_name}</p>
+                    <p className="text-xs text-muted font-mono">{Number(sc.total_amount).toLocaleString()} {sc.currency} · {sc.status}</p>
+                  </div>
+                  <button onClick={() => handleExportPDF(sc.id, sc.contract_number)} className="shrink-0 px-2 py-1 text-xs bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded transition-colors">PDF</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <SpreadsheetGrid
+          title="Sales Contracts"
+          toolbar={true}
+          exportable={true}
+          columnChooser={true}
+          actionColumn={true}
+          paginationSize={25}
+          height={480}
           loading={loading}
+          data={gridData}
+          columns={columns}
+          onAdd={openCreate}
+          onEdit={(row) => {
+            const sc = scs.find(x => x.id === row.id);
+            if (sc) openEdit(sc);
+          }}
+          onDelete={(row) => setDeleteId(String(row.id))}
         />
       </main>
 

@@ -2,38 +2,11 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { logisticsApi, setupApi, merchApi } from '../api/client';
 import type { Shipment } from '../api/client';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import SearchableSelect from '../components/SearchableSelect';
 import { useToast } from '../contexts/ToastContext';
 import Layout from '../components/Layout';
-
-const MODE_COLORS: Record<string, string> = {
-  sea: 'bg-blue-500/20 text-badge-blue',
-  air: 'bg-purple-500/20 text-badge-purple',
-  road: 'bg-amber-500/20 text-badge-amber',
-  rail: 'bg-emerald-500/20 text-badge-emerald',
-  multi: 'bg-surface-alt/20 text-muted',
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  booking: 'bg-surface-alt/20 text-muted',
-  booked: 'bg-blue-500/20 text-badge-blue',
-  picked_up: 'bg-amber-500/20 text-badge-amber',
-  in_transit: 'bg-amber-500/20 text-badge-amber',
-  at_port: 'bg-purple-500/20 text-badge-purple',
-  on_water: 'bg-blue-500/20 text-badge-blue',
-  arrived: 'bg-cyan-500/20 text-badge-blue',
-  cleared: 'bg-indigo-500/20 text-badge-blue',
-  delivered: 'bg-emerald-500/20 text-badge-emerald',
-  cancelled: 'bg-red-500/20 text-badge-red',
-};
-
-const BOOKING_REF_COLORS: Record<string, string> = {
-  ok: 'bg-emerald-500/20 text-badge-emerald',
-  na: 'bg-surface-alt/20 text-muted',
-  due: 'bg-red-500/20 text-badge-red',
-};
 
 const MODES = [
   { value: 'sea', label: 'Sea' },
@@ -49,10 +22,6 @@ export default function ShipmentsPage() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -60,7 +29,6 @@ export default function ShipmentsPage() {
   const [factories, setFactories] = useState<{ value: string; label: string }[]>([]);
   const [pos, setPOs] = useState<{ value: string; label: string }[]>([]);
   const [freightForwarders, setFreightForwarders] = useState<{ value: string; label: string }[]>([]);
-  const [filters, setFilters] = useState<Record<string, string>>({});
   const [bookingRefAlerts, setBookingRefAlerts] = useState<Shipment[]>([]);
   const [alertReferences, setAlertReferences] = useState<Record<string, string>>({});
   const [savingRef, setSavingRef] = useState<string | null>(null);
@@ -91,23 +59,24 @@ export default function ShipmentsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
-      if (filters.status) params.status = filters.status;
-      if (filters.mode) params.mode = filters.mode;
-      if (filters.factory) params.factory = filters.factory;
-      const res = await logisticsApi.getShipments(params);
+      const res = await logisticsApi.getShipments({ page_size: '10000' });
       setShipments(res.data.results);
       setCount(res.data.count);
-      const alerts = await logisticsApi.getBookingRefAlerts();
-      setBookingRefAlerts(alerts.data.results);
     } catch {
       toast('error', 'Failed to load shipments');
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, [search, page, sortField, sortOrder, filters]);
+  const fetchAlerts = async () => {
+    try {
+      const alerts = await logisticsApi.getBookingRefAlerts();
+      setBookingRefAlerts(alerts.data.results);
+    } catch {
+      /* non-blocking */
+    }
+  };
+
+  useEffect(() => { fetchData(); fetchAlerts(); }, []);
 
   useEffect(() => {
     setupApi.getFactories({ page_size: '100' }).then(r => {
@@ -129,6 +98,33 @@ export default function ShipmentsPage() {
       etd: '', eta: '', port_of_loading: '', port_of_discharge: '',
       container_number: '', seal_number: '', container_size: '', quantity: '', weight_kg: '',
       cbm: '', vessel_name: '', voyage_number: '', remarks: '',
+    });
+    setShowModal(true);
+  };
+
+  const openEdit = (s: Shipment) => {
+    setEditingId(s.id);
+    setForm({
+      purchase_order: s.purchase_order || '',
+      factory: s.factory || '',
+      freight_forwarder: s.freight_forwarder || '',
+      mode: s.mode || 'sea',
+      booking_date: s.booking_date || '',
+      booking_reference: s.booking_reference || '',
+      booking_ref_required_date: s.booking_ref_required_date || '',
+      etd: s.etd || '',
+      eta: s.eta || '',
+      port_of_loading: s.port_of_loading || '',
+      port_of_discharge: s.port_of_discharge || '',
+      container_number: s.container_number || '',
+      seal_number: s.seal_number || '',
+      container_size: s.container_size || '',
+      quantity: String(s.quantity ?? ''),
+      weight_kg: String(s.weight_kg ?? ''),
+      cbm: String(s.cbm ?? ''),
+      vessel_name: s.vessel_name || '',
+      voyage_number: s.voyage_number || '',
+      remarks: s.remarks || '',
     });
     setShowModal(true);
   };
@@ -169,11 +165,12 @@ export default function ShipmentsPage() {
       setShowModal(false);
       setEditingId(null);
       fetchData();
+      fetchAlerts();
     } catch { toast('error', editingId ? 'Failed to update shipment' : 'Failed to create shipment'); } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
-    try { await logisticsApi.deleteShipment(id); setDeleteId(null); toast('success', 'Shipment deleted'); fetchData(); } catch { toast('error', 'Failed to delete shipment'); }
+    try { await logisticsApi.deleteShipment(id); setDeleteId(null); toast('success', 'Shipment deleted'); fetchData(); fetchAlerts(); } catch { toast('error', 'Failed to delete shipment'); }
   };
 
   const saveBookingRef = async (id: string) => {
@@ -185,72 +182,30 @@ export default function ShipmentsPage() {
       toast('success', 'Booking reference saved');
       setAlertReferences(prev => { const next = { ...prev }; delete next[id]; return next; });
       fetchData();
+      fetchAlerts();
     } catch { toast('error', 'Failed to save booking reference'); } finally { setSavingRef(null); }
   };
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
-
-  const columns: Column[] = [
-    { key: 'shipment_number', label: 'Shipment #', sortable: true, render: (v) => <span className="font-mono text-heading">{String(v)}</span> },
-    { key: 'po_number', label: 'PO #', sortable: true, render: (v) => <span className="font-mono">{String(v)}</span> },
-    { key: 'factory_name', label: 'Factory', sortable: true },
-    { key: 'mode', label: 'Mode', sortable: true,
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${MODE_COLORS[String(v)] || ''}`}>{String(v)}</span> },
-    { key: 'status', label: 'Status', sortable: true,
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v).replace(/_/g, ' ')}</span> },
-    { key: 'etd', label: 'ETD', sortable: true, render: (v) => <span>{v ? String(v) : '-'}</span> },
-    { key: 'eta', label: 'ETA', sortable: true, render: (v) => <span>{v ? String(v) : '-'}</span> },
-    { key: 'booking_reference', label: 'Booking Ref', sortable: true, render: (v, row) => {
-      const s = row as unknown as Shipment;
-      return (
-        <span className="inline-flex items-center gap-2">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${BOOKING_REF_COLORS[s.booking_ref_status] || ''}`}>
-            {s.booking_ref_status === 'due' ? 'DUE' : s.booking_ref_status === 'na' ? 'N/A' : 'OK'}
-          </span>
-          <span className="font-mono text-xs">{s.booking_reference ? String(v) : '—'}</span>
-        </span>
-      );
-    } },
-    { key: 'container_number', label: 'Container #', sortable: true, render: (v) => <span className="font-mono">{v ? String(v) : '-'}</span> },
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => (
-      <div className="flex justify-end gap-3">
-        <button onClick={(e) => { e.stopPropagation(); navigate(`/logistics/${String(row.id)}`); }} className="text-sm text-heading hover:text-emerald-500">View</button>
-        {(['booking', 'booked'].includes(String(row.status))) && (
-          <button onClick={(e) => {
-            e.stopPropagation();
-            const s = shipments.find(sh => String(sh.id) === String(row.id));
-            if (s) {
-              setEditingId(s.id);
-              setForm({
-                purchase_order: s.purchase_order || '',
-                factory: s.factory || '',
-                freight_forwarder: s.freight_forwarder || '',
-                mode: s.mode || 'sea',
-                booking_date: s.booking_date || '',
-                booking_reference: s.booking_reference || '',
-                booking_ref_required_date: s.booking_ref_required_date || '',
-                etd: s.etd || '',
-                eta: s.eta || '',
-                port_of_loading: s.port_of_loading || '',
-                port_of_discharge: s.port_of_discharge || '',
-                container_number: s.container_number || '',
-                seal_number: s.seal_number || '',
-                container_size: s.container_size || '',
-                quantity: String(s.quantity ?? ''),
-                weight_kg: String(s.weight_kg ?? ''),
-                cbm: String(s.cbm ?? ''),
-                vessel_name: s.vessel_name || '',
-                voyage_number: s.voyage_number || '',
-                remarks: s.remarks || '',
-              });
-              setShowModal(true);
-            }
-          }} className="text-sm text-heading hover:text-emerald-500">Edit</button>
-        )}
-        <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(row.id)); }} className="text-sm text-red-500 hover:text-red-400">Delete</button>
-      </div>
-    )},
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Shipment #', field: 'shipment_number', headerFilter: true },
+    { title: 'PO #', field: 'po_number', headerFilter: true },
+    { title: 'Factory', field: 'factory_name', headerFilter: true },
+    { title: 'Mode', field: 'mode', headerFilter: true },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'ETD', field: 'etd' },
+    { title: 'ETA', field: 'eta' },
+    { title: 'Booking Ref', field: 'booking_reference' },
+    { title: 'Container #', field: 'container_number' },
   ];
+
+  const gridData = shipments.map((s) => ({
+    ...s,
+    status: String(s.status).replace(/_/g, ' '),
+    booking_reference: s.booking_reference || '—',
+    container_number: s.container_number || '—',
+    etd: s.etd || '—',
+    eta: s.eta || '—',
+  }));
 
   return (
     <Layout>
@@ -293,22 +248,21 @@ export default function ShipmentsPage() {
           </div>
         )}
 
-        <DataTable
-          data={shipments as unknown as Record<string, unknown>[]}
+        <SpreadsheetGrid
+          data={gridData as unknown as Record<string, unknown>[]}
           columns={columns}
-          totalCount={count}
-          page={page}
-          pageSize={25}
-          onPageChange={setPage}
-          searchValue={search}
-          onSearchChange={(v) => { setSearch(v); setPage(1); }}
-          searchPlaceholder="Search shipments..."
-          onSort={handleSort}
-          sortField={sortField}
-          sortOrder={sortOrder}
+          height={480}
+          toolbar
+          title="Shipments"
+          exportable
+          columnChooser
+          paginationSize={25}
+          actionColumn
+          onAdd={openCreate}
+          onView={(row) => navigate(`/logistics/${String(row.id)}`)}
+          onEdit={(row) => openEdit(row as unknown as Shipment)}
+          onDelete={(row) => setDeleteId(String(row.id))}
           loading={loading}
-          filters={filters}
-          onFilterChange={(f) => { setFilters(f); setPage(1); }}
         />
       </main>
 

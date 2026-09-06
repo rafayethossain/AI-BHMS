@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { GARMENT_GLOSSARY } from '../components/InfoTooltip';
 import { resetTour } from '../components/GuidedTour';
+import OnboardingChecklist from '../components/OnboardingChecklist';
+import ReleaseNotesTab from '../components/ReleaseNotesTab';
 
 interface ModuleGuide {
   module: string;
@@ -408,7 +410,7 @@ const FAQ = [
   },
 ];
 
-type TabKey = 'getting-started' | 'workflows' | 'modules' | 'glossary' | 'faq';
+type TabKey = 'getting-started' | 'workflows' | 'modules' | 'onboarding' | 'glossary' | 'release-notes' | 'faq';
 
 const LIFECYCLE_SPINE = [
   'Buyer Inquiry', 'Style', 'Style Version', 'Style Approval', 'File Opening', 'PO',
@@ -421,6 +423,7 @@ export default function HelpPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabKey>('getting-started');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [glossarySearch, setGlossarySearch] = useState('');
 
   return (
     <Layout>
@@ -443,7 +446,9 @@ export default function HelpPage() {
             { key: 'getting-started' as const, label: 'Getting Started' },
             { key: 'workflows' as const, label: 'Workflows' },
             { key: 'modules' as const, label: 'Modules' },
+            { key: 'onboarding' as const, label: 'Onboarding' },
             { key: 'glossary' as const, label: 'Glossary' },
+            { key: 'release-notes' as const, label: 'Release Notes' },
             { key: 'faq' as const, label: 'FAQ' },
           ].map(t => (
             <button
@@ -572,14 +577,53 @@ export default function HelpPage() {
 
         {/* Glossary */}
         {activeTab === 'glossary' && (
-          <div className="bg-surface rounded-xl border border-border divide-y divide-border">
-            {Object.entries(GARMENT_GLOSSARY).map(([term, definition]) => (
-              <div key={term} className="p-4">
-                <p className="text-sm font-bold text-heading">{term}</p>
-                <p className="text-xs text-muted mt-1 leading-relaxed">{definition}</p>
-              </div>
-            ))}
+          <div className="space-y-3">
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search glossary terms..."
+                value={glossarySearch}
+                onChange={(e) => setGlossarySearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm bg-surface border border-border rounded-lg text-heading placeholder-faint focus:outline-none focus:border-emerald-500/50 transition-colors"
+              />
+            </div>
+            <div className="bg-surface rounded-xl border border-border divide-y divide-border">
+              {Object.entries(GARMENT_GLOSSARY)
+                .filter(([term, definition]) => {
+                  if (!glossarySearch) return true;
+                  const q = glossarySearch.toLowerCase();
+                  return term.toLowerCase().includes(q) || definition.toLowerCase().includes(q);
+                })
+                .map(([term, definition]) => (
+                  <div key={term} className="p-4">
+                    <p className="text-sm font-bold text-heading">{term}</p>
+                    <p className="text-xs text-muted mt-1 leading-relaxed">{definition}</p>
+                  </div>
+                ))}
+              {Object.entries(GARMENT_GLOSSARY).filter(([term, definition]) => {
+                if (!glossarySearch) return false;
+                const q = glossarySearch.toLowerCase();
+                return !term.toLowerCase().includes(q) && !definition.toLowerCase().includes(q);
+              }).length === 0 && glossarySearch && Object.keys(GARMENT_GLOSSARY).length > 0 && (
+                <div className="p-4 text-center">
+                  <p className="text-xs text-muted">No terms match &quot;{glossarySearch}&quot;</p>
+                </div>
+              )}
+            </div>
           </div>
+        )}
+
+        {/* Onboarding */}
+        {activeTab === 'onboarding' && (
+          <OnboardingChecklist />
+        )}
+
+        {/* Release Notes */}
+        {activeTab === 'release-notes' && (
+          <ReleaseNotesTab />
         )}
 
         {/* FAQ */}

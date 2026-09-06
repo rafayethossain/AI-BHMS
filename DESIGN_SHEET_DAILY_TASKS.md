@@ -2,7 +2,7 @@
 
 **Duration:** 6 weeks (30 working days)
 **Start Date:** TBD
-**Objective:** Connect Tech Pack PDF extractor to GC Design Sheet workflow
+**Objective:** Connect Tech Pack PDF extractor to target Design Sheet workflow
 
 ---
 
@@ -206,7 +206,7 @@
 - [x] Add footer (Carmel copyright + timestamp) — CARMEL APPARELS + printed-at timestamp
 
 ### Day 27 (Tuesday) - Print Features
-- [x] Add selective printing (tick boxes) — per-item FitSpec + material tick boxes; none ticked ⇒ print ALL, any ticked ⇒ print only ticked (GC behaviour)
+- [x] Add selective printing (tick boxes) — per-item FitSpec + material tick boxes; none ticked ⇒ print ALL, any ticked ⇒ print only ticked (target behaviour)
 - [x] Add print preview — toolbard Preview/Exit-Preview toggle (hides Print trigger while previewing)
 - [x] Add print area CSS (cream/grey) — cream printable sheet (`#f8f3e6`) surrounded by grey no-print gutter; `@page` A4 rules
 - [x] Add double-sided optimization — `@media print` `break-inside: avoid` on sections so pages stay clean when printed double-sided
@@ -227,7 +227,7 @@
 - [x] New `backend/tests/unit/test_design_sheet_e2e_flows.py` (6 journey tests) — GREEN
 - [x] `is_selected` single-selection now enforced at DB: partial `UniqueConstraint` migration `0033_fitspecification_unique_selected_fit_spec_per_design_sheet.py`, pre-migration violation check clean, applied to dev DB
 
-### Day 30 (Friday) - Final Polish (GC gap closure)
+### Day 30 (Friday) - Final Polish (target gap closure)
 - [x] Copy fit spec with annotations — `include_annotations` flag on `copy_fit_spec`; target gets fresh-UUID annotations; 2 new tests
 - [x] Mandatory issuer/designer guard — `transition` returns 400 when moving out of New without `issuer`+`designer`; 3 new API tests; E2E intro flow updated
 - [x] Design sheet `season` + `style_id` — serializer fields (source `tech_pack.style`), DesignSheet TS interface, Season row added to `DESIGN_INFO_FIELDS` (header + print)

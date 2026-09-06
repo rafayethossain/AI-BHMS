@@ -1,14 +1,14 @@
-# GC Manual vs Roadmap - Comprehensive Gap Analysis
+# target manual vs Roadmap - Comprehensive Gap Analysis
 
 **Analysis Date:** August 27, 2026
-**Source:** GC- Manual 19-01-21.docx (797 paragraphs, 804 total)
+**Source:** Target Manual 19-01-21.docx (797 paragraphs, 804 total)
 **Status:** CRITICAL GAPS IDENTIFIED
 
 ---
 
 ## Executive Summary
 
-After thorough analysis of the GC Manual, I identified **47 features/workflows/rules** that are either **MISSING or INCOMPLETE** in the current roadmap. The roadmap covers ~60% of the GC functionality. Major gaps exist in:
+After thorough analysis of the target manual, I identified **47 features/workflows/rules** that are either **MISSING or INCOMPLETE** in the current roadmap. The roadmap covers ~60% of the target functionality. Major gaps exist in:
 
 1. **UI/UX Behavior** - Grid interactions, right-click menus, drag-drop
 2. **Business Rules** - Tolerances, validation, workflow constraints
@@ -24,7 +24,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 1. DESIGN TAB - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 1.1 | **Image Gallery View** - Toggle between list and image view | ✅ DONE | HIGH |
 | 1.2 | **"Show with Range Photo"** checkbox | ❌ MISSING | MEDIUM |
@@ -39,7 +39,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 2. DESIGN SHEET - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 2.1 | **Issuer and Designer** fields (mandatory) | ✅ DONE | HIGH |
 | 2.2 | **Season** field | ✅ DONE | MEDIUM |
@@ -48,7 +48,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 3. FIT SPECIFICATIONS - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 3.1 | **Copy from base/development sheet** | ✅ DONE | HIGH |
 | 3.2 | **Copy from another style number** | ✅ DONE | HIGH |
@@ -58,7 +58,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 4. DESIGN COSTING - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 4.1 | **Multiple costing versions** | ⚠️ INCOMPLETE | HIGH |
 | 4.2 | **Single size costing with watermark** | ❌ MISSING | MEDIUM |
@@ -72,7 +72,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 5. JOB REQUEST - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 5.1 | **Single or multiple job selection** | ❌ MISSING | HIGH |
 | 5.2 | **Work location** selection | ❌ MISSING | MEDIUM |
@@ -84,7 +84,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 6. ORDER LIST - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 6.1 | **FN with country suffix** (B, SL, R, VN) | ⚠️ INCOMPLETE | HIGH |
 | 6.2 | **Origin** (UK/EU) field | ❌ MISSING | HIGH |
@@ -96,7 +96,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 7. ORDER TAB - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 7.1 | **Auto-populate from design sheet** | ⚠️ INCOMPLETE | HIGH |
 | 7.2 | **Critical fields validation** | ❌ MISSING | HIGH |
@@ -106,7 +106,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 8. COSTING TAB (ORDER) - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 8.1 | **Select cost box** (tick to select active cost sheet) | ❌ MISSING | HIGH |
 | 8.2 | **Dgn rating** (pulled from design) | ❌ MISSING | MEDIUM |
@@ -116,7 +116,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 9. BREAKDOWN TAB - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 9.1 | **Hit + Color = unique identifier** | ⚠️ INCOMPLETE | HIGH |
 | 9.2 | **PO number and Customer style** | ⚠️ INCOMPLETE | HIGH |
@@ -128,7 +128,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 10. FABRIC TAB - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 10.1 | **Prime tab** (cannot delete) | ❌ MISSING | HIGH |
 | 10.2 | **Orders Colour Ref** | ❌ MISSING | HIGH |
@@ -147,7 +147,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 11. TRIMS/LABEL TABS - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 11.1 | **Location on Garment** | ❌ MISSING | HIGH |
 | 11.2 | **Supplier** (pre-approved dropdown) | ⚠️ INCOMPLETE | HIGH |
@@ -160,7 +160,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 12. TECHNICAL TAB - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 12.1 | **Fit note date** | ❌ MISSING | HIGH |
 | 12.2 | **Fit number selection** | ❌ MISSING | HIGH |
@@ -170,7 +170,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 13. BOOKING SCHEDULE - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 13.1 | **Weekly planning view** | ❌ MISSING | HIGH |
 | 13.2 | **Wednesday cut-off** for next week | ❌ MISSING | MEDIUM |
@@ -186,7 +186,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 14. FABRIC SCHEDULE - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 14.1 | **Lab dip/strike-off dates** | ❌ MISSING | HIGH |
 | 14.2 | **Bulk approval dates** | ❌ MISSING | HIGH |
@@ -196,7 +196,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 15. RECONCILIATION - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 15.1 | **Shipping paperwork vs ordered quantity** | ❌ MISSING | HIGH |
 | 15.2 | **Fabric utilization analysis** | ❌ MISSING | HIGH |
@@ -206,7 +206,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 16. BUSINESS RULES - MISSING
 
-| # | GC Rule | Roadmap Status | Priority |
+| # | target Rule | Roadmap Status | Priority |
 |---|---------|----------------|----------|
 | 16.1 | **Fabric tolerances** (Primark: 5%/3%/2%, Others: 5%/3%/2%) | ❌ MISSING | HIGH |
 | 16.2 | **Shortages and defects max 2%** | ❌ MISSING | HIGH |
@@ -223,7 +223,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 17. REPEAT ORDERS - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 17.1 | **Create from existing FN** | ⚠️ INCOMPLETE | HIGH |
 | 17.2 | **Department confirmation required** | ❌ MISSING | HIGH |
@@ -232,7 +232,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 18. NOTES SYSTEM - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 18.1 | **Notes box at every level** | ❌ MISSING | HIGH |
 | 18.2 | **Summary notes** | ❌ MISSING | HIGH |
@@ -242,7 +242,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 19. PRINTING - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 19.1 | **Print button** with preview | ⚠️ INCOMPLETE | HIGH |
 | 19.2 | **Selective printing** (tick boxes) | ❌ MISSING | HIGH |
@@ -253,7 +253,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 20. SEARCH/FILTER - MISSING FEATURES
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 20.1 | **Quick Search** with selectable criteria | ❌ MISSING | HIGH |
 | 20.2 | **Right-click to select search criteria** | ❌ MISSING | HIGH |
@@ -266,7 +266,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 21. UI BEHAVIOR - MISSING
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 21.1 | **Asterisk (*) on editable columns** | ❌ MISSING | HIGH |
 | 21.2 | **Right-click context menu** on grids | ❌ MISSING | HIGH |
@@ -280,7 +280,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 22. STOCK FABRIC - MISSING
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 22.1 | **Separate FN for stock fabric** | ❌ MISSING | MEDIUM |
 | 22.2 | **Fabric photo instead of sketch** | ❌ MISSING | MEDIUM |
@@ -289,7 +289,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 23. FILE SHARE - MISSING
 
-| # | GC Feature | Roadmap Status | Priority |
+| # | target Feature | Roadmap Status | Priority |
 |---|-----------|----------------|----------|
 | 23.1 | **Virtual folder per design** | ❌ MISSING | MEDIUM |
 | 23.2 | **Virtual folder per order section** | ❌ MISSING | MEDIUM |
@@ -332,7 +332,7 @@ After thorough analysis of the GC Manual, I identified **47 features/workflows/r
 
 ### 1. Order Creation Workflow
 ```
-GC: Design Sheet → Select Style → Create Order → Auto-populate Costing → 
+target: Design Sheet → Select Style → Create Order → Auto-populate Costing → 
     Fill Breakdown → Fill Fabric → Fill Trims → Fill Labels → 
     Validate Critical Fields → Change Status to Live → Generate FN
 
@@ -341,7 +341,7 @@ Current Roadmap: Create PO manually
 
 ### 2. Fabric Booking Workflow
 ```
-GC: Create Order → Fabric Tab (Prime) → Select Supplier → 
+target: Create Order → Fabric Tab (Prime) → Select Supplier → 
     Enter Description → Enter Quantities → Set Lab Dip Date → 
     Set Onboard Date → Copy Tab for Other Colors → 
     Track Risk Progression (None → Amber → Green)
@@ -351,7 +351,7 @@ Current Roadmap: Basic fabric booking form
 
 ### 3. Risk Assessment Workflow
 ```
-GC: Risk starts as None → Amber when bulk approved → 
+target: Risk starts as None → Amber when bulk approved → 
     Green when in factory → Red if major issue
     Overall risk = Highest of (Fabric, Trims, Labels, Technical)
 
@@ -360,7 +360,7 @@ Current Roadmap: No risk system
 
 ### 4. Status Workflow
 ```
-GC: New → Available → Live → In Work → Delivered
+target: New → Available → Live → In Work → Delivered
     (Also: Hold, Cancel, Archive)
     Status changes trigger FN generation
     Status changes have role-based permissions
@@ -395,5 +395,5 @@ Current Roadmap: Basic status field
 ---
 
 *Document Version: 1.0*
-*Analysis: Comprehensive GC Manual Review*
+*Analysis: Comprehensive target manual Review*
 *Date: August 27, 2026*

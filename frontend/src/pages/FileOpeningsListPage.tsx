@@ -3,17 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { merchApi, setupApi } from '../api/client';
 import type { FileOpening, Style, Buyer, Factory } from '../api/client';
 import SearchableSelect from '../components/SearchableSelect';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import EntityCard, { CardListToggle } from '../components/EntityCard';
 import { useToast } from '../contexts/ToastContext';
 import Layout from '../components/Layout';
-
-const STATUS_COLORS: Record<string, string> = {
-  open: 'bg-blue-500/20 text-badge-blue',
-  closed: 'bg-surface-alt/20 text-muted',
-  cancelled: 'bg-red-500/20 text-badge-red',
-};
 
 export default function FileOpeningsListPage() {
   const navigate = useNavigate();
@@ -21,10 +15,6 @@ export default function FileOpeningsListPage() {
   const [files, setFiles] = useState<FileOpening[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [showCreate, setShowCreate] = useState(false);
   const [view, setView] = useState<'grid' | 'list'>('list');
@@ -38,9 +28,7 @@ export default function FileOpeningsListPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
+      const params: Record<string, string> = { page: '1', page_size: '10000' };
       Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
       const res = await merchApi.getFileOpenings(params);
       setFiles(res.data.results); setCount(res.data.count);
@@ -54,7 +42,7 @@ export default function FileOpeningsListPage() {
     } catch { toast('error', 'Failed to load form data'); }
   };
 
-  useEffect(() => { fetchData(); }, [search, page, sortField, sortOrder, filters]);
+  useEffect(() => { fetchData(); }, [filters]);
   useEffect(() => { fetchFormData(); }, []);
 
   const handleCreate = async (e: FormEvent) => {
@@ -79,38 +67,38 @@ export default function FileOpeningsListPage() {
     setCreateForm({ ...createForm, style: sid, buyer: style?.buyer || '', style_version: '' });
   };
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
-  const handleFilterChange = (f: Record<string, string>) => { setFilters(f); setPage(1); };
+  const togglePill = (key: 'is_quick_lead' | 'is_repeat' | 'is_stock_fabric') => {
+    const next = filters[key] ? { ...filters, [key]: '' } : { ...filters, [key]: 'true' };
+    setFilters(next);
+  };
 
-  const columns: Column[] = [
-    { key: 'file_number', label: 'File #', sortable: true, render: (v, row) => (
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-emerald-400">{String(v)}</span>
-        {(row as unknown as FileOpening).is_quick_lead && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-400/20 text-yellow-400 border border-yellow-400/30" title="Quick lead time order">QL</span>
-        )}
-        {(row as unknown as FileOpening).is_repeat && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-500/20 text-violet-400 border border-violet-400/30" title="Repeat order">RPT</span>
-        )}
-        {(row as unknown as FileOpening).is_stock_fabric && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-400 border border-sky-400/30" title="Stock fabric">STK</span>
-        )}
-      </div>
-    ) },
-    { key: 'style_number', label: 'Style', sortable: true },
-    { key: 'buyer_name', label: 'Buyer', sortable: true },
-    { key: 'factory_name', label: 'Factory', sortable: true },
-    { key: 'file_date', label: 'Date', sortable: true },
-    { key: 'purchase_orders_count', label: 'POs', sortable: true,
-      render: (v) => <span className="text-blue-400 font-medium">{String(v ?? 0)}</span> },
-    { key: 'status', label: 'Status', sortable: true, filterable: true, filterOptions: ['open', 'closed', 'cancelled'],
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v)}</span> },
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => (
-      <div className="flex justify-end gap-3">
-        <button onClick={(e) => { e.stopPropagation(); navigate(`/file-openings/${row.id}`); }} className="text-sm text-blue-400 hover:text-blue-300">View</button>
-        <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(row.id)); }} className="text-sm text-red-400 hover:text-red-300">Delete</button>
-      </div>
-    )},
+  const flagsFor = (fo: FileOpening) => [
+    fo.is_quick_lead ? 'QL' : '',
+    fo.is_repeat ? 'RPT' : '',
+    fo.is_stock_fabric ? 'STK' : '',
+  ].filter(Boolean).join(' · ');
+
+  const gridData = files.map(fo => ({
+    id: fo.id,
+    file_number: fo.file_number,
+    flags: flagsFor(fo),
+    style_number: fo.style_number,
+    buyer_name: fo.buyer_name,
+    factory_name: fo.factory_name,
+    file_date: fo.file_date,
+    purchase_orders_count: fo.purchase_orders_count,
+    status: fo.status,
+  }));
+
+  const columns: SpreadsheetColumn[] = [
+    { title: 'File #', field: 'file_number', headerFilter: true },
+    { title: 'Flags', field: 'flags' },
+    { title: 'Style', field: 'style_number', headerFilter: true },
+    { title: 'Buyer', field: 'buyer_name', headerFilter: true },
+    { title: 'Factory', field: 'factory_name' },
+    { title: 'Date', field: 'file_date' },
+    { title: 'POs', field: 'purchase_orders_count', hozAlign: 'right' },
+    { title: 'Status', field: 'status', headerFilter: true },
   ];
 
   return (
@@ -122,24 +110,15 @@ export default function FileOpeningsListPage() {
             <p className="text-muted text-sm mt-1">{count} total files</p>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => {
-              const next = filters.is_quick_lead ? { ...filters, is_quick_lead: '' } : { ...filters, is_quick_lead: 'true' };
-              setFilters(next); setPage(1);
-            }}
+            <button onClick={() => togglePill('is_quick_lead')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${filters.is_quick_lead === 'true' ? 'bg-yellow-400/20 text-yellow-400 border-yellow-400/40' : 'bg-surface-alt hover:bg-surface-alt border-border text-muted'}`}>
               Quick Lead
             </button>
-            <button onClick={() => {
-              const next = filters.is_repeat ? { ...filters, is_repeat: '' } : { ...filters, is_repeat: 'true' };
-              setFilters(next); setPage(1);
-            }}
+            <button onClick={() => togglePill('is_repeat')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${filters.is_repeat === 'true' ? 'bg-violet-500/20 text-violet-400 border-violet-400/40' : 'bg-surface-alt hover:bg-surface-alt border-border text-muted'}`}>
               Repeats
             </button>
-            <button onClick={() => {
-              const next = filters.is_stock_fabric ? { ...filters, is_stock_fabric: '' } : { ...filters, is_stock_fabric: 'true' };
-              setFilters(next); setPage(1);
-            }}
+            <button onClick={() => togglePill('is_stock_fabric')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${filters.is_stock_fabric === 'true' ? 'bg-sky-500/20 text-sky-400 border-sky-400/40' : 'bg-surface-alt hover:bg-surface-alt border-border text-muted'}`}>
               Stock Fabric
             </button>
@@ -151,23 +130,21 @@ export default function FileOpeningsListPage() {
         </div>
 
         {view === 'list' ? (
-          <DataTable
-            data={files as unknown as Record<string, unknown>[]}
-            columns={columns}
-            totalCount={count}
-            page={page}
-            pageSize={25}
-            onPageChange={setPage}
-            searchValue={search}
-            onSearchChange={(v) => { setSearch(v); setPage(1); }}
-            searchPlaceholder="Search by file number..."
-            onSort={handleSort}
-            sortField={sortField}
-            sortOrder={sortOrder}
-            filters={filters}
-            onFilterChange={handleFilterChange}
-            onRowClick={(row) => navigate(`/file-openings/${String(row.id)}`)}
+          <SpreadsheetGrid
+            title="File Openings"
+            toolbar={true}
+            exportable={true}
+            columnChooser={true}
+            actionColumn={true}
+            paginationSize={25}
+            height={480}
             loading={loading}
+            data={gridData}
+            columns={columns}
+            onAdd={() => setShowCreate(true)}
+            onEdit={(row) => navigate(`/file-openings/${String(row.id)}`)}
+            onDelete={(row) => setDeleteId(String(row.id))}
+            onRowClick={(row) => navigate(`/file-openings/${String(row.id)}`)}
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -1,7 +1,7 @@
-# GC (Garment Control) Replication Roadmap
+# the target buying-house reference Replication Roadmap
 
 **Project:** AI-BHMS (AI-Buying House Management System)
-**Objective:** 100% replicate GC (Garment Control) reference solution features
+**Objective:** 100% replicate the target buying-house reference reference solution features
 **Client Feedback Date:** August 27, 2026
 **Status:** PLANNING
 
@@ -11,7 +11,7 @@
 
 1. [Executive Summary](#1-executive-summary)
 2. [Reference Solution Analysis](#2-reference-solution-analysis)
-3. [Gap Analysis: Current BHMS vs GC](#3-gap-analysis)
+3. [Gap Analysis: Current BHMS vs target](#3-gap-analysis)
 4. [Excel Library Recommendation](#4-excel-library-recommendation)
 5. [Implementation Roadmap](#5-implementation-roadmap)
 6. [Phase 1: Design Sheet](#6-phase-1-design-sheet)
@@ -19,7 +19,7 @@
 8. [Phase 3: PO Confirmation](#8-phase-3-po-confirmation)
 9. [Phase 4: Booking](#9-phase-4-booking)
 10. [Technical Architecture](#10-technical-architecture)
-11. [UI/UX Behavior (GC-Specific)](#11-uiux-behavior-gc-specific)
+11. [UI/UX Behavior (target-Specific)](#11-uiux-behavior-target-specific)
 12. [Print & Export System](#12-print--export-system)
 13. [Search & Filter System](#13-search--filter-system)
 14. [Business Rules Engine](#14-business-rules-engine)
@@ -30,7 +30,7 @@
 19. [Stock Fabric](#19-stock-fabric)
 20. [Audit Trail](#20-audit-trail)
 21. [Risk Assessment](#21-risk-assessment)
-22. [Appendix A: GC Terminology Mapping](#appendix-a-gc-terminology-mapping)
+22. [Appendix A: target Terminology Mapping](#appendix-a-target-terminology-mapping)
 23. [Appendix B: Complete Feature Checklist](#appendix-b-complete-feature-checklist)
 24. [Appendix C: Database Migration Plan](#appendix-c-database-migration-plan)
 25. [Appendix D: Testing Strategy](#appendix-d-testing-strategy)
@@ -41,7 +41,7 @@
 ## 1. Executive Summary
 
 ### Client Requirement
-The client wants to replicate the **GC (Garment Control)** system used by Carmel Clothing (UK-based buying house). The system is Excel-centric and serves as the backbone for:
+The client wants to replicate the **the target buying-house reference** system used by Carmel Clothing (UK-based buying house). The system is Excel-centric and serves as the backbone for:
 - Design management
 - Costing preparation
 - Order management (File Numbers/FN)
@@ -59,7 +59,7 @@ The client wants to replicate the **GC (Garment Control)** system used by Carmel
 4. **Booking** → Fabric, Trims, Labels
 
 ### Comprehensive Coverage
-This roadmap now covers **286 features** across 7 implementation phases, addressing all gaps identified in the GC Manual analysis. The previous version covered only ~7% of GC functionality; this update brings coverage to **100%**.
+This roadmap now covers **286 features** across 7 implementation phases, addressing all gaps identified in the target manual analysis. The previous version covered only ~7% of target functionality; this update brings coverage to **100%**.
 
 ---
 
@@ -69,16 +69,16 @@ This roadmap now covers **286 features** across 7 implementation phases, address
 
 | File | Type | Purpose |
 |------|------|---------|
-| `GC- Manual 19-01-21.docx` | Word Doc | Complete GC system manual (797 paragraphs) |
+| `Target Manual 19-01-21.docx` | Word Doc | Complete target system manual (797 paragraphs) |
 | `20830-B.xlsx` | Excel | Cost Report with 3 sheets (Costing, Label, Trims & Lining) |
 | `Fabric booking format.xls` | Excel | Fabric booking order template |
 | `trims booking format.xlsx` | Excel | Trims and accessories booking template |
 | `file BD CMPT update 14-08.xlsx` | Excel | CMPT (Cut Make Pack Trim) summary with 4 sheets |
 
-### 2.2 GC System Architecture
+### 2.2 target System Architecture
 
 ```
-GC (Garment Control)
+the target buying-house reference
 ├── Design Tab
 │   ├── Style Creation (unique style code)
 │   ├── Design Sheet (sketches, annotations)
@@ -112,7 +112,7 @@ GC (Garment Control)
     └── Technical Risk
 ```
 
-### 2.3 Key GC Features to Replicate
+### 2.3 Key target Features to Replicate
 
 #### Design Management
 - **Style Creation**: Unique style code generation
@@ -160,9 +160,9 @@ GC (Garment Control)
 
 ## 3. Gap Analysis
 
-### 3.1 Current BHMS Features vs GC Requirements
+### 3.1 Current BHMS Features vs target Requirements
 
-| Feature | Current BHMS | GC Reference | Gap |
+| Feature | Current BHMS | target Reference | Gap |
 |---------|-------------|--------------|-----|
 | **Design Management** | Basic styles with sketches | Full design sheet with annotations, fit specs, job requests | MAJOR |
 | **Costing** | Basic BOM/Costing | Multi-version costing, 8 categories, risk rating | MAJOR |
@@ -176,11 +176,11 @@ GC (Garment Control)
 
 ### 3.2 Critical Differences
 
-1. **Data Model**: GC uses File Numbers (FN) tied to Styles; BHMS uses POs
-2. **Interface**: GC is spreadsheet-heavy; BHMS is form-based
-3. **Workflow**: GC has linear progression; BHMS is modular
-4. **Risk Management**: GC has integrated risk; BHMS has none
-5. **Reporting**: GC focuses on booking schedules; BHMS on dashboards
+1. **Data Model**: target uses File Numbers (FN) tied to Styles; BHMS uses POs
+2. **Interface**: target is spreadsheet-heavy; BHMS is form-based
+3. **Workflow**: target has linear progression; BHMS is modular
+4. **Risk Management**: target has integrated risk; BHMS has none
+5. **Reporting**: target focuses on booking schedules; BHMS on dashboards
 
 ---
 
@@ -214,7 +214,7 @@ GC (Garment Control)
 15. **MIT License**: Free for commercial use
 
 **Key Architecture Decision:**
-Calculations (formulas) are handled in the **Django backend**. The frontend displays calculated results. This is simpler, more maintainable, and matches the GC reference workflow.
+Calculations (formulas) are handled in the **Django backend**. The frontend displays calculated results. This is simpler, more maintainable, and matches the target reference workflow.
 
 **Installation:**
 ```bash
@@ -1000,11 +1000,11 @@ export class PrintService {
 
 ---
 
-## 11. UI/UX Behavior (GC-Specific)
+## 11. UI/UX Behavior (target-Specific)
 
 ### 11.1 Grid Interactions
 
-| Feature | GC Behavior | Implementation |
+| Feature | target Behavior | Implementation |
 |---------|-------------|----------------|
 | **Asterisk (*)** | Editable columns marked with * | Tabulator `titleFormatter` with asterisk |
 | **Right-click menu** | Context menu on every grid | Tabulator `menu` module |
@@ -1024,7 +1024,7 @@ export class PrintService {
 
 ### 11.2 Cell Editing Behavior
 
-| Feature | GC Behavior | Implementation |
+| Feature | target Behavior | Implementation |
 |---------|-------------|----------------|
 | **Tab out** | Must tab/click out before save | `cellEdited` callback |
 | **Validation** | Error messages at page bottom | Tabulator `validator` + toast notifications |
@@ -1033,7 +1033,7 @@ export class PrintService {
 
 ### 11.3 Notes System
 
-| Feature | GC Behavior | Implementation |
+| Feature | target Behavior | Implementation |
 |---------|-------------|----------------|
 | **Notes box** | Every tab/section has notes | `TextField` component per section |
 | **Summary notes** | High-level notes at order level | `Order.notes` field |
@@ -1275,7 +1275,7 @@ export class PrintService {
 
 ### 12.7 Print Features
 
-| Feature | GC Behavior | Implementation |
+| Feature | target Behavior | Implementation |
 |---------|-------------|----------------|
 | **Print button** | Top-left, opens print preview | `window.print()` + CSS `@media print` |
 | **Print preview** | Shows before printing | Separate preview modal/page |
@@ -1319,7 +1319,7 @@ export class PrintService {
 
 ### 13.1 Quick Search
 
-| Feature | GC Behavior | Implementation |
+| Feature | target Behavior | Implementation |
 |---------|-------------|----------------|
 | **Selectable criteria** | Right-click to choose search fields | Dynamic search form |
 | **Multi-criteria** | AND logic across selected fields | API query builder |
@@ -1339,7 +1339,7 @@ export class PrintService {
 
 ### 13.3 Grouping
 
-| Feature | GC Behavior | Implementation |
+| Feature | target Behavior | Implementation |
 |---------|-------------|----------------|
 | **Drag header** | Drag column header to group | Tabulator `groupBy` |
 | **Multi-level** | Group by Customer → Style → Status | Nested `groupBy` array |
@@ -1474,7 +1474,7 @@ def calculate_overall_risk(fabric_risk, trims_risk, labels_risk, technical_risk)
 
 ### 16.1 Booking Schedule
 
-| Feature | GC Behavior | Implementation |
+| Feature | target Behavior | Implementation |
 |---------|-------------|----------------|
 | **Weekly view** | Monday-Sunday calendar | `BookingSchedulePage.tsx` |
 | **Wednesday cut-off** | Week 1 must be sorted | Validation + warning |
@@ -1493,7 +1493,7 @@ def calculate_overall_risk(fabric_risk, trims_risk, labels_risk, technical_risk)
 
 ### 16.2 Fabric Schedule
 
-| Feature | GC Behavior | Implementation |
+| Feature | target Behavior | Implementation |
 |---------|-------------|----------------|
 | **Lab dip dates** | Required, actual, approved | 3 date fields + status |
 | **Strike-off dates** | Required, actual, approved | 3 date fields + status |
@@ -1508,7 +1508,7 @@ def calculate_overall_risk(fabric_risk, trims_risk, labels_risk, technical_risk)
 
 ### 16.3 Order Manager
 
-| Feature | GC Behavior | Implementation |
+| Feature | target Behavior | Implementation |
 |---------|-------------|----------------|
 | **Daily review** | Production managers use daily | `OrderManagerPage.tsx` |
 | **Critical path** | Customer delivery tracking | Timeline visualization |
@@ -1523,7 +1523,7 @@ def calculate_overall_risk(fabric_risk, trims_risk, labels_risk, technical_risk)
 
 ### 17.1 Fabric Reconciliation
 
-| Feature | GC Behavior | Implementation |
+| Feature | target Behavior | Implementation |
 |---------|-------------|----------------|
 | **Shipping paperwork** | Compare vs ordered quantity | `ReconciliationPage.tsx` |
 | **Utilization analysis** | Fabric usage efficiency | Calculated field |
@@ -1551,8 +1551,8 @@ def calculate_overall_risk(fabric_risk, trims_risk, labels_risk, technical_risk)
 |------|--------|------------|
 | 1 | Click "Create Repeat Order" | Must be in order |
 | 2 | Copy order details to new FN | Auto-populate fields |
-| 3 | Technical confirms repeat | Green tick on GC |
-| 4 | Trims confirms same trims | Green tick on GC |
+| 3 | Technical confirms repeat | Green tick on target |
+| 4 | Trims confirms same trims | Green tick on target |
 | 5 | Treat as new order | Follow full process |
 | 6 | No processes skipped | Validation on save |
 
@@ -1571,7 +1571,7 @@ def calculate_overall_risk(fabric_risk, trims_risk, labels_risk, technical_risk)
 
 ### 19.1 Features
 
-| Feature | GC Behavior | Implementation |
+| Feature | target Behavior | Implementation |
 |---------|-------------|----------------|
 | **Separate FN** | Stock fabric has own FN | `is_stock_fabric` flag |
 | **Fabric photo** | Instead of sketch | Image upload required |
@@ -1623,15 +1623,15 @@ class AuditLog(models.Model):
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| Developer unfamiliarity with GC | HIGH | HIGH | Training sessions, documentation review |
+| Developer unfamiliarity with target | HIGH | HIGH | Training sessions, documentation review |
 | Scope creep | HIGH | MEDIUM | Strict adherence to roadmap, client sign-off |
 | Timeline delays | MEDIUM | MEDIUM | Buffer time, parallel workstreams |
 
 ---
 
-## Appendix A: GC Terminology Mapping
+## Appendix A: target Terminology Mapping
 
-| GC Term | BHMS Equivalent | Notes |
+| target Term | BHMS Equivalent | Notes |
 |---------|-----------------|-------|
 | Style Number | Style Code | Unique identifier for design |
 | File Number (FN) | PO Number | Order identifier (e.g., 20830-B) |
@@ -2181,4 +2181,4 @@ Tech Pack Extract → StyleTechPack (14 fields)
 *Document Version: 2.1*
 *Last Updated: August 27, 2026*
 *Author: AI Chief of Staff*
-*Revision: Comprehensive GC Manual gap analysis + Tech Pack connection plan incorporated*
+*Revision: Comprehensive target manual gap analysis + Tech Pack connection plan incorporated*

@@ -407,3 +407,84 @@ class TestBookingScheduleAPI:
         assert response.status_code == status.HTTP_200_OK
         results = response.data["results"]
         assert all(r["id"] != item.id for r in results)
+
+    def test_is_last_hit_flag_on_last_sequence(self, bs_client, seed_bs_data):
+        """B8 (16.1): the last hit for a shipment/week carries the cyan last-hit marker."""
+        from apps.setup.models import ColorCode
+        from apps.merchandising.models import Hit as HitModel
+
+        member_hit = seed_bs_data["hit"]  # existing HIT-BS-1 on BLK
+        second_color = ColorCode.objects.create(
+            tenant=seed_bs_data["tenant"], code="WHT", name="White", hex_code="#FFFFFF",
+        )
+        last_hit = HitModel.objects.create(
+            tenant=seed_bs_data["tenant"], purchase_order=seed_bs_data["purchase_order"],
+            hit_number="HIT-BS-2", colour=second_color, created_by=seed_bs_data["user"],
+        )
+
+        first_item = BookingScheduleItem.objects.create(
+            tenant=seed_bs_data["tenant"], shipment=seed_bs_data["shipment"],
+            week_ending=date(2026, 5, 22), hit=member_hit, created_by=seed_bs_data["user"],
+        )
+        last_item = BookingScheduleItem.objects.create(
+            tenant=seed_bs_data["tenant"], shipment=seed_bs_data["shipment"],
+            week_ending=date(2026, 5, 22), hit=last_hit, created_by=seed_bs_data["user"],
+        )
+
+        response = bs_client.get(f"{self._base()}/", {"shipment": seed_bs_data["shipment"].id})
+        assert response.status_code == status.HTTP_200_OK
+        results = {str(r["id"]): r for r in response.data["results"]}
+        assert results[str(first_item.id)]["is_last_hit"] is False
+        assert results[str(last_item.id)]["is_last_hit"] is True
+
+    def test_is_last_hit_false_when_no_hit(self, bs_client, seed_bs_data):
+        item = BookingScheduleItem.objects.create(
+            tenant=seed_bs_data["tenant"], shipment=seed_bs_data["shipment"],
+            week_ending=date(2026, 5, 22), hit=None, created_by=seed_bs_data["user"],
+        )
+        response = bs_client.get(f"{self._base()}/{item.id}/")
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["is_last_hit"] is False
+
+    def test_create_captures_point_in_time_snapshot(self, bs_client, seed_bs_data):
+        """B8 (16.1 snapshot columns): create auto-captures snapshot_date + point-in-time JSON."""
+        response = bs_client.post(
+            f"{self._base()}/",
+            {
+                "shipment": seed_bs_data["shipment"].id,
+                "week_ending": "2026-05-22",
+                "cut_qty": "800",
+                "garments_ready_qty": "300",
+                "ex_factory_date": "2026-05-08",
+                "ex_factory_notes": "Confirmed",
+            },
+            format="json",
+        )
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        data = response.data
+        assert data["snapshot_date"] is not None
+        snapshot = data["snapshot_data"]
+        assert snapshot.get("cut_qty") == "800.00"
+        assert snapshot.get("garments_ready_qty") == "300.00"
+        assert snapshot.get("week_ending") == "2026-05-22"
+        assert snapshot.get("status") == "live"
+        assert snapshot.get("ex_factory_date") == "2026-05-08"
+
+    def test_snapshot_is_server_captured_not_client_writable(self, bs_client, seed_bs_data):
+        """B8 (16.1): snapshot columns are read-only and reflect the server's capture, not client-sent."""
+        response = bs_client.post(
+            f"{self._base()}/",
+            {
+                "shipment": seed_bs_data["shipment"].id,
+                "week_ending": "2026-05-22",
+                "cut_qty": "700",
+                "snapshot_date": "2020-01-01T00:00:00Z",
+                "snapshot_data": {"tampered": "true"},
+            },
+            format="json",
+        )
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        data = response.data
+        assert data["snapshot_data"].get("cut_qty") == "700.00"
+        assert "tampered" not in data["snapshot_data"]
+        assert data["snapshot_date"] is not None

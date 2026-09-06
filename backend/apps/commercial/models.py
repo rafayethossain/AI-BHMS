@@ -11,6 +11,59 @@ from django.utils import timezone
 from apps.core.models import TenantModel
 
 
+class ForwardOrder(TenantModel):
+    """
+    RQ-048 (B7): Forward Order / Order In-hand book.
+
+    Reference Forward Order / Order In-hand book: a monthly forward
+    commitment tracking ordered quantity and cost for a buyer per factory,
+    carrying a service charge % (default 3%) applied to the total cost, plus
+    an in-hand tracked quantity and an order status.  `total_cost` and
+    `service_charge` are recomputed on save for the monthly forward report.
+    """
+    STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("confirmed", "Confirmed"),
+        ("in_production", "In Production"),
+        ("shipped", "Shipped"),
+    ]
+
+    month = models.DateField(help_text="Commitment month (first of month)")
+    buyer = models.ForeignKey("setup.Buyer", on_delete=models.CASCADE, related_name="forward_orders")
+    factory = models.ForeignKey("setup.Factory", on_delete=models.CASCADE, related_name="forward_orders")
+    purchase_order = models.ForeignKey(
+        "merchandising.PurchaseOrder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="forward_orders",
+    )
+    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    unit_cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_cost = models.DecimalField(max_digits=16, decimal_places=2, default=0, help_text="quantity x unit cost")
+    service_pct = models.DecimalField(max_digits=6, decimal_places=3, default=Decimal("3.00"), help_text="Service charge %")
+    service_charge = models.DecimalField(max_digits=16, decimal_places=2, default=0, help_text="total cost x service % / 100")
+    in_hand_units = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Order In-hand tracked quantity")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+    remarks = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Forward Order"
+        verbose_name_plural = "Forward Orders"
+
+    def __str__(self):
+        return f"{self.month:%Y-%m} - {self.buyer.name}"
+
+    def _recompute(self):
+        self.total_cost = (self.quantity or 0) * (self.unit_cost or 0)
+        self.service_charge = (self.total_cost * (self.service_pct or 0)) / Decimal("100.00")
+
+    def save(self, *args, **kwargs):
+        self._recompute()
+        super().save(*args, **kwargs)
+
+
 class LC(TenantModel):
     """
     Letter of Credit model.

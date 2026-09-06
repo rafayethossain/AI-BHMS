@@ -1,38 +1,17 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { usersApi } from '../api/client';
 import type { User, Role, UserRole } from '../api/client';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import { useToast } from '../contexts/ToastContext';
 import SearchableSelect from '../components/SearchableSelect';
 import Layout from '../components/Layout';
-
-const STATUS_COLORS: Record<string, string> = {
-  active: 'bg-emerald-500/20 text-badge-emerald',
-  inactive: 'bg-surface-alt/50 text-muted',
-  suspended: 'bg-red-500/20 text-badge-red',
-};
-
-const ROLE_COLORS: Record<string, string> = {
-  Admin: 'bg-purple-500/20 text-badge-purple',
-  Manager: 'bg-blue-500/20 text-badge-blue',
-  Merchandiser: 'bg-emerald-500/20 text-badge-emerald',
-  'Production Manager': 'bg-amber-500/20 text-badge-amber',
-  'Quality Manager': 'bg-red-500/20 text-badge-red',
-  'Commercial Manager': 'bg-blue-500/20 text-badge-blue',
-  'Shipping Manager': 'bg-emerald-500/20 text-badge-emerald',
-  Viewer: 'bg-surface-alt/50 text-muted',
-};
 
 export default function UsersPage() {
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('full_name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [form, setForm] = useState({
@@ -55,9 +34,7 @@ export default function UsersPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
+      const params: Record<string, string> = { page: '1', page_size: '10000' };
       const res = await usersApi.getUsers(params);
       setUsers(res.data.results);
       setCount(res.data.count);
@@ -80,7 +57,7 @@ export default function UsersPage() {
     } catch { toast('error', 'Failed to load user roles'); } finally { setRoleLoading(false); }
   }, [toast]);
 
-  useEffect(() => { fetchData(); }, [search, page, sortField, sortOrder]);
+  useEffect(() => { fetchData(); }, []);
   useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
   const openCreate = () => {
@@ -158,40 +135,25 @@ export default function UsersPage() {
     try { await usersApi.deleteUser(id); setDeleteId(null); toast('success', 'User deleted'); fetchData(); } catch { toast('error', 'Failed to delete user'); }
   };
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
-
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleString() : '-';
 
-  const columns: Column[] = [
-    { key: 'full_name', label: 'Name', sortable: true, render: (v) => <span className="font-medium text-heading">{String(v || '-')}</span> },
-    { key: 'email', label: 'Email', sortable: true, render: (v) => <span className="text-body">{String(v)}</span> },
-    { key: 'roles', label: 'Roles', sortable: false,
-      render: (_v, row) => {
-        const u = row as unknown as User;
-        const roles = u.roles || [];
-        if (roles.length === 0) return <span className="text-muted text-xs">No roles</span>;
-        return (
-          <div className="flex flex-wrap gap-1">
-            {roles.map((r) => (
-              <span key={r} className={`px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[r] || 'bg-surface-alt/50 text-muted'}`}>{r}</span>
-            ))}
-          </div>
-        );
-      }},
-    { key: 'status', label: 'Status', sortable: true,
-      render: (v) => {
-        const s = String(v || 'active');
-        return <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[s] || STATUS_COLORS.active}`}>{s}</span>;
-      }},
-    { key: 'mfa_enabled', label: 'MFA', sortable: false,
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs ${v ? 'bg-emerald-500/20 text-badge-emerald' : 'bg-surface-alt/50 text-muted'}`}>{v ? 'Enabled' : 'Disabled'}</span> },
-    { key: 'last_login', label: 'Last Login', sortable: true, render: (v) => <span className="text-muted text-xs">{formatDate(v as string | null)}</span> },
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => (
-      <div className="flex justify-end gap-3">
-        <button onClick={(e) => { e.stopPropagation(); openEdit(row as unknown as User); }} className="text-sm text-blue-400 hover:text-blue-300">Edit</button>
-        <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(row.id)); }} className="text-sm text-red-400 hover:text-red-300">Delete</button>
-      </div>
-    )},
+  const gridData = users.map(u => ({
+    id: u.id,
+    full_name: u.full_name || '-',
+    email: u.email,
+    roles: (u.roles?.length ? u.roles.join(', ') : 'No roles'),
+    status: u.status || 'active',
+    mfa_enabled: u.mfa_enabled ? 'Enabled' : 'Disabled',
+    last_login: formatDate(u.last_login ?? null),
+  }));
+
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Name', field: 'full_name', headerFilter: true },
+    { title: 'Email', field: 'email', headerFilter: true },
+    { title: 'Roles', field: 'roles' },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'MFA', field: 'mfa_enabled' },
+    { title: 'Last Login', field: 'last_login' },
   ];
 
   return (
@@ -207,20 +169,23 @@ export default function UsersPage() {
           </button>
         </div>
 
-        <DataTable
-          data={users as unknown as Record<string, unknown>[]}
-          columns={columns}
-          totalCount={count}
-          page={page}
-          pageSize={25}
-          onPageChange={setPage}
-          searchValue={search}
-          onSearchChange={(v) => { setSearch(v); setPage(1); }}
-          searchPlaceholder="Search users..."
-          onSort={handleSort}
-          sortField={sortField}
-          sortOrder={sortOrder}
+        <SpreadsheetGrid
+          title="Users"
+          toolbar={true}
+          exportable={true}
+          columnChooser={true}
+          actionColumn={true}
+          paginationSize={25}
+          height={480}
           loading={loading}
+          data={gridData}
+          columns={columns}
+          onAdd={openCreate}
+          onEdit={(row) => {
+            const u = users.find(x => x.id === row.id);
+            if (u) openEdit(u);
+          }}
+          onDelete={(row) => setDeleteId(String(row.id))}
         />
       </main>
 

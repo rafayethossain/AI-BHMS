@@ -106,6 +106,12 @@ export default function FabricUtilizationPage() {
     { key: 'damaged_meters', label: 'Damaged', render: (v) => <span className="font-mono text-body">{String(v)}</span> },
     { key: 'excess_meters', label: 'Excess', render: (v) => <span className="font-mono text-amber-600">{String(v)}</span> },
     { key: 'efficiency_pct', label: 'Efficiency', render: (v) => <span className="font-mono text-emerald-600">{String(v)}%</span> },
+    { key: 'tolerance_status', label: 'Tolerance', sortable: true, render: (v) => {
+      const status = String(v);
+      const cls = status === 'over' ? 'bg-red-100 text-red-700' : status === 'under' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+      return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{status === 'over' ? 'Over' : status === 'under' ? 'Under' : 'Within'}</span>;
+    }},
+    { key: 'over_tolerance', label: 'Debit Flag', render: (v) => v === true ? <span className="text-red-600 font-medium text-xs">DEBIT</span> : <span className="text-muted text-xs">-</span> },
     { key: 'actions', label: '', className: 'text-right', render: (_v, row) => {
       const item = row as unknown as FabricUtilization;
       return <button onClick={(e) => { e.stopPropagation(); setDeleteId(item.id); }} className="text-red-500 hover:text-red-400 text-sm">Delete</button>;

@@ -213,6 +213,14 @@ class BookingScheduleItem(TenantModel):
     )
     week_ending = models.DateField(help_text="Week-ending date (Friday)")
     notes = models.TextField(blank=True)
+    snapshot_date = models.DateTimeField(
+        blank=True, null=True, editable=False,
+        help_text="Timestamp of the last point-in-time snapshot capture",
+    )
+    snapshot_data = models.JSONField(
+        blank=True, null=True, editable=False,
+        help_text="Point-in-time snapshot JSON (cut/garments/ex-factory/status)",
+    )
 
     class Meta:
         ordering = ["week_ending", "-created_at"]
@@ -298,6 +306,180 @@ class Docket(TenantModel):
         self.sales_notified = True
         self.sales_notified_at = timezone.now()
         self.save(update_fields=["sales_notified", "sales_notified_at"])
+
+
+class ImportRecap(TenantModel):
+    """
+    RQ-043 (B2): Import Recap — fabric/trims inbound tracking.
+
+    Reference Logistics Import Recap: supplier/vendor, factory, s/c no,
+    invoice value, item category, qty, rolls/bales, container, B/L-HAWB,
+    mode (Sea/Air), LC/FOC, vessel; milestone dates PCD/ETD/ETA/ATB/
+    Unstuffed/In-house; clearing agent, docs workflow flag, status, remarks.
+    """
+    STATUS_CHOICES = [
+        ("planned", "Planned"),
+        ("in_transit", "In Transit"),
+        ("arrived", "Arrived"),
+        ("unstuffed", "Unstuffed"),
+        ("in_house", "In House"),
+        ("closed", "Closed"),
+        ("cancelled", "Cancelled"),
+    ]
+    MODE_CHOICES = [
+        ("sea", "Sea"),
+        ("air", "Air"),
+    ]
+    LC_FOC_CHOICES = [
+        ("lc", "LC"),
+        ("foc", "FOC"),
+    ]
+    ITEM_CATEGORY_CHOICES = [
+        ("fabric", "Fabric"),
+        ("trims", "Trims"),
+        ("labels", "Labels"),
+        ("accessories", "Accessories"),
+        ("packaging", "Packaging"),
+        ("other", "Other"),
+    ]
+
+    supplier = models.ForeignKey(
+        "setup.Vendor",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="import_recaps",
+    )
+    factory = models.ForeignKey(
+        "setup.Factory",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="import_recaps",
+    )
+    s_c_number = models.CharField(max_length=60, blank=True)
+    invoice_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    item_category = models.CharField(max_length=20, choices=ITEM_CATEGORY_CHOICES, default="fabric")
+    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    rolls_bales = models.PositiveIntegerField(null=True, blank=True)
+    container = models.CharField(max_length=50, blank=True)
+    bl_hawb = models.CharField(max_length=60, blank=True, help_text="Bill of Lading / HAWB number")
+    mode = models.CharField(max_length=10, choices=MODE_CHOICES, default="sea")
+    lc_foc = models.CharField(max_length=10, choices=LC_FOC_CHOICES, default="lc")
+    vessel = models.CharField(max_length=100, blank=True)
+    pcd_date = models.DateField(null=True, blank=True, help_text="PCD milestone date")
+    etd_date = models.DateField(null=True, blank=True, help_text="ETD milestone date")
+    eta_date = models.DateField(null=True, blank=True, help_text="ETA milestone date")
+    atb_date = models.DateField(null=True, blank=True, help_text="ATB milestone date")
+    unstuffed_date = models.DateField(null=True, blank=True, help_text="Unstuffed milestone date")
+    in_house_date = models.DateField(null=True, blank=True, help_text="In-house milestone date")
+    agent = models.CharField(max_length=120, blank=True, help_text="Clearing / shipping agent")
+    docs_received = models.BooleanField(
+        default=False,
+        help_text="Import documents received (docs workflow flag)",
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="planned")
+    remarks = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Import Recap"
+        verbose_name_plural = "Import Recaps"
+
+    def __str__(self):
+        return self.s_c_number or f"Import {self.pk}"
+
+
+class ExportRecap(TenantModel):
+    """
+    RQ-044 (B3): Export Recap — per-hit landed economics.
+
+    Reference Logistics Export Recap: identifiers (FOB no, factory & customer
+    invoice + dates, S/C), quantities, FOB/CMPT/cost values + service %,
+    logistics (ex-factory, mode, forwarder, HBL, on-board/ETA, container, BL,
+    courier), and the payment-to-factory + payment-from-customer pipelines
+    (terms, due date, received, overdue).
+    """
+    MODE_CHOICES = [
+        ("sea", "Sea"),
+        ("air", "Air"),
+    ]
+
+    purchase_order = models.ForeignKey(
+        "merchandising.PurchaseOrder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="export_recaps",
+    )
+    factory = models.ForeignKey(
+        "setup.Factory",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="export_recaps",
+    )
+    forwarder = models.ForeignKey(
+        "FreightForwarder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="export_recaps",
+    )
+    fob_no = models.CharField(max_length=60, blank=True, help_text="FOB identifier")
+    s_c_number = models.CharField(max_length=60, blank=True)
+    factory_invoice = models.CharField(max_length=80, blank=True, help_text="Factory invoice number")
+    factory_invoice_date = models.DateField(null=True, blank=True)
+    customer_invoice = models.CharField(max_length=80, blank=True, help_text="Customer invoice number")
+    customer_invoice_date = models.DateField(null=True, blank=True)
+    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    fob_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    cmpt_value = models.DecimalField(max_digits=14, decimal_places=2, default=0, help_text="Cut Make Pack Trim value")
+    cost_value = models.DecimalField(max_digits=14, decimal_places=2, default=0, help_text="Landed cost value")
+    service_pct = models.DecimalField(max_digits=6, decimal_places=3, default=0, help_text="Service charge %")
+    ex_factory_date = models.DateField(null=True, blank=True)
+    mode = models.CharField(max_length=10, choices=MODE_CHOICES, default="sea")
+    hbl = models.CharField(max_length=60, blank=True, help_text="House Bill of Lading")
+    on_board_date = models.DateField(null=True, blank=True)
+    eta_date = models.DateField(null=True, blank=True)
+    container = models.CharField(max_length=50, blank=True)
+    bl_number = models.CharField(max_length=60, blank=True, help_text="Bill of Lading number")
+    courier = models.CharField(max_length=80, blank=True)
+    factory_pay_terms = models.CharField(max_length=80, blank=True)
+    factory_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    factory_due_date = models.DateField(null=True, blank=True)
+    factory_paid_date = models.DateField(null=True, blank=True)
+    customer_pay_terms = models.CharField(max_length=80, blank=True)
+    customer_received_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    customer_due_date = models.DateField(null=True, blank=True)
+    customer_payment_date = models.DateField(null=True, blank=True)
+    remarks = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Export Recap"
+        verbose_name_plural = "Export Recaps"
+
+    def __str__(self):
+        return self.fob_no or f"Export {self.pk}"
+
+    @property
+    def factory_payment_status(self):
+        """paid / overdue / pending for the payment-to-factory pipeline."""
+        if self.factory_paid_date:
+            return "paid"
+        if self.factory_due_date and self.factory_due_date < timezone.localdate():
+            return "overdue"
+        return "pending"
+
+    @property
+    def customer_payment_status(self):
+        """received / overdue / pending for the payment-from-customer pipeline."""
+        if self.customer_payment_date:
+            return "received"
+        if self.customer_due_date and self.customer_due_date < timezone.localdate():
+            return "overdue"
+        return "pending"
 
 
 class FinalHitReconciliation(TenantModel):
@@ -390,3 +572,227 @@ class FinalHitReconciliation(TenantModel):
             self.reconciled_by = user
         self.save()
         return self.shortage_units, self.requires_debit
+
+
+class SupplierPayment(TenantModel):
+    """
+    RQ-045 (B4): Supplier Payment + Due — SP log.
+
+    Reference manual Supplier Payment / SP log: SP log CRUD, invoice-value
+    allocation by FN, due pivot by supplier x month, to-be-released statuses,
+    and a release workflow. Tied to a supplier (setup.Vendor), the PO/FN the
+    payment settles, and an optional LC reference.
+    """
+    PAYMENT_METHODS = [
+        ("TT", "TT"),
+        ("LC", "LC"),
+        ("FOC", "FOC"),
+        ("cash", "Cash"),
+    ]
+
+    supplier = models.ForeignKey(
+        "setup.Vendor",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="supplier_payments",
+    )
+    purchase_order = models.ForeignKey(
+        "merchandising.PurchaseOrder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="supplier_payments",
+    )
+    lc = models.ForeignKey(
+        "commercial.LC",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="supplier_payments",
+    )
+    payment_ref = models.CharField(max_length=60, help_text="SP log reference")
+    invoice_no = models.CharField(max_length=80, blank=True, help_text="Supplier invoice number")
+    fn_ref = models.CharField(max_length=60, blank=True, help_text="File number (FN) reference")
+    allocated_amount = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0,
+        help_text="Invoice value allocated against the FN/PO",
+    )
+    amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    currency = models.CharField(max_length=10, blank=True, default="USD")
+    payment_date = models.DateField(null=True, blank=True, help_text="Actual payment date")
+    due_date = models.DateField(null=True, blank=True)
+    payment_method = models.CharField(max_length=10, choices=PAYMENT_METHODS, default="TT")
+    released = models.BooleanField(default=False, help_text="Payment released for settlement")
+    released_at = models.DateTimeField(null=True, blank=True)
+    released_by = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="released_supplier_payments",
+    )
+    remarks = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Supplier Payment"
+        verbose_name_plural = "Supplier Payments"
+
+    def __str__(self):
+        return self.payment_ref or f"SP {self.pk}"
+
+    @property
+    def payment_status(self):
+        """released / overdue / to_be_released for the release workflow."""
+        if self.released:
+            return "released"
+        if self.due_date and self.due_date < timezone.localdate():
+            return "overdue"
+        return "to_be_released"
+
+    def release(self, user=None):
+        """Stamp the payment as released (release workflow)."""
+        self.released = True
+        self.released_at = timezone.now()
+        if user:
+            self.released_by = user
+        self.save(update_fields=["released", "released_at", "released_by"])
+
+
+class CostReconciliation(TenantModel):
+    """
+    RQ-046 (B5): Cost update / reconcile.
+
+    Compares the Factory Invoice (make price / MP) against the Planning CM for
+    the same order, recording a point-in-time snapshot. Derives a Saving/Loss
+    per unit and total by order/invoice quantity and flags a mismatch when the
+    two sources differ. Mirrors the FinalHitReconciliation status workflow.
+    """
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("reconciled", "Reconciled"),
+        ("disputed", "Disputed"),
+        ("resolved", "Resolved"),
+    ]
+
+    purchase_order = models.ForeignKey(
+        "merchandising.PurchaseOrder",
+        on_delete=models.CASCADE,
+        related_name="cost_reconciliations",
+    )
+    export_recap = models.ForeignKey(
+        ExportRecap,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cost_reconciliations",
+        help_text="Optional source export recap supplying the factory invoice",
+    )
+    costing = models.ForeignKey(
+        "merchandising.Costing",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cost_reconciliations",
+        help_text="Optional live costing sheet supplying the planning CM",
+    )
+    factory_inv_amount = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0,
+        help_text="Factory Invoice (MP) value for the order",
+    )
+    factory_inv_qty = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0,
+        help_text="Invoice quantity for the factory side",
+    )
+    planning_cm_amount = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0,
+        help_text="Planning CM value for the order",
+    )
+    planning_cm_qty = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0,
+        help_text="Order quantity for the planning side",
+    )
+    factory_inv_per_unit = models.DecimalField(
+        max_digits=14, decimal_places=4, default=0,
+        help_text="Factory Invoice value divided by its quantity",
+    )
+    planning_cm_per_unit = models.DecimalField(
+        max_digits=14, decimal_places=4, default=0,
+        help_text="Planning CM value divided by its quantity",
+    )
+    saving_loss_per_unit = models.DecimalField(
+        max_digits=14, decimal_places=4, default=0,
+        help_text="Factory Inv per unit - Planning CM per unit (positive = saving, negative = loss)",
+    )
+    saving_loss_total = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0,
+        help_text="Saving/Loss per unit x reference quantity",
+    )
+    is_mismatch = models.BooleanField(
+        default=False,
+        help_text="Factory Inv and Planning CM differ",
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    notes = models.TextField(blank=True)
+    reconciled_at = models.DateTimeField(null=True, blank=True)
+    reconciled_by = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cost_reconciliations",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Cost Reconciliation"
+        verbose_name_plural = "Cost Reconciliations"
+
+    def __str__(self):
+        return f"{self.purchase_order.po_number} ({self.get_status_display()})"
+
+    def _recompute(self):
+        fi_per_unit = (
+            (self.factory_inv_amount / self.factory_inv_qty)
+            if self.factory_inv_qty else Decimal("0.00")
+        )
+        cm_per_unit = (
+            (self.planning_cm_amount / self.planning_cm_qty)
+            if self.planning_cm_qty else Decimal("0.00")
+        )
+        self.factory_inv_per_unit = fi_per_unit
+        self.planning_cm_per_unit = cm_per_unit
+        self.saving_loss_per_unit = fi_per_unit - cm_per_unit
+        ref_qty = self.factory_inv_qty or self.planning_cm_qty
+        self.saving_loss_total = (self.saving_loss_per_unit * ref_qty) if ref_qty else Decimal("0.00")
+        self.is_mismatch = self.saving_loss_per_unit != 0
+
+    def save(self, *args, **kwargs):
+        self._recompute()
+        super().save(*args, **kwargs)
+
+    def compare(self, factory_inv_amount=None, planning_cm_amount=None,
+                factory_inv_qty=None, planning_cm_qty=None, user=None):
+        """Update the snapshot inputs and re-run the comparison."""
+        if factory_inv_amount is not None:
+            self.factory_inv_amount = factory_inv_amount
+        if planning_cm_amount is not None:
+            self.planning_cm_amount = planning_cm_amount
+        if factory_inv_qty is not None:
+            self.factory_inv_qty = factory_inv_qty
+        if planning_cm_qty is not None:
+            self.planning_cm_qty = planning_cm_qty
+        self.save()
+        return self.saving_loss_per_unit, self.saving_loss_total
+
+    def resolve_status(self, status=None, user=None):
+        """Set a workflow status and stamp the reconciliation."""
+        if status:
+            self.status = status
+        self.reconciled_at = timezone.now()
+        if user:
+            self.reconciled_by = user
+        self.save(update_fields=["status", "reconciled_at", "reconciled_by"])
+        return self.status
+        return self

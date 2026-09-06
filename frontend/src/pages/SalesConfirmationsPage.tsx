@@ -1,27 +1,16 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { commercialApi } from '../api/client';
 import type { SalesConfirmation, SalesConfirmationDashboard } from '../api/client';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import { useToast } from '../contexts/ToastContext';
 import Layout from '../components/Layout';
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-surface-alt/20 text-muted',
-  sent: 'bg-blue-500/20 text-badge-blue',
-  disputed: 'bg-amber-500/20 text-badge-amber',
-  accepted: 'bg-emerald-500/20 text-badge-emerald',
-};
 
 export default function SalesConfirmationsPage() {
   const { toast } = useToast();
   const [confirmations, setConfirmations] = useState<SalesConfirmation[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('confirmation_number');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [dashboard, setDashboard] = useState<SalesConfirmationDashboard | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingSC, setEditingSC] = useState<SalesConfirmation | null>(null);
@@ -35,9 +24,7 @@ export default function SalesConfirmationsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
+      const params: Record<string, string> = { page: '1', page_size: '10000' };
       const res = await commercialApi.getSalesConfirmations(params);
       setConfirmations(res.data.results);
       setCount(res.data.count);
@@ -51,8 +38,10 @@ export default function SalesConfirmationsPage() {
     } catch { /* non-critical */ }
   };
 
-  useEffect(() => { fetchData(); }, [search, page, sortField, sortOrder]);
+  useEffect(() => { fetchData(); }, []);
   useEffect(() => { fetchDashboard(); }, []);
+
+  const refresh = () => { fetchData(); fetchDashboard(); };
 
   const openCreate = () => {
     setEditingSC(null);
@@ -87,7 +76,8 @@ export default function SalesConfirmationsPage() {
   };
 
   const handleSend = async (sc: SalesConfirmation) => {
-    try { await commercialApi.sendSalesConfirmation(sc.id); toast('success', `Sent ${sc.confirmation_number}`); fetchData(); fetchDashboard(); } catch { toast('error', 'Failed to send confirmation'); }
+    setActing(true);
+    try { await commercialApi.sendSalesConfirmation(sc.id); toast('success', `Sent ${sc.confirmation_number}`); refresh(); } catch { toast('error', 'Failed to send confirmation'); } finally { setActing(false); }
   };
 
   const handleDispute = async () => {
@@ -98,52 +88,42 @@ export default function SalesConfirmationsPage() {
       toast('success', 'Dispute recorded');
       setDisputeFor(null);
       setDisputeReason('');
-      fetchData();
-      fetchDashboard();
+      refresh();
     } catch { toast('error', 'Failed to record dispute'); } finally { setActing(false); }
   };
 
   const handleAccept = async (sc: SalesConfirmation) => {
-    try { await commercialApi.acceptSalesConfirmation(sc.id); toast('success', `Accepted ${sc.confirmation_number}`); fetchData(); fetchDashboard(); } catch { toast('error', 'Failed to accept confirmation'); }
+    setActing(true);
+    try { await commercialApi.acceptSalesConfirmation(sc.id); toast('success', `Accepted ${sc.confirmation_number}`); refresh(); } catch { toast('error', 'Failed to accept confirmation'); } finally { setActing(false); }
   };
 
   const handleAutoAccept = async () => {
     try {
       const res = await commercialApi.autoAcceptSalesConfirmations();
       toast('success', `Auto-accepted ${res.data.auto_accepted} overdue confirmation(s)`);
-      fetchData();
-      fetchDashboard();
+      refresh();
     } catch { toast('error', 'Failed to auto-accept overdue confirmations'); }
   };
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
+  const actionable = confirmations.filter(sc => sc.status === 'draft' || sc.status === 'sent');
 
-  const columns: Column[] = [
-    { key: 'confirmation_number', label: 'Confirmation #', sortable: true, render: (v) => <span className="font-mono text-emerald-400">{String(v)}</span> },
-    { key: 'po_number', label: 'PO #', sortable: true, render: (v) => <span className="font-mono text-body">{String(v)}</span> },
-    { key: 'buyer_name', label: 'Buyer', sortable: true },
-    { key: 'status', label: 'Status', sortable: true,
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v)}</span> },
-    { key: 'sent_at', label: 'Sent', sortable: true, render: (v) => (v ? new Date(String(v)).toLocaleString() : '—') },
-    { key: 'auto_accepted', label: 'Auto', sortable: false, render: (v) => (v ? <span className="text-xs text-badge-purple font-medium">auto</span> : '—') },
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => {
-      const sc = row as unknown as SalesConfirmation;
-      return (
-        <div className="flex justify-end gap-1.5">
-          {sc.status === 'draft' && (
-            <button onClick={(e) => { e.stopPropagation(); handleSend(sc); }} className="text-xs px-2 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-badge-blue rounded transition-colors">Send</button>
-          )}
-          {sc.status === 'sent' && (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); setDisputeFor(sc); setDisputeReason(''); }} className="text-xs px-2 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-badge-amber rounded transition-colors">Dispute</button>
-              <button onClick={(e) => { e.stopPropagation(); handleAccept(sc); }} className="text-xs px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-badge-emerald rounded transition-colors">Accept</button>
-            </>
-          )}
-          <button onClick={(e) => { e.stopPropagation(); openEdit(sc); }} className="text-xs px-2 py-1 bg-surface-alt hover:bg-surface-alt text-heading rounded transition-colors">Edit</button>
-          <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(sc.id)); }} className="text-xs px-2 py-1 bg-red-900/50 hover:bg-red-800 text-red-400 rounded transition-colors">Del</button>
-        </div>
-      );
-    }},
+  const gridData = confirmations.map(sc => ({
+    id: sc.id,
+    confirmation_number: sc.confirmation_number,
+    po_number: sc.po_number,
+    buyer_name: sc.buyer_name,
+    status: sc.status,
+    sent_at: sc.sent_at ? new Date(String(sc.sent_at)).toLocaleString() : '—',
+    auto_accepted: sc.auto_accepted ? 'auto' : '—',
+  }));
+
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Confirmation #', field: 'confirmation_number', headerFilter: true },
+    { title: 'PO #', field: 'po_number', headerFilter: true },
+    { title: 'Buyer', field: 'buyer_name', headerFilter: true },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'Sent', field: 'sent_at' },
+    { title: 'Auto', field: 'auto_accepted' },
   ];
 
   const cards = [
@@ -182,20 +162,51 @@ export default function SalesConfirmationsPage() {
           ))}
         </div>
 
-        <DataTable
-          data={confirmations as unknown as Record<string, unknown>[]}
-          columns={columns}
-          totalCount={count}
-          page={page}
-          pageSize={25}
-          onPageChange={setPage}
-          searchValue={search}
-          onSearchChange={(v) => { setSearch(v); setPage(1); }}
-          searchPlaceholder="Search confirmations..."
-          onSort={handleSort}
-          sortField={sortField}
-          sortOrder={sortOrder}
+        {actionable.length > 0 && (
+          <div className="bg-surface rounded-xl border border-border p-5 mb-6">
+            <h2 className="text-sm font-semibold text-heading mb-3">Register Actions</h2>
+            <p className="text-xs text-muted mb-3">Draft confirmations can be sent; sent confirmations can be disputed (with reason) or accepted. Edit and delete are available via the grid row actions.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {actionable.map(sc => (
+                <div key={sc.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-heading truncate">{sc.confirmation_number} — {sc.buyer_name}</p>
+                    <p className="text-xs text-muted font-mono">{sc.status}</p>
+                  </div>
+                  <div className="shrink-0 flex gap-2">
+                    {sc.status === 'draft' && (
+                      <button onClick={() => handleSend(sc)} disabled={acting} className="px-2 py-1 text-xs bg-blue-600/20 hover:bg-blue-600/30 text-badge-blue rounded transition-colors disabled:opacity-50">Send</button>
+                    )}
+                    {sc.status === 'sent' && (
+                      <>
+                        <button onClick={() => { setDisputeFor(sc); setDisputeReason(''); }} disabled={acting} className="px-2 py-1 text-xs bg-amber-600/20 hover:bg-amber-600/30 text-badge-amber rounded transition-colors disabled:opacity-50">Dispute</button>
+                        <button onClick={() => handleAccept(sc)} disabled={acting} className="px-2 py-1 text-xs bg-emerald-600/20 hover:bg-emerald-600/30 text-badge-emerald rounded transition-colors disabled:opacity-50">Accept</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <SpreadsheetGrid
+          title="Sales Confirmations"
+          toolbar={true}
+          exportable={true}
+          columnChooser={true}
+          actionColumn={true}
+          paginationSize={25}
+          height={480}
           loading={loading}
+          data={gridData}
+          columns={columns}
+          onAdd={openCreate}
+          onEdit={(row) => {
+            const sc = confirmations.find(c => c.id === row.id);
+            if (sc) openEdit(sc);
+          }}
+          onDelete={(row) => setDeleteId(String(row.id))}
         />
       </main>
 

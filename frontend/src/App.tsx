@@ -6,6 +6,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import StylesListPage from './pages/StylesListPage';
+import DesignsPage from './pages/DesignsPage';
 import StyleDetailPage from './pages/StyleDetailPage';
 import FileOpeningsListPage from './pages/FileOpeningsListPage';
 import FileOpeningDetailPage from './pages/FileOpeningDetailPage';
@@ -37,6 +38,7 @@ import HealthPage from './pages/HealthPage';
 import ProductionDashboardPage from './pages/ProductionDashboardPage';
 import FactoryPortalPage from './pages/FactoryPortalPage';
 import ProformaInvoicesPage from './pages/ProformaInvoicesPage';
+import ForwardOrderPage from './pages/ForwardOrderPage';
 import SalesContractsPage from './pages/SalesContractsPage';
 import SalesConfirmationsPage from './pages/SalesConfirmationsPage';
 import DebitNotesPage from './pages/DebitNotesPage';
@@ -65,6 +67,11 @@ import FabricTolerancesPage from './pages/FabricTolerancesPage';
 import FabricUtilizationPage from './pages/FabricUtilizationPage';
 import DocketsPage from './pages/DocketsPage';
 import FinalHitReconciliationsPage from './pages/FinalHitReconciliationsPage';
+import ImportRecapsPage from './pages/ImportRecapsPage';
+import ExportRecapsPage from './pages/ExportRecapsPage';
+import SupplierPaymentsPage from './pages/SupplierPaymentsPage';
+import CostReconcilePage from './pages/CostReconcilePage';
+import SummaryReportsPage from './pages/SummaryReportsPage';
 import FitSpecsPage from './pages/FitSpecsPage';
 import JobRequestsPage from './pages/JobRequestsPage';
 import OrderManagerDashboardPage from './pages/OrderManagerDashboardPage';
@@ -74,6 +81,8 @@ import TechPackImportWizardPage from './pages/TechPackImportWizardPage';
 import DesignSheetsListPage from './pages/DesignSheetsListPage';
 import DesignSheetPage from './pages/DesignSheetPage';
 import DesignSheetPrintPage from './pages/DesignSheetPrintPage';
+import DesignCostingsListPage from './pages/DesignCostingsListPage';
+import DesignCostingDetailPage from './pages/DesignCostingDetailPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -151,6 +160,7 @@ function App() {
             <Route path="/sales-confirmations" element={<ProtectedRoute><SalesConfirmationsPage /></ProtectedRoute>} />
 <Route path="/debit-notes" element={<ProtectedRoute><DebitNotesPage /></ProtectedRoute>} />
 <Route path="/invoice-approvals" element={<ProtectedRoute><InvoiceApprovalsPage /></ProtectedRoute>} />
+<Route path="/forward-order-book" element={<ProtectedRoute><ForwardOrderPage /></ProtectedRoute>} />
             <Route path="/tas/calendar" element={<ProtectedRoute><TACalendarPage /></ProtectedRoute>} />
             <Route path="/tas/heatmap" element={<ProtectedRoute><TAHeatmapPage /></ProtectedRoute>} />
             <Route path="/production/:id" element={<ProtectedRoute><ProductionDetailPage /></ProtectedRoute>} />
@@ -166,11 +176,19 @@ function App() {
             <Route path="/fabric/utilizations" element={<ProtectedRoute><FabricUtilizationPage /></ProtectedRoute>} />
             <Route path="/fabric/dockets" element={<ProtectedRoute><DocketsPage /></ProtectedRoute>} />
             <Route path="/logistics/reconciliations" element={<ProtectedRoute><FinalHitReconciliationsPage /></ProtectedRoute>} />
+            <Route path="/logistics/import-recaps" element={<ProtectedRoute><ImportRecapsPage /></ProtectedRoute>} />
+            <Route path="/logistics/export-recaps" element={<ProtectedRoute><ExportRecapsPage /></ProtectedRoute>} />
+            <Route path="/logistics/supplier-payments" element={<ProtectedRoute><SupplierPaymentsPage /></ProtectedRoute>} />
+            <Route path="/logistics/cost-reconciliations" element={<ProtectedRoute><CostReconcilePage /></ProtectedRoute>} />
+<Route path="/logistics/summary-reports" element={<ProtectedRoute><SummaryReportsPage /></ProtectedRoute>} />
             <Route path="/fit-specs" element={<ProtectedRoute><FitSpecsPage /></ProtectedRoute>} />
             <Route path="/styles/techpack-import" element={<ProtectedRoute><TechPackImportWizardPage /></ProtectedRoute>} />
             <Route path="/design-sheets" element={<ProtectedRoute><DesignSheetsListPage /></ProtectedRoute>} />
+            <Route path="/design" element={<ProtectedRoute><DesignsPage /></ProtectedRoute>} />
             <Route path="/design-sheets/:id" element={<ProtectedRoute><DesignSheetPage /></ProtectedRoute>} />
             <Route path="/design-sheets/:id/print" element={<ProtectedRoute><DesignSheetPrintPage /></ProtectedRoute>} />
+            <Route path="/design-costings" element={<ProtectedRoute><DesignCostingsListPage /></ProtectedRoute>} />
+            <Route path="/design-costings/:id" element={<ProtectedRoute><DesignCostingDetailPage /></ProtectedRoute>} />
             <Route path="/jobs" element={<ProtectedRoute><JobRequestsPage /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

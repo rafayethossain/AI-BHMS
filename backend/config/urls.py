@@ -39,6 +39,7 @@ urlpatterns = [
     path("api/v1/reporting/", include("apps.reporting.urls")),
     path("api/v1/monitoring/", include("apps.monitoring.urls")),
     path("api/v1/fabric/", include("apps.fabric.urls")),
+    path("api/v1/help/", include("apps.help.urls")),
 ]
 
 # Debug toolbar

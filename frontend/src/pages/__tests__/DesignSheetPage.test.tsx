@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -105,6 +105,7 @@ const merchApiMock = vi.hoisted(() => ({
   getDesignSheets: vi.fn(),
   createDesignSheetJob: vi.fn(),
   updateDesignJobRequest: vi.fn(),
+  updateDesignSheet: vi.fn(),
 }));
 
 const usersApiMock = vi.hoisted(() => ({
@@ -139,6 +140,7 @@ const baseSheet: DesignSheet = {
   description: '',
   note: '',
   sketch_annotations: [],
+  layout_order: [],
   fit_specs: [],
   job_requests: [],
   created_at: '2026-08-27T10:00:00Z',
@@ -593,6 +595,146 @@ describe('DesignSheetPage fit spec + job request wiring', () => {
       'href',
       '/design-sheets/ds-1/print',
     );
+  });
+});
+
+describe('DesignSheetPage block layout order (design builder Phase 1)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fitSpecCapture.current = null;
+    jobCapture.current = null;
+    usersApiMock.getUsers.mockResolvedValue({
+      data: {
+        count: 2,
+        results: [
+          {
+            id: 'u1',
+            full_name: 'Alice Rahman',
+            username: 'alice',
+            first_name: 'Alice',
+            last_name: 'Rahman',
+            email: 'alice@demo.com',
+          },
+          {
+            id: 'u2',
+            full_name: 'Bob Chowdhury',
+            username: 'bob',
+            first_name: 'Bob',
+            last_name: 'Chowdhury',
+            email: 'bob@demo.com',
+          },
+        ],
+      },
+    });
+    merchApiMock.getDesignSheets.mockResolvedValue({
+      data: {
+        count: 1,
+        results: [{ id: 'ds-1', file_number: 'TP-1002', style_code: '67741T' }],
+      },
+    });
+  });
+
+  const blockKeys = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('[data-testid^="block-"]')).map(
+      (el) => el.getAttribute('data-testid'),
+    );
+
+  it('renders blocks in the persisted layout order', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({
+      data: {
+        ...baseSheet,
+        layout_order: [
+          'images', 'header', 'sketch', 'material',
+          'fit_specs', 'job_requests',
+        ],
+      },
+    });
+    const { container } = renderPage();
+    await screen.findByTestId('fitspec-mock');
+    expect(blockKeys(container)).toEqual([
+      'block-images',
+      'block-header',
+      'block-sketch',
+      'block-material',
+      'block-fit_specs',
+      'block-job_requests',
+    ]);
+  });
+
+  it('falls back to the standard block order when none is saved', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({
+      data: { ...baseSheet, layout_order: [] },
+    });
+    const { container } = renderPage();
+    await screen.findByTestId('fitspec-mock');
+    expect(blockKeys(container)).toEqual([
+      'block-header',
+      'block-sketch',
+      'block-material',
+      'block-fit_specs',
+      'block-images',
+      'block-job_requests',
+    ]);
+  });
+
+  it('moves a block up and persists the new order via PATCH', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({
+      data: {
+        ...baseSheet,
+        layout_order: [
+          'header', 'images', 'sketch', 'material',
+          'fit_specs', 'job_requests',
+        ],
+      },
+    });
+    merchApiMock.updateDesignSheet.mockResolvedValue({
+      data: {
+        ...baseSheet,
+        layout_order: [
+          'images', 'header', 'sketch', 'material',
+          'fit_specs', 'job_requests',
+        ],
+      },
+    });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('move-up-images'));
+    });
+    expect(merchApiMock.updateDesignSheet).toHaveBeenCalledWith('ds-1', {
+      layout_order: [
+        'images', 'header', 'sketch', 'material',
+        'fit_specs', 'job_requests',
+      ],
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('block-images')).not.toBe(null);
+    });
+  });
+
+  it('moves a block down and persists the new order via PATCH', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    merchApiMock.updateDesignSheet.mockResolvedValue({ data: baseSheet });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('move-down-header'));
+    });
+    expect(merchApiMock.updateDesignSheet).toHaveBeenCalledWith('ds-1', {
+      layout_order: [
+        'sketch', 'header', 'material', 'fit_specs',
+        'images', 'job_requests',
+      ],
+    });
+  });
+
+  it('disables move-up on the first block and move-down on the last block', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+    const { container } = renderPage();
+    await screen.findByTestId('fitspec-mock');
+    expect(screen.getByTestId('move-up-header')).toBeDisabled();
+    expect(screen.getByTestId('move-down-job_requests')).toBeDisabled();
+    expect(container.querySelectorAll('[data-testid^="block-"]')).toHaveLength(6);
   });
 });
 

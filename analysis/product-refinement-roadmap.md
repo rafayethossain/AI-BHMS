@@ -9,14 +9,14 @@
 
 ## 0. Executive Summary
 
-BHMS is **functionally complete against the GC-manual bar** — all 35 RQ requirements are done, 100% tested (1126 green), seeded end-to-end, with production-grade auth (JWT + MFA), ~75 frontend pages, and excellent demo data. **Do not build more features before delivery.** The path to client readiness is:
+BHMS is **functionally complete against the target-manual bar** — all 35 RQ requirements are done, 100% tested (1126 green), seeded end-to-end, with production-grade auth (JWT + MFA), ~75 frontend pages, and excellent demo data. **Do not build more features before delivery.** The path to client readiness is:
 
 1. **Harden what exists** — tenant isolation is the one true production blocker (📊 `TenantMiddleware`); Hit colour needs referential integrity (RQ-010).
 2. **Cut dead weight** — `FabricInventory` (two parallel inventory systems), `Alert` (no producer), `ReportSchedule` (no worker), orphan `/dashboard/executive`, duplicated dashboard KPI endpoint.
 3. **Make it client/end-user oriented** — onboarding flow, role-first home screens, BD localization polish, a rehearsed demo script.
 4. **Productize deployment** — gunicorn/nginx, non-debug, real secrets, CI/CD, PostgreSQL verification.
 
-**Verdict on the headline question (Hit vs Line Items): do NOT merge the entities.** Hit is the colour-level *production commitment* (GC-010 system key `hit_number + colour`); `PurchaseOrderItem` is the colour×size *contract line*. They were already reparented/decoupled once (migration `0016`). What *is* redundant is `Hit.colour` as free text — fix it to an FK (P0), don't merge models. Details in §3.
+**Verdict on the headline question (Hit vs Line Items): do NOT merge the entities.** Hit is the colour-level *production commitment* (target-010 system key `hit_number + colour`); `PurchaseOrderItem` is the colour×size *contract line*. They were already reparented/decoupled once (migration `0016`). What *is* redundant is `Hit.colour` as free text — fix it to an FK (P0), don't merge models. Details in §3.
 
 ---
 
@@ -65,7 +65,7 @@ Full evidence: `analysis/redundancy-overlap-audit.md`. Verified in source today.
 | | `PurchaseOrderItem` | `Hit` |
 |---|---|---|
 | Business meaning | Contract line, colour×size | Production commitment per colour (whole PO) |
-| Key | `color` FK + `size` | `hit_number` + `colour` (GC system key) |
+| Key | `color` FK + `size` | `hit_number` + `colour` (target system key) |
 | Location | `merchandising/models.py:400` | `merchandising/models.py:427` |
 | Consumed by | PO, Costing, BOM | `BookingScheduleItem` (logistics/models.py:189), `FinalHitReconciliation` (logistics/models.py:303), DebitNote (commercial/models.py:300), PO hit tab |
 
@@ -80,7 +80,7 @@ Why not merge:
 - 📊 `Hit` node; 📝 Sprint 2.6 + Sprint 2.10 lessons; 📝 "model the real parent before building a UI".
 
 ### 3.2 Keep-as-is but document (informational, no code change)
-- **O5 — Three scheduling structures**: `TAMilestone` (merchandising), `BookingScheduleItem` (logistics), `ProductionPlan` (production) all carry "when does this order move". Not removable (each is a GC requirement) — document the intentional gap in the client handover so expectations stay honest.
+- **O5 — Three scheduling structures**: `TAMilestone` (merchandising), `BookingScheduleItem` (logistics), `ProductionPlan` (production) all carry "when does this order move". Not removable (each is a target requirement) — document the intentional gap in the client handover so expectations stay honest.
 - **O6 — Change-audit trio**: `AuditLog` (middleware), `OrderTrail` (PO join view), `POAmendment`/`LCAmendment`/`InvoiceApproval` (workflow gates). Keep all; cross-link Trail ↔ Audit Logs pages.
 - **O7 — PI vs SalesContract**: closest commercial pair (both one-per-PO, amount/currency/status). **Ask the client** whether they issue both; do not merge blind.
 
@@ -98,7 +98,7 @@ Why not merge:
 | Tier | Modules | Business reason (BD buying house) |
 |---|---|---|
 | **T1 core spine** | Styles, File Openings, POs, BOM/Costing, T&A, Fabric (procurement), Production follow-up, Quality/Inspection, Shipments/Booking, Commercial (LC/PI/SC) | The order-to-cash spine. Every BD sale is won or lost here. |
-| **T2 GC differentiators** | Hits (RQ-010), Fit Specs (011/012), Job Queue (024/025), Fabric Risk & Schedule (018/020), Stock Fabric (019), Booking Schedule (029), Dockets (026), Reconciliation (027), Order Manager (028), Paperwork Comparison (031), Gold Seal (032), Compliance Audit (033), Debit Notes (034), Invoice Approvals (035), Sales Confirmation 48h (007), Repeats (009), Quick Lead (008) | Hard-won GC-manual parity — this is the **competitive story** for the demo. Protect, don't cut. |
+| **T2 target differentiators** | Hits (RQ-010), Fit Specs (011/012), Job Queue (024/025), Fabric Risk & Schedule (018/020), Stock Fabric (019), Booking Schedule (029), Dockets (026), Reconciliation (027), Order Manager (028), Paperwork Comparison (031), Gold Seal (032), Compliance Audit (033), Debit Notes (034), Invoice Approvals (035), Sales Confirmation 48h (007), Repeats (009), Quick Lead (008) | Hard-won target-manual parity — this is the **competitive story** for the demo. Protect, don't cut. |
 | **T3 support** | Setup/master data, Users/Roles, Health, Audit Logs, Help Center | Enabler, low demo value. |
 | **T4 candidate cut/merge** | FabricInventory (R1), Alert (R2), ReportSchedule (R3), ExecutiveDashboard (R4/R5), duplicate summary endpoint (R5) | Dead or duplicate; remove before delivery. |
 
@@ -145,7 +145,7 @@ Why not merge:
 | # | Task | Trace | Priority |
 |---|---|---|---|
 | 0.1 | **Tenant isolation fail-closed**: middleware rejects missing/invalid tenant; viewsets with `tenant=None` return `.none()`; add cross-tenant 403 tests | 📊 `TenantMiddleware`; 📝 "Multi-Tenancy" + US-006 | **P0** |
-| 0.2 | **Hit.colour → FK `ColorCode`** + validate colour ∈ PO items; data-clean seed values | RQ-010 (GC-010); 📊 `Hit`; 📝 Sprint 2.6/2.10; audit 1a | **P0** |
+| 0.2 | **Hit.colour → FK `ColorCode`** + validate colour ∈ PO items; data-clean seed values | RQ-010 (target-010); 📊 `Hit`; 📝 Sprint 2.6/2.10; audit 1a | **P0** |
 | 0.3 | ~~**Consolidate dashboard KPI** on `/dashboard/summary/`; retire `/monitoring/health/summary/`; link or delete `/dashboard/executive`~~ | audit O1/R4/R5; 📊 `DashboardSummaryView` | P1 |
 | 0.4 | ~~**Demo hardening**: fix `root_redirect` hardcoded `:5173`; make seeded milestone/ETA dates relative-or-rebasable; add `seed_demo_data --demo-frozen-dates` option~~ *(done 2026-08-07: `FRONTEND_URL` setting + redirect; LC expiry → days-offset, PO amendment delivery relative; `--demo-frozen-dates` pins to `date(2026,8,1)`; frozen test added; full suite green)* | business-context §4.2/§5; 📝 seed lessons | P1 |
 | 0.5 | **BD localization**: currency default BDT, Chattogram naming, `bd` costing default, BD LC bank | business-context §4.2 | P1 |

@@ -1,46 +1,34 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { commercialApi } from '../api/client';
 import type { ProformaInvoice } from '../api/client';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import { useToast } from '../contexts/ToastContext';
 import Layout from '../components/Layout';
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-surface-alt/20 text-muted',
-  sent: 'bg-blue-500/20 text-badge-blue',
-  accepted: 'bg-emerald-500/20 text-badge-emerald',
-  rejected: 'bg-red-500/20 text-badge-red',
-};
 
 export default function ProformaInvoicesPage() {
   const { toast } = useToast();
   const [pis, setPIs] = useState<ProformaInvoice[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('pi_number');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showModal, setShowModal] = useState(false);
   const [editingPI, setEditingPI] = useState<ProformaInvoice | null>(null);
   const [form, setForm] = useState({ purchase_order: '', buyer: '', amount: '', currency: 'USD', validity_date: '', remarks: '' });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
+      const params: Record<string, string> = { page: '1', page_size: '10000' };
       const res = await commercialApi.getPIs(params);
       setPIs(res.data.results);
       setCount(res.data.count);
     } catch { toast('error', 'Failed to load proforma invoices'); } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, [search, page, sortField, sortOrder]);
+  useEffect(() => { fetchData(); }, []);
 
   const openCreate = () => {
     setEditingPI(null);
@@ -75,13 +63,14 @@ export default function ProformaInvoicesPage() {
   };
 
   const handleAction = async (id: string, action: 'send' | 'accept' | 'reject') => {
+    setBusyId(id);
     try {
       if (action === 'send') await commercialApi.sendPI(id);
       else if (action === 'accept') await commercialApi.acceptPI(id);
       else await commercialApi.rejectPI(id);
       toast('success', `PI ${action}ed`);
       fetchData();
-    } catch { toast('error', `Failed to ${action} PI`); }
+    } catch { toast('error', `Failed to ${action} PI`); } finally { setBusyId(null); }
   };
 
   const handleExportPDF = async (id: string, piNumber: string) => {
@@ -99,29 +88,27 @@ export default function ProformaInvoicesPage() {
     } catch { toast('error', 'Failed to export PDF'); }
   };
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
+  const actionable = pis.filter(pi => pi.status === 'draft' || pi.status === 'sent');
 
-  const columns: Column[] = [
-    { key: 'pi_number', label: 'PI #', sortable: true, render: (v) => <span className="font-mono text-emerald-400">{String(v)}</span> },
-    { key: 'po_number', label: 'PO #', sortable: true, render: (v) => <span className="font-mono text-body">{String(v)}</span> },
-    { key: 'buyer_name', label: 'Buyer', sortable: true },
-    { key: 'amount', label: 'Amount', sortable: true, render: (v) => <span className="text-heading font-medium">{Number(v).toLocaleString()}</span> },
-    { key: 'currency', label: 'Currency', sortable: false },
-    { key: 'status', label: 'Status', sortable: true,
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v)}</span> },
-    { key: 'issued_date', label: 'Issued', sortable: true },
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => (
-      <div className="flex justify-end gap-2">
-        {row.status === 'draft' && <button onClick={(e) => { e.stopPropagation(); handleAction(String(row.id), 'send'); }} className="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors">Send</button>}
-        {row.status === 'sent' && <>
-          <button onClick={(e) => { e.stopPropagation(); handleAction(String(row.id), 'accept'); }} className="text-xs px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded transition-colors">Accept</button>
-          <button onClick={(e) => { e.stopPropagation(); handleAction(String(row.id), 'reject'); }} className="text-xs px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded transition-colors">Reject</button>
-        </>}
-        <button onClick={(e) => { e.stopPropagation(); handleExportPDF(String(row.id), String(row.pi_number)); }} className="text-xs px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded transition-colors" title="Export PDF">PDF</button>
-        <button onClick={(e) => { e.stopPropagation(); openEdit(row as unknown as ProformaInvoice); }} className="text-xs px-2 py-1 bg-surface-alt hover:bg-surface-alt text-heading rounded transition-colors">Edit</button>
-        <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(row.id)); }} className="text-xs px-2 py-1 bg-red-900/50 hover:bg-red-800 text-red-400 rounded transition-colors">Del</button>
-      </div>
-    )},
+  const gridData = pis.map(pi => ({
+    id: pi.id,
+    pi_number: pi.pi_number,
+    po_number: pi.po_number,
+    buyer_name: pi.buyer_name,
+    amount: Number(pi.amount).toLocaleString(),
+    currency: pi.currency,
+    status: pi.status,
+    issued_date: pi.issued_date,
+  }));
+
+  const columns: SpreadsheetColumn[] = [
+    { title: 'PI #', field: 'pi_number', headerFilter: true },
+    { title: 'PO #', field: 'po_number', headerFilter: true },
+    { title: 'Buyer', field: 'buyer_name', headerFilter: true },
+    { title: 'Amount', field: 'amount', hozAlign: 'right' },
+    { title: 'Currency', field: 'currency' },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'Issued', field: 'issued_date' },
   ];
 
   return (
@@ -137,20 +124,51 @@ export default function ProformaInvoicesPage() {
           </button>
         </div>
 
-        <DataTable
-          data={pis as unknown as Record<string, unknown>[]}
-          columns={columns}
-          totalCount={count}
-          page={page}
-          pageSize={25}
-          onPageChange={setPage}
-          searchValue={search}
-          onSearchChange={(v) => { setSearch(v); setPage(1); }}
-          searchPlaceholder="Search PIs..."
-          onSort={handleSort}
-          sortField={sortField}
-          sortOrder={sortOrder}
+        <div className="bg-surface rounded-xl border border-border p-5 mb-6">
+          <h2 className="text-sm font-semibold text-heading mb-3">Register Actions</h2>
+          <p className="text-xs text-muted mb-3">Status-specific actions (Send / Accept / Reject / PDF) for in-flight proforma invoices; edit and delete are available via the grid row actions.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {actionable.map(pi => (
+              <div key={pi.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-heading truncate">{pi.pi_number} — {pi.buyer_name}</p>
+                  <p className="text-xs text-muted font-mono">{pi.status}</p>
+                </div>
+                <div className="shrink-0 flex gap-2">
+                  {pi.status === 'draft' && (
+                    <button onClick={() => handleAction(pi.id, 'send')} disabled={busyId === pi.id} className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors disabled:opacity-50">Send</button>
+                  )}
+                  {pi.status === 'sent' && <>
+                    <button onClick={() => handleAction(pi.id, 'accept')} disabled={busyId === pi.id} className="px-2 py-1 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded transition-colors disabled:opacity-50">Accept</button>
+                    <button onClick={() => handleAction(pi.id, 'reject')} disabled={busyId === pi.id} className="px-2 py-1 text-xs bg-red-600 hover:bg-red-500 text-white rounded transition-colors disabled:opacity-50">Reject</button>
+                  </>}
+                  <button onClick={() => handleExportPDF(pi.id, pi.pi_number)} className="px-2 py-1 text-xs bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded transition-colors" title="Export PDF">PDF</button>
+                </div>
+              </div>
+            ))}
+            {actionable.length === 0 && (
+              <p className="text-sm text-muted">No in-flight PIs.</p>
+            )}
+          </div>
+        </div>
+
+        <SpreadsheetGrid
+          title="Proforma Invoices"
+          toolbar={true}
+          exportable={true}
+          columnChooser={true}
+          actionColumn={true}
+          paginationSize={25}
+          height={480}
           loading={loading}
+          data={gridData}
+          columns={columns}
+          onAdd={openCreate}
+          onEdit={(row) => {
+            const pi = pis.find(p => p.id === row.id);
+            if (pi) openEdit(pi);
+          }}
+          onDelete={(row) => setDeleteId(String(row.id))}
         />
       </main>
 

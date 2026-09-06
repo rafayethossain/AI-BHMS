@@ -165,8 +165,13 @@ class FabricOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         "lab_dip_required_date": "lab_dip",
         "lab_dip_actual_date": "lab_dip",
         "lab_dip_approval_date": "lab_dip",
+        "strike_off_required_date": "strike_off",
+        "strike_off_actual_date": "strike_off",
+        "strike_off_approval_date": "strike_off",
         "onboard_date": "onboard",
         "eta_date": "eta",
+        "actual_arrival_date": "actual_arrival",
+        "paperwork_date": "paperwork",
         "clearance_date": "clearance",
     }
 
@@ -221,8 +226,9 @@ class FabricOrderViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         from django.utils import timezone
         order.bulk_approved_date = timezone.now().date()
         order.bulk_approved_by = request.user
+        order.bulk_approved_notes = request.data.get("bulk_approved_notes", order.bulk_approved_notes)
         order.status = "bulk_approved"
-        order.save(update_fields=["status", "bulk_approved_date", "bulk_approved_by"])
+        order.save(update_fields=["status", "bulk_approved_date", "bulk_approved_by", "bulk_approved_notes"])
         order.apply_risk_policy()
         serializer = self.get_serializer(order)
         return Response(serializer.data)

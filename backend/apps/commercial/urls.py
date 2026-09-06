@@ -7,6 +7,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     BankViewSet,
     DebitNoteViewSet,
+    ForwardOrderViewSet,
     InvoiceApprovalViewSet,
     LCAmendmentViewSet,
     LCViewSet,
@@ -24,6 +25,7 @@ router.register(r"sales-contracts", SalesContractViewSet)
 router.register(r"sales-confirmations", SalesConfirmationViewSet)
 router.register(r"debit-notes", DebitNoteViewSet)
 router.register(r"invoice-approvals", InvoiceApprovalViewSet)
+router.register(r"forward-orders", ForwardOrderViewSet)
 
 urlpatterns = [
     path("", include(router.urls)),

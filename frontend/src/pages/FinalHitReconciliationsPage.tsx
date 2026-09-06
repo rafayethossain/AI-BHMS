@@ -1,20 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import DataTable from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import { logisticsApi } from '../api/client';
 import type { FinalHitReconciliation, Shipment } from '../api/client';
-import type { Column } from '../components/DataTable';
 import { useToast } from '../contexts/ToastContext';
 
 const EMPTY_FORM = {
   shipment: '', docket_quantity: '', shipped_quantity: '', reasons_evident: false, notes: '',
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400',
-  reconciled: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400',
-  debited: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400',
-  waived: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
 };
 
 export default function FinalHitReconciliationsPage() {
@@ -31,14 +24,11 @@ export default function FinalHitReconciliationsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
 
   const loadData = async () => {
     try {
       const [res, over] = await Promise.all([
-        logisticsApi.getReconciliations({ page_size: '100' }),
+        logisticsApi.getReconciliations({ page_size: '10000' }),
         logisticsApi.getOverLimitReconciliations(),
       ]);
       setItems(res.data.results);
@@ -48,7 +38,7 @@ export default function FinalHitReconciliationsPage() {
 
   useEffect(() => {
     Promise.all([
-      logisticsApi.getReconciliations({ page_size: '100' }),
+      logisticsApi.getReconciliations({ page_size: '10000' }),
       logisticsApi.getOverLimitReconciliations(),
       logisticsApi.getShipments({ page_size: '100', status: 'delivered' }),
     ]).then(([res, over, ships]) => {
@@ -112,59 +102,20 @@ export default function FinalHitReconciliationsPage() {
     await runAction(rec.id, () => logisticsApi.waiveReconciliation(rec.id, waiveForm), 'Debit waived');
   };
 
-  const filtered = useMemo(() => items.filter(i =>
-    i.shipment_number.toLowerCase().includes(search.toLowerCase()) ||
-    i.po_number.toLowerCase().includes(search.toLowerCase()) ||
-    i.status_label.toLowerCase().includes(search.toLowerCase())
-  ), [items, search]);
-  const pagedData = useMemo(() => { const s = (page - 1) * pageSize; return filtered.slice(s, s + pageSize); }, [filtered, page]);
-
-  const statusBadge = (status: string, label: string) => (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[status] ?? STATUS_STYLES.pending}`}>{label}</span>
-  );
-
-  const columns: Column[] = [
-    { key: 'shipment_number', label: 'Shipment', sortable: true, render: (v) => <span className="font-medium text-heading font-mono">{String(v)}</span> },
-    { key: 'po_number', label: 'PO', render: (v) => <span className="font-mono text-body">{String(v)}</span> },
-    { key: 'docket_quantity', label: 'Docket Qty', render: (v) => <span className="font-mono text-body">{String(v)}</span> },
-    { key: 'shipped_quantity', label: 'Shipped', render: (v) => <span className="font-mono text-body">{String(v)}</span> },
-    { key: 'shortage_units', label: 'Shortage', render: (v, row) => {
-      const r = row as unknown as FinalHitReconciliation;
-      const short = Number(r.shortage_units) > 0;
-      return <span className={`font-mono ${short ? 'text-amber-600 font-semibold' : 'text-muted'}`}>{short ? String(v) : '—'}</span>;
-    }},
-    { key: 'requires_debit', label: 'Debit', render: (_v, row) => {
-      const r = row as unknown as FinalHitReconciliation;
-      return r.requires_debit ? <span className="text-red-600 font-semibold text-sm">&gt;20 short</span> : <span className="text-muted">No</span>;
-    }},
-    { key: 'status', label: 'Status', render: (_v, row) => {
-      const r = row as unknown as FinalHitReconciliation;
-      return statusBadge(r.status, r.status_label);
-    }},
-    { key: 'reconciled_by_name', label: 'Reconciled By', render: (v) => <span className="text-body text-sm">{String(v ?? '—')}</span> },
-    { key: 'actions', label: '', className: 'text-right', render: (_v, row) => {
-      const r = row as unknown as FinalHitReconciliation;
-      const idle = busyId !== r.id;
-      return (
-        <div className="flex justify-end gap-3 text-sm">
-          {r.status === 'pending' && (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); runAction(r.id, () => logisticsApi.reconcileHit(r.id), 'Reconciliation complete'); }} disabled={!idle} className="text-emerald-600 hover:text-emerald-500 disabled:opacity-50">Reconcile</button>
-              {r.requires_debit && (
-                <button onClick={(e) => { e.stopPropagation(); runAction(r.id, () => logisticsApi.markDebited(r.id), 'Debit raised'); }} disabled={!idle} className="text-red-500 hover:text-red-400 disabled:opacity-50">Debit</button>
-              )}
-              <button onClick={(e) => { e.stopPropagation(); openWaive(r); }} className="text-slate-500 hover:text-slate-400">Waive</button>
-            </>
-          )}
-          <button onClick={(e) => { e.stopPropagation(); setEditing(r); setForm({
-            shipment: r.shipment, docket_quantity: r.docket_quantity, shipped_quantity: r.shipped_quantity,
-            reasons_evident: r.reasons_evident, notes: r.notes,
-          }); setShowModal(true); }} className="text-emerald-600 hover:text-emerald-500">Edit</button>
-          <button onClick={(e) => { e.stopPropagation(); setDeleteId(r.id); }} className="text-red-500 hover:text-red-400">Delete</button>
-        </div>
-      );
-    }},
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Shipment', field: 'shipment_number', headerFilter: true },
+    { title: 'PO', field: 'po_number', headerFilter: true },
+    { title: 'Docket Qty', field: 'docket_quantity' },
+    { title: 'Shipped', field: 'shipped_quantity' },
+    { title: 'Shortage', field: 'shortage_units' },
+    { title: 'Status', field: 'status_label', headerFilter: true },
+    { title: 'Reconciled By', field: 'reconciled_by_name' },
   ];
+
+  const gridData = items.map((rec) => ({
+    ...rec,
+    shortage_units: Number(rec.shortage_units) > 0 ? rec.shortage_units : '—',
+  }));
 
   const overLimitCard = (rec: FinalHitReconciliation) => (
     <div key={rec.id} className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -172,7 +123,7 @@ export default function FinalHitReconciliationsPage() {
         <div>
           <p className="text-sm font-semibold text-red-700 dark:text-red-400">{rec.shipment_number} — {rec.po_number}</p>
           <p className="text-xs text-red-600 dark:text-red-500 mt-1 font-mono">{rec.shortage_units} units short vs docket of {rec.docket_quantity} (over the 20-unit limit)</p>
-          <p className="text-xs text-red-600 dark:text-red-500 mt-0.5">GC Manual: if more than 20 units short and reasons are not evident, a debit must be raised.</p>
+          <p className="text-xs text-red-600 dark:text-red-500 mt-0.5">Target requirements: if more than 20 units short and reasons are not evident, a debit must be raised.</p>
         </div>
         <div className="shrink-0 flex gap-2">
           <button onClick={() => runAction(rec.id, () => logisticsApi.reconcileHit(rec.id), 'Reconciliation complete')} disabled={busyId === rec.id} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50">Reconcile</button>
@@ -181,8 +132,6 @@ export default function FinalHitReconciliationsPage() {
       </div>
     </div>
   );
-
-  if (loading) return <Layout><div className="p-6 flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-2 border-emerald-400 border-t-transparent rounded-full" /></div></Layout>;
 
   return (
     <Layout>
@@ -204,7 +153,52 @@ export default function FinalHitReconciliationsPage() {
 
         <div className="bg-surface rounded-xl border border-border p-5">
           <h2 className="text-sm font-semibold text-heading mb-4">Reconciliation Register</h2>
-          <DataTable data={pagedData as unknown as Record<string, unknown>[]} columns={columns} totalCount={filtered.length} page={page} pageSize={pageSize} onPageChange={setPage} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search by shipment, PO or status..." loading={loading} />
+          <SpreadsheetGrid
+            data={gridData as unknown as Record<string, unknown>[]}
+            columns={columns}
+            height={480}
+            toolbar
+            title="Final Hit Reconciliation"
+            exportable
+            columnChooser
+            paginationSize={10}
+            actionColumn
+            onAdd={() => { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); }}
+            onEdit={(row) => {
+              const r = row as unknown as FinalHitReconciliation;
+              setEditing(r); setForm({
+                shipment: r.shipment, docket_quantity: r.docket_quantity, shipped_quantity: r.shipped_quantity,
+                reasons_evident: r.reasons_evident, notes: r.notes,
+              }); setShowModal(true);
+            }}
+            onDelete={(row) => setDeleteId(String(row.id))}
+            loading={loading}
+          />
+        </div>
+
+        <div className="bg-surface rounded-xl border border-border p-4">
+          <h2 className="text-sm font-semibold text-heading mb-3">Register Actions</h2>
+          <p className="text-xs text-muted mb-3">Status-specific actions (Reconcile / Debit / Waive) for pending entries; edit and delete are available via the grid row actions.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {items.filter(i => i.status === 'pending').map(rec => (
+              <div key={rec.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-heading truncate">{rec.shipment_number} — {rec.po_number}</p>
+                  <p className="text-xs text-muted font-mono">{rec.shortage_units} short {rec.requires_debit ? '· debit required' : ''}</p>
+                </div>
+                <div className="shrink-0 flex gap-2">
+                  <button onClick={() => runAction(rec.id, () => logisticsApi.reconcileHit(rec.id), 'Reconciliation complete')} disabled={busyId === rec.id} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50">Reconcile</button>
+                  {rec.requires_debit && (
+                    <button onClick={() => runAction(rec.id, () => logisticsApi.markDebited(rec.id), 'Debit raised')} disabled={busyId === rec.id} className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50">Debit</button>
+                  )}
+                  <button onClick={() => openWaive(rec)} className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-xs font-medium transition-colors">Waive</button>
+                </div>
+              </div>
+            ))}
+            {items.filter(i => i.status === 'pending').length === 0 && (
+              <p className="text-sm text-muted">No pending reconciliations.</p>
+            )}
+          </div>
         </div>
       </div>
 

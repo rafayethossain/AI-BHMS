@@ -1,17 +1,11 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { logisticsApi, setupApi } from '../api/client';
 import type { BookingScheduleItem } from '../api/client';
-import DataTable from '../components/DataTable';
-import type { Column } from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import SearchableSelect from '../components/SearchableSelect';
 import { useToast } from '../contexts/ToastContext';
 import Layout from '../components/Layout';
-
-const STATUS_COLORS: Record<string, string> = {
-  live: 'bg-blue-500/20 text-badge-blue',
-  in_work: 'bg-amber-500/20 text-badge-amber',
-  delivered: 'bg-emerald-500/20 text-badge-emerald',
-};
 
 const STATUSES = [
   { value: 'live', label: 'Live' },
@@ -27,22 +21,40 @@ function nextWeekEnding(base: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+function formatSnapshotDate(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  const isoDate = raw.slice(0, 10);
+  const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return `${isoDate} ${time}`;
+}
+
+function toPatch(field: string, value: unknown): Record<string, unknown> | null {
+  const patch: Record<string, unknown> = {};
+  if (field === 'cut_qty' || field === 'garments_ready_qty') {
+    patch[field] = Number(value) || 0;
+  } else if (field === 'ex_factory_date') {
+    patch[field] = value ? String(value) : null;
+  } else if (field === 'ex_factory_notes') {
+    patch[field] = String(value ?? '');
+  } else {
+    return null;
+  }
+  return patch;
+}
+
 export default function BookingSchedulePage() {
   const { toast } = useToast();
   const [items, setItems] = useState<BookingScheduleItem[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState('week_ending');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [shipments, setShipments] = useState<{ value: string; label: string }[]>([]);
   const [riskLevels, setRiskLevels] = useState<{ value: string; label: string }[]>([]);
-  const [filters, setFilters] = useState<Record<string, string>>({});
 
   const [form, setForm] = useState({
     shipment: '',
@@ -60,13 +72,7 @@ export default function BookingSchedulePage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), page_size: '25' };
-      if (search) params.search = search;
-      params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
-      if (filters.status) params.status = filters.status;
-      if (filters.risk_level) params.risk_level = filters.risk_level;
-      if (filters.week_ending) params.week_ending = filters.week_ending;
-      const res = await logisticsApi.getBookingSchedule(params);
+      const res = await logisticsApi.getBookingSchedule({ page: '1', page_size: '10000' });
       setItems(res.data.results);
       setCount(res.data.count);
     } catch {
@@ -74,7 +80,7 @@ export default function BookingSchedulePage() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, [search, page, sortField, sortOrder, filters]);
+  useEffect(() => { fetchData(); }, []);
 
   useEffect(() => {
     logisticsApi.getShipments({ page_size: '100' }).then(r => {
@@ -91,6 +97,23 @@ export default function BookingSchedulePage() {
       shipment: '', hit: '', status: 'live', cut_qty: '', garments_ready_qty: '',
       ex_factory_date: '', ex_factory_notes: '', risk_level: '',
       week_ending: nextWeekEnding(new Date()), notes: '',
+    });
+    setShowModal(true);
+  };
+
+  const openEdit = (item: BookingScheduleItem) => {
+    setEditingId(item.id);
+    setForm({
+      shipment: item.shipment || '',
+      hit: item.hit || '',
+      status: item.status || 'live',
+      cut_qty: String(item.cut_qty ?? ''),
+      garments_ready_qty: String(item.garments_ready_qty ?? ''),
+      ex_factory_date: item.ex_factory_date || '',
+      ex_factory_notes: item.ex_factory_notes || '',
+      risk_level: item.risk_level || '',
+      week_ending: item.week_ending || '',
+      notes: item.notes || '',
     });
     setShowModal(true);
   };
@@ -136,58 +159,49 @@ export default function BookingSchedulePage() {
     } catch { toast('error', 'Failed to transition status'); }
   };
 
-  const handleSort = (field: string, order: 'asc' | 'desc') => { setSortField(field); setSortOrder(order); };
+  const handleCellEdited = async (field: string, value: unknown, row: Record<string, unknown>) => {
+    const rowId = typeof row.id === 'string' ? row.id : null;
+    const patch = toPatch(field, value);
+    if (!patch || !rowId) return;
+    try {
+      await logisticsApi.updateBookingScheduleItem(rowId, patch);
+      toast('success', 'Schedule field updated');
+      fetchData();
+    } catch { toast('error', 'Failed to save schedule field'); }
+  };
 
-  const columns: Column[] = [
-    { key: 'week_ending', label: 'Week Ending', sortable: true, filterable: true, render: (v) => <span className="font-mono text-heading">{String(v)}</span> },
-    { key: 'shipment_number', label: 'Shipment #', sortable: true, render: (v) => <span className="font-mono">{String(v)}</span> },
-    { key: 'po_number', label: 'PO #', sortable: true, render: (v) => <span className="font-mono">{String(v)}</span> },
-    { key: 'hit_colour', label: 'Hit', sortable: true, render: (v) => v ? <span className="text-body">{String(v)}</span> : <span className="text-faint">—</span> },
-    { key: 'status', label: 'Status', sortable: true, filterable: true, filterOptions: ['live', 'in_work', 'delivered'],
-      render: (v) => <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[String(v)] || ''}`}>{String(v).replace(/_/g, ' ')}</span> },
-    { key: 'cut_qty', label: 'Cut Qty', sortable: true, render: (v) => <span>{v ? String(v) : '-'}</span> },
-    { key: 'garments_ready_qty', label: 'Garments Ready', sortable: true, render: (v, row) => (
-      <span className={row.is_at_risk ? 'text-badge-amber font-medium' : ''}>{v ? String(v) : '-'}</span>
-    )},
-    { key: 'ex_factory_date', label: 'Ex-Factory', sortable: true, render: (v) => <span>{v ? String(v) : '-'}</span> },
-    { key: 'risk_level_detail', label: 'Risk', sortable: false, filterable: true, render: (v) => {
-      if (!v) return <span className="text-faint">—</span>;
-      const rl = v as { code: string; name: string; color: string };
-      return <span className="px-2 py-1 rounded-full text-xs font-medium text-white" style={{ backgroundColor: rl.color }}>{rl.code}</span>;
-    }},
-    { key: 'id', label: 'Actions', className: 'text-right', render: (_v, row) => {
-      const item = items.find(i => String(i.id) === String(row.id));
-      const next: Record<string, string | undefined> = { live: 'in_work', in_work: 'delivered' };
-      const nxt = item ? next[item.status] : undefined;
-      return (
-        <div className="flex justify-end gap-3">
-          {nxt && (
-            <button onClick={(e) => { e.stopPropagation(); if (item) handleTransition(item, nxt); }}
-              className="text-sm text-emerald-500 hover:text-emerald-400">{nxt === 'in_work' ? 'Start Work' : 'Mark Delivered'}</button>
-          )}
-          <button onClick={(e) => {
-            e.stopPropagation();
-            if (item) {
-              setEditingId(item.id);
-              setForm({
-                shipment: item.shipment || '',
-                hit: item.hit || '',
-                status: item.status || 'live',
-                cut_qty: String(item.cut_qty ?? ''),
-                garments_ready_qty: String(item.garments_ready_qty ?? ''),
-                ex_factory_date: item.ex_factory_date || '',
-                ex_factory_notes: item.ex_factory_notes || '',
-                risk_level: item.risk_level || '',
-                week_ending: item.week_ending || '',
-                notes: item.notes || '',
-              });
-              setShowModal(true);
-            }
-          }} className="text-sm text-heading hover:text-emerald-500">Edit</button>
-          <button onClick={(e) => { e.stopPropagation(); setDeleteId(String(row.id)); }} className="text-sm text-red-500 hover:text-red-400">Delete</button>
-        </div>
-      );
-    }},
+  const transitionable = items.filter(i => i.status === 'live' || i.status === 'in_work');
+  const lastHits = items.filter(i => i.is_last_hit);
+  const snapshotted = items.filter(i => i.snapshot_date);
+
+  const gridData = items.map(i => ({
+    id: i.id,
+    week_ending: i.week_ending,
+    shipment_number: i.shipment_number,
+    po_number: i.po_number,
+    hit_colour: i.hit_colour || null,
+    hit_number: i.hit_number || null,
+    status: i.status,
+    cut_qty: i.cut_qty,
+    garments_ready_qty: i.garments_ready_qty,
+    ex_factory_date: i.ex_factory_date || null,
+    ex_factory_notes: i.ex_factory_notes || '',
+    risk_level_code: i.risk_level_detail?.code ?? (i.risk_level ? i.risk_level : ''),
+    is_at_risk: i.is_at_risk,
+    is_last_hit: i.is_last_hit,
+  }));
+
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Week Ending', field: 'week_ending', headerFilter: true, editor: 'date' },
+    { title: 'Shipment #', field: 'shipment_number', headerFilter: true },
+    { title: 'PO #', field: 'po_number', headerFilter: true },
+    { title: 'Hit', field: 'hit_colour', headerFilter: true },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'Cut Qty *', field: 'cut_qty', hozAlign: 'right', editor: 'input' },
+    { title: 'Garments Ready *', field: 'garments_ready_qty', hozAlign: 'right', editor: 'input' },
+    { title: 'Ex-Factory *', field: 'ex_factory_date', editor: 'date' },
+    { title: 'Ex-Factory Notes *', field: 'ex_factory_notes', editor: 'input' },
+    { title: 'Risk', field: 'risk_level_code', headerFilter: true },
   ];
 
   return (
@@ -203,22 +217,78 @@ export default function BookingSchedulePage() {
           </button>
         </div>
 
-        <DataTable
-          data={items as unknown as Record<string, unknown>[]}
-          columns={columns}
-          totalCount={count}
-          page={page}
-          pageSize={25}
-          onPageChange={setPage}
-          searchValue={search}
-          onSearchChange={(v) => { setSearch(v); setPage(1); }}
-          searchPlaceholder="Search schedule..."
-          onSort={handleSort}
-          sortField={sortField}
-          sortOrder={sortOrder}
+        {lastHits.length > 0 && (
+          <div className="bg-surface rounded-xl border border-border p-5 mb-4">
+            <h2 className="text-sm font-semibold text-heading mb-3">Last Hit Markers</h2>
+            <div className="flex flex-wrap gap-2">
+              {lastHits.map(item => (
+                <span key={item.id} data-testid={`last-hit-marker-${item.id}`}
+                  className="px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500 text-white">
+                  {item.shipment_number} · Last Hit ({item.hit_colour || '—'})
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {snapshotted.length > 0 && (
+          <div className="bg-surface rounded-xl border border-border p-5 mb-4">
+            <h2 className="text-sm font-semibold text-heading mb-3">Last Snapshot</h2>
+            <div className="flex flex-wrap gap-2">
+              {snapshotted.map(item => (
+                <span key={item.id} data-testid={`snapshot-marker-${item.id}`}
+                  className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                  {item.shipment_number} · snapshot {formatSnapshotDate(item.snapshot_date)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="bg-surface rounded-xl border border-border p-5 mb-4">
+          <h2 className="text-sm font-semibold text-heading mb-3">Schedule Transitions</h2>
+          <p className="text-xs text-muted mb-3">Advance weekly schedule items Live → In Work → Delivered; edit/delete are available via the grid row actions.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {transitionable.map(item => (
+              <div key={item.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-heading truncate">{item.shipment_number} — {item.hit_colour || item.week_ending}</p>
+                  <p className="text-xs text-muted font-mono">{item.status.replace(/_/g, ' ')}</p>
+                </div>
+                <div className="shrink-0 flex gap-2">
+                  {item.status === 'live' && (
+                    <button onClick={() => handleTransition(item, 'in_work')} className="px-2 py-1 text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded transition-colors">Start Work</button>
+                  )}
+                  {item.status === 'in_work' && (
+                    <button onClick={() => handleTransition(item, 'delivered')} className="px-2 py-1 text-xs bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded transition-colors">Mark Delivered</button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {transitionable.length === 0 && (
+              <p className="text-sm text-muted">No in-flight schedule items.</p>
+            )}
+          </div>
+        </div>
+
+        <SpreadsheetGrid
+          title="Booking Schedule"
+          toolbar={true}
+          exportable={true}
+          columnChooser={true}
+          actionColumn={true}
+          paginationSize={25}
+          height={480}
           loading={loading}
-          filters={filters}
-          onFilterChange={(f) => { setFilters(f); setPage(1); }}
+          data={gridData}
+          columns={columns}
+          onCellEdited={handleCellEdited}
+          onAdd={openCreate}
+          onEdit={(row) => {
+            const item = items.find(i => i.id === row.id);
+            if (item) openEdit(item);
+          }}
+          onDelete={(row) => setDeleteId(String(row.id))}
         />
       </main>
 

@@ -21,6 +21,38 @@ vi.mock('react-router-dom', async (importOriginal) => {
   return { ...actual, useNavigate: () => navigateMock };
 });
 
+const gridCapture = vi.hoisted(() => ({
+  lastProps: null as Record<string, unknown> | null,
+  reset() {
+    this.lastProps = null;
+  },
+}));
+
+vi.mock('../../components/SpreadsheetGrid', () => ({
+  default: (props: Record<string, unknown>) => {
+    gridCapture.lastProps = props;
+    const { data, onRowClick } = props as {
+      data: Record<string, unknown>[];
+      onRowClick?: (row: Record<string, unknown>) => void;
+    };
+    return (
+      <div data-testid="spreadsheet-grid">
+        {(data as Record<string, unknown>[]).map((row) => (
+          <div
+            key={String(row.id)}
+            data-testid={`grid-row-${String(row.id)}`}
+            onClick={() => onRowClick?.(row)}
+          >
+            <span>{String(row.file_number)}</span>
+            <span>{String(row.style_code)}</span>
+            <span>{String(row.buyer_name)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  },
+}));
+
 import DesignSheetsListPage from '../DesignSheetsListPage';
 import { merchApi } from '../../api/client';
 import type { DesignSheet } from '../../api/client';
@@ -48,6 +80,7 @@ const designSheet: DesignSheet = {
   description: '',
   note: '',
   sketch_annotations: [],
+  layout_order: [],
   fit_specs: [],
   job_requests: [],
   created_at: '2026-08-27T10:00:00Z',
@@ -62,21 +95,70 @@ function renderPage() {
   );
 }
 
-describe('DesignSheetsListPage', () => {
+type SpreadsheetColumnLike = { title: string; field: string; headerFilter?: boolean };
+
+describe('DesignSheetsListPage (Tabulator grid)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    gridCapture.reset();
   });
 
-  it('shows a loading indicator and lists design sheets', async () => {
+  it('shows a loading indicator while fetching', async () => {
     (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { count: 1, results: [designSheet] },
     });
     renderPage();
     expect(screen.getByTestId('design-sheets-loading')).toBeInTheDocument();
-    expect(await screen.findByText('TP-1002')).toBeInTheDocument();
+    expect(await screen.findByTestId('spreadsheet-grid')).toBeInTheDocument();
+  });
+
+  it('renders the list through the Tabulator spreadsheet grid', async () => {
+    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { count: 1, results: [designSheet] },
+    });
+    renderPage();
+    const grid = await screen.findByTestId('spreadsheet-grid');
+    expect(grid).toBeInTheDocument();
+    expect(screen.getByText('TP-1002')).toBeInTheDocument();
     expect(screen.getByText('67741T')).toBeInTheDocument();
     expect(screen.getByText('CMT Apparel')).toBeInTheDocument();
-    expect(screen.getByText('New')).toBeInTheDocument();
+  });
+
+  it('configures grid columns with header filters for searchable fields', async () => {
+    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { count: 1, results: [designSheet] },
+    });
+    renderPage();
+    await screen.findByTestId('spreadsheet-grid');
+    const columns = gridCapture.lastProps?.columns as SpreadsheetColumnLike[] | undefined;
+    expect(columns).toBeDefined();
+    const fieldOf = (name: string) => columns?.find((c) => c.field === name);
+    expect(fieldOf('file_number')?.title).toBe('File #');
+    expect(fieldOf('style_code')?.headerFilter).toBe(true);
+    expect(fieldOf('buyer_name')?.headerFilter).toBe(true);
+    expect(fieldOf('status')).toBeDefined();
+    expect(fieldOf('updated_at')).toBeDefined();
+  });
+
+  it('passes the loaded rows as grid data', async () => {
+    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { count: 1, results: [designSheet] },
+    });
+    renderPage();
+    await screen.findByTestId('spreadsheet-grid');
+    const data = gridCapture.lastProps?.data as Record<string, unknown>[];
+    expect(data).toHaveLength(1);
+    expect(data[0].file_number).toBe('TP-1002');
+  });
+
+  it('navigates to the detail page when a grid row is clicked', async () => {
+    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { count: 1, results: [designSheet] },
+    });
+    renderPage();
+    const row = await screen.findByTestId('grid-row-ds-1');
+    fireEvent.click(row);
+    expect(navigateMock).toHaveBeenCalledWith('/design-sheets/ds-1');
   });
 
   it('shows an empty state when no design sheets exist', async () => {
@@ -91,14 +173,5 @@ describe('DesignSheetsListPage', () => {
     (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('boom'));
     renderPage();
     expect(await screen.findByText(/failed to load/i)).toBeInTheDocument();
-  });
-
-  it('navigates to the detail page when a row is clicked', async () => {
-    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { count: 1, results: [designSheet] },
-    });
-    renderPage();
-    fireEvent.click(await screen.findByText('TP-1002'));
-    expect(navigateMock).toHaveBeenCalledWith('/design-sheets/ds-1');
   });
 });

@@ -1,4 +1,4 @@
-# BHMS vs GC: Gap Analysis
+# BHMS vs target: Gap Analysis
 
 > [!IMPORTANT]
 > **SUPERSEDED — HISTORICAL REFERENCE ONLY (2026-08-03).** Kept for priority/dependency intent.
@@ -6,18 +6,18 @@
 > (`RQ-###` requirements, workflow-ordered).
 
 > **Date**: 2026-07-30
-> **Methodology**: Deep comparison of GC (Garment Control) 48-page manual vs current BHMS codebase (12 Django apps, 40+ models, 20+ frontend pages)
+> **Methodology**: Deep comparison of the target buying-house reference 48-page manual vs current BHMS codebase (12 Django apps, 40+ models, 20+ frontend pages)
 > **Existing Gaps (backlog)**: 6 items (US-003, US-016, US-053, US-091, US-108, US-015)
-> **GC-Identified Gaps**: 50+ new feature areas
+> **target-Identified Gaps**: 50+ new feature areas
 
 ---
 
 ## Priority Matrix
 
 ### P0 — Critical (Blocking operational parity)
-*Must implement to compete with GC*
+*Must implement to compete with target*
 
-| # | Gap | GC Area | BHMS Gap | Impact | Effort | Dependencies |
+| # | Gap | target Area | BHMS Gap | Impact | Effort | Dependencies |
 |---|-----|---------|----------|--------|--------|-------------|
 | G-01 | Fabric Management System | Fabric (8) | No fabric model, lab dip, bulk, tolerances, risk colors, supplier management | **HIGH** — core to garment business | 3-4 sprints | Models, new app? |
 | G-02 | Trims & Labels Management | Trims (9) | No trim schedule, location, copy-from-order, price variance | **HIGH** — every order needs this | 2 sprints | Extend BOM |
@@ -47,7 +47,7 @@
 | G-16 | Stock Fabric Management | Orders (5) | Separate FN with meter tracking | MEDIUM | 1 sprint |
 | G-17 | Sales Confirmation | Orders (5) | 48-hour dispute window workflow | MEDIUM | 1 sprint |
 | G-18 | Fabric Issue Reporting | Fabric (8) | Monday.com-style factory claim form | LOW | 0.5 sprint |
-| G-19 | Invoice Approval | Invoice (17) | Qty/date/price matching against GC data | LOW | 1 sprint |
+| G-19 | Invoice Approval | Invoice (17) | Qty/date/price matching against target data | LOW | 1 sprint |
 | G-20 | Compliance Audit | Compliance (19) | Weekly order review with 10 checklist items | LOW | 1-2 sprints |
 
 ### P3 — Low (Nice to have, future phase)
@@ -58,7 +58,7 @@
 | G-22 | Snapshot Status Presets | Booking (11) | Pre-selected status options | LOW | 0.5 sprint |
 | G-23 | China Office Fabric Role | Fabric (12) | Specific role for schedule management | LOW | — (process) |
 | G-24 | Teams Integration | Comms (18) | Per-customer Teams channels | LOW | 1 sprint |
-| G-25 | Auto Invoice Approval | Invoice (17) | GC/accounts package integration | LOW | Future phase |
+| G-25 | Auto Invoice Approval | Invoice (17) | target/accounts package integration | LOW | Future phase |
 
 ---
 
@@ -131,7 +131,7 @@ IMPACT (HIGH)
 
 ## Cross-Cutting Concerns
 
-| Area | Current BHMS | GC Pattern | Action |
+| Area | Current BHMS | target Pattern | Action |
 |------|-------------|------------|--------|
 | **Risk Indicators** | None | Color-coded (Green→Amber→Red→Cyan) per order/sub-area | Add `RiskLevel` model or JSON field on order |
 | **Notes System** | Plain text fields | Initials + date prefix, responsible for removal, snapshot presets | Standardize across models |

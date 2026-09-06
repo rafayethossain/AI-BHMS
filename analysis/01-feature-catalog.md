@@ -1,18 +1,18 @@
-# GC (Garment Control) Feature Catalog
+# the target buying-house reference Feature Catalog
 
 > [!IMPORTANT]
 > **SUPERSEDED — HISTORICAL REFERENCE ONLY (2026-08-03).** Kept for requirement intent and
-> GC-vs-BHMS comparison. Active tracking moved to [`master-backlog.md`](../master-backlog.md)
+> target-vs-BHMS comparison. Active tracking moved to [`master-backlog.md`](../master-backlog.md)
 > Part 2 (`RQ-###` requirements, workflow-ordered).
 
-> **Source**: GC Manual 19-01-21 (48 pages)
+> **Source**: target manual 19-01-21 (48 pages)
 > **Extracted**: 2026-07-30
 
 ---
 
-## 1. Design Management (GC Pages 17-26, 43-44)
+## 1. Design Management (target Pages 17-26, 43-44)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Design List with image thumbnails | Grid view with main sketch or range photo toggle; list view option | Style list page — no image thumbnails |
 | Style creation from template | Select garment type, base style (with include annotations/notes toggle), block reference | Style CRUD standalone, no copy-from-template |
@@ -25,9 +25,9 @@
 
 ---
 
-## 2. Specification Management (GC Pages 20-22, 36-38)
+## 2. Specification Management (target Pages 20-22, 36-38)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Fit Specs (Dev Spec → 1st Fit → 2nd Fit → ...) | Tabbed multi-fit specifications with ticked "current" selection | No fit spec system at all |
 | Spec versioning | Copy from base/development/previous fit or from another style number | Style versioning exists but no measurement/spec data |
@@ -38,9 +38,9 @@
 
 ---
 
-## 3. Design Costings (GC Pages 22-24)
+## 3. Design Costings (target Pages 22-24)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Multiple costing versions | Multiple cost sheets per style, tick to select live one | Costing versions exist |
 | Size/width column | Required for costing schedule accuracy | Not present in current costing |
@@ -55,9 +55,9 @@
 
 ---
 
-## 4. Job Request / Job Queue (GC Pages 24, 38)
+## 4. Job Request / Job Queue (target Pages 24, 38)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Job types (Pattern, Sample, 3D, Mini-marker) | Drop-down single/multi-job selection | Not present |
 | Work location assignment | Select factory/work location | Factory model exists, no job routing |
@@ -70,9 +70,9 @@
 
 ---
 
-## 5. File Number / Order Management (GC Pages 27-31)
+## 5. File Number / Order Management (target Pages 27-31)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | FN (File Number) system | Auto-issued on status change → Live; country suffix (VN/SL/R) | FileOpening exists with FO-XXXX; no country suffix |
 | Order raising validation | Validates: costing tab, breakdown tab, fabric tab before issuing FN | Basic validation exists |
@@ -88,9 +88,9 @@
 
 ---
 
-## 6. Costing Sheet — Order Level (GC Pages 31-32)
+## 6. Costing Sheet — Order Level (target Pages 31-32)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | 8 cost categories | Standardized categories for reconciliation | Not standardized |
 | 5 costing sheet types | By factory location (SL, VN, etc.), selectable+live tick | Costing sheets exist |
@@ -103,9 +103,9 @@
 
 ---
 
-## 7. Breakdown Tab — HIT Management (GC Page 32)
+## 7. Breakdown Tab — HIT Management (target Page 32)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Hit numbers | Unique per color; hit number + color = system key for production | PO items with color/size |
 | PO/Customer style number per hit | Each hit gets PO and customer style ref | PO linked to file opening |
@@ -118,9 +118,9 @@
 
 ---
 
-## 8. Fabric Management (GC Pages 32-35, 40-41, 44-45)
+## 8. Fabric Management (target Pages 32-35, 40-41, 44-45)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Prime tab (initial planning) | Cannot delete; first planning step | Not present |
 | Order colour ref per fabric | Fabric assigned to breakdown colour | Not present |
@@ -141,9 +141,9 @@
 
 ---
 
-## 9. Trims & Labels Management (GC Pages 35-36)
+## 9. Trims & Labels Management (target Pages 35-36)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Location on garment | Specify where trim/label goes on garment | BOMItem exists, no location field |
 | Pre-approved supplier list | Drop-down only | Vendor exists |
@@ -157,9 +157,9 @@
 
 ---
 
-## 10. Technical Management (GC Pages 36-38)
+## 10. Technical Management (target Pages 36-38)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Fit tracking per order | Date + fit number + brief description in Technical tab | Not present |
 | Fit spec sheets | Multi-tab: Dev Spec, 1st Fit, 2nd Fit, etc. with tick for current | StyleVersion exists but no spec data |
@@ -171,9 +171,9 @@
 
 ---
 
-## 11. Booking Schedule (GC Pages 39-40, 42)
+## 11. Booking Schedule (target Pages 39-40, 42)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Weekly schedule updates | Wednesday: 100% sorted; Friday: copy to Directors | Not present |
 | Status management | Live→In Work (planning)→Delivered (logistics) | Shipment status exists |
@@ -192,9 +192,9 @@
 
 ---
 
-## 12. Fabric Schedule (GC Pages 40-41)
+## 12. Fabric Schedule (target Pages 40-41)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Lab dip/strike-off approval | Sales+merch responsible; must have approved dates | Not present |
 | Bulk approval | Planning team chases and updates | Not present |
@@ -206,9 +206,9 @@
 
 ---
 
-## 13. Order Manager — Critical Path (GC Pages 42-43)
+## 13. Order Manager — Critical Path (target Pages 42-43)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Customer-level summary | Overview by customer; ordered by completion date | Reporting exists |
 | Risk indicators | Fabric/Labels/Trims/Technical per-order risk colors | No risk indicator system |
@@ -220,9 +220,9 @@
 
 ---
 
-## 14. Quality Control (GC Page 44)
+## 14. Quality Control (target Page 44)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | QC via Monday.com | PP→Final AQL tracking | Inspection exists |
 | Weekly AQL reports | Monday STSU meetings | Quality dashboard exists |
@@ -232,9 +232,9 @@
 
 ---
 
-## 15. Dockets & Reconciliation (GC Pages 38, 44-45)
+## 15. Dockets & Reconciliation (target Pages 38, 44-45)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Contract pricing on docket | Saved centrally: price, date raised, delivery date | Not present |
 | Fabric over 200m handling | Docket sent to sales for direction | Not present |
@@ -247,9 +247,9 @@
 
 ---
 
-## 16. Debits Management (GC Page 44)
+## 16. Debits Management (target Page 44)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Pro forma debits | Raised when issue confirmed; formalized later | Not present |
 | Compliance email workflow | Debits sent from compliance@ with CC chain | Not present |
@@ -260,21 +260,21 @@
 
 ---
 
-## 17. Invoice Approval (GC Page 44)
+## 17. Invoice Approval (target Page 44)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
-| Fabric/trimmings invoice review | Quantity/Date/Price vs GC data | Not present |
+| Fabric/trimmings invoice review | Quantity/Date/Price vs target data | Not present |
 | Over-tolerance debits | Raised on invoice mismatch | Not present |
-| Auto-approvals | Future integration between GC and accounts package | Not present |
+| Auto-approvals | Future integration between target and accounts package | Not present |
 
 ### Gap Score: 0/10 (Not implemented at all)
 
 ---
 
-## 18. Communication & Teams Integration (GC Pages 45-46)
+## 18. Communication & Teams Integration (target Pages 45-46)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Teams channels per customer | Sub-groups within Mini-Markers VN team | Not present |
 | Email vs Teams policy | "Do not be an email warrior, use Teams" | Not present |
@@ -284,9 +284,9 @@
 
 ---
 
-## 19. Compliance Internal Audit (GC Pages 46-47)
+## 19. Compliance Internal Audit (target Pages 46-47)
 
-| Feature | GC Implementation | BHMS Equivalent |
+| Feature | target Implementation | BHMS Equivalent |
 |---------|-------------------|-----------------|
 | Weekly order review | All orders from 1st July 2020; weekly from Aug 24 | AuditLog exists |
 | 10 key review items | Fabric paperwork, mini-marker efficiency, dockets, utilization, invoices, ratings, trims, final hits | Partial coverage |
@@ -297,9 +297,9 @@
 
 ---
 
-## Overall GC Feature Coverage Summary
+## Overall target Feature Coverage Summary
 
-| Domain | GC Score | BHMS Score | Gap Level |
+| Domain | target Score | BHMS Score | Gap Level |
 |--------|----------|------------|-----------|
 | Design Management | 10 | 6 | Medium |
 | Specification/Fit Management | 10 | 1 | **Critical** |

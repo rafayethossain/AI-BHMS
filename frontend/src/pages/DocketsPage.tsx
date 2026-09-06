@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import DataTable from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import { logisticsApi } from '../api/client';
 import type { Docket, Shipment } from '../api/client';
-import type { Column } from '../components/DataTable';
 import { useToast } from '../contexts/ToastContext';
 
 const EMPTY_FORM = {
@@ -23,14 +23,11 @@ export default function DocketsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [notifying, setNotifying] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
 
   const loadData = async () => {
     try {
       const [res, over] = await Promise.all([
-        logisticsApi.getDockets({ page_size: '100' }),
+        logisticsApi.getDockets({ page_size: '10000' }),
         logisticsApi.getOverLimitDockets(),
       ]);
       setItems(res.data.results);
@@ -40,7 +37,7 @@ export default function DocketsPage() {
 
   useEffect(() => {
     Promise.all([
-      logisticsApi.getDockets({ page_size: '100' }),
+      logisticsApi.getDockets({ page_size: '10000' }),
       logisticsApi.getOverLimitDockets(),
       logisticsApi.getShipments({ page_size: '100', status: 'booked' }),
     ]).then(([res, over, ships]) => {
@@ -95,45 +92,6 @@ export default function DocketsPage() {
     } finally { setNotifying(null); }
   };
 
-  const filtered = useMemo(() => items.filter(i =>
-    i.docket_number.toLowerCase().includes(search.toLowerCase()) ||
-    i.shipment_number.toLowerCase().includes(search.toLowerCase()) ||
-    i.po_number.toLowerCase().includes(search.toLowerCase())
-  ), [items, search]);
-  const pagedData = useMemo(() => { const s = (page - 1) * pageSize; return filtered.slice(s, s + pageSize); }, [filtered, page]);
-
-  const columns: Column[] = [
-    { key: 'docket_number', label: 'Docket', sortable: true, render: (v) => <span className="font-medium text-heading font-mono">{String(v)}</span> },
-    { key: 'shipment_number', label: 'Shipment', sortable: true, render: (v) => <span className="font-mono text-body">{String(v)}</span> },
-    { key: 'po_number', label: 'PO', render: (v) => <span className="font-mono text-body">{String(v)}</span> },
-    { key: 'contract_price', label: 'Contract Price', render: (v) => <span className="font-mono text-body">{v ? `$${String(v)}` : '—'}</span> },
-    { key: 'date_raised', label: 'Date Raised', render: (v) => <span className="font-mono text-body">{String(v ?? '—')}</span> },
-    { key: 'delivery_date', label: 'Delivery', render: (v) => <span className="font-mono text-body">{String(v ?? '—')}</span> },
-    { key: 'total_fabric_meters', label: 'Total (m)', render: (v) => <span className="font-mono text-body">{String(v ?? '—')}</span> },
-    { key: 'unused_fabric_meters', label: 'Unused (m)', render: (v, row) => {
-      const d = row as unknown as Docket;
-      return <span className={`font-mono ${d.requires_sales_notification ? 'text-red-500 font-semibold' : 'text-body'}`}>{String(v ?? '—')}</span>;
-    }},
-    { key: 'is_final', label: 'Final', render: (v) => v ? <span className="text-emerald-600">Yes</span> : <span className="text-muted">No</span> },
-    { key: 'sales_notified', label: 'Sales', render: (v) => v ? <span className="text-emerald-600">Notified</span> : <span className="text-muted">—</span> },
-    { key: 'actions', label: '', className: 'text-right', render: (_v, row) => {
-      const d = row as unknown as Docket;
-      return (
-        <div className="flex justify-end gap-3 text-sm">
-          {d.requires_sales_notification && !d.sales_notified && (
-            <button onClick={(e) => { e.stopPropagation(); sendToSales(d); }} disabled={notifying === d.id} className="text-amber-600 hover:text-amber-500 disabled:opacity-50">Send to Sales</button>
-          )}
-          <button onClick={(e) => { e.stopPropagation(); setEditing(d); setForm({
-            shipment: d.shipment, contract_price: d.contract_price ?? '', date_raised: d.date_raised ?? '',
-            delivery_date: d.delivery_date ?? '', total_fabric_meters: d.total_fabric_meters ?? '',
-            unused_fabric_meters: d.unused_fabric_meters ?? '', is_final: d.is_final, notes: d.notes,
-          }); setShowModal(true); }} className="text-emerald-600 hover:text-emerald-500">Edit</button>
-          <button onClick={(e) => { e.stopPropagation(); setDeleteId(d.id); }} className="text-red-500 hover:text-red-400">Delete</button>
-        </div>
-      );
-    }},
-  ];
-
   const overLimitCard = (docket: Docket) => (
     <div key={docket.id} className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
       <div className="flex items-start justify-between gap-3">
@@ -151,7 +109,32 @@ export default function DocketsPage() {
     </div>
   );
 
-  if (loading) return <Layout><div className="p-6 flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-2 border-emerald-400 border-t-transparent rounded-full" /></div></Layout>;
+  const gridData = items.map(d => ({
+    id: d.id,
+    docket_number: d.docket_number,
+    shipment_number: d.shipment_number,
+    po_number: d.po_number,
+    contract_price: d.contract_price ? `$${d.contract_price}` : '—',
+    date_raised: d.date_raised ?? '—',
+    delivery_date: d.delivery_date ?? '—',
+    total_fabric_meters: d.total_fabric_meters ?? '—',
+    unused_fabric_meters: d.unused_fabric_meters ?? '—',
+    is_final: d.is_final ? 'Yes' : 'No',
+    sales_notified: d.sales_notified ? 'Notified' : '—',
+  }));
+
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Docket', field: 'docket_number', headerFilter: true },
+    { title: 'Shipment', field: 'shipment_number', headerFilter: true },
+    { title: 'PO', field: 'po_number', headerFilter: true },
+    { title: 'Contract Price', field: 'contract_price' },
+    { title: 'Date Raised', field: 'date_raised' },
+    { title: 'Delivery', field: 'delivery_date' },
+    { title: 'Total (m)', field: 'total_fabric_meters', hozAlign: 'right' },
+    { title: 'Unused (m)', field: 'unused_fabric_meters', hozAlign: 'right' },
+    { title: 'Final', field: 'is_final' },
+    { title: 'Sales', field: 'sales_notified' },
+  ];
 
   return (
     <Layout>
@@ -173,7 +156,29 @@ export default function DocketsPage() {
 
         <div className="bg-surface rounded-xl border border-border p-5">
           <h2 className="text-sm font-semibold text-heading mb-4">Docket Register</h2>
-          <DataTable data={pagedData as unknown as Record<string, unknown>[]} columns={columns} totalCount={filtered.length} page={page} pageSize={pageSize} onPageChange={setPage} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search by docket, shipment or PO..." loading={loading} />
+          <SpreadsheetGrid
+            title="Docket Register"
+            toolbar={true}
+            exportable={true}
+            columnChooser={true}
+            actionColumn={true}
+            paginationSize={10}
+            height={480}
+            loading={loading}
+            data={gridData}
+            columns={columns}
+            onAdd={() => { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); }}
+            onEdit={(row) => {
+              const d = items.find(x => x.id === row.id);
+              if (!d) return;
+              setEditing(d); setForm({
+                shipment: d.shipment, contract_price: d.contract_price ?? '', date_raised: d.date_raised ?? '',
+                delivery_date: d.delivery_date ?? '', total_fabric_meters: d.total_fabric_meters ?? '',
+                unused_fabric_meters: d.unused_fabric_meters ?? '', is_final: d.is_final, notes: d.notes,
+              }); setShowModal(true);
+            }}
+            onDelete={(row) => setDeleteId(String(row.id))}
+          />
         </div>
       </div>
 

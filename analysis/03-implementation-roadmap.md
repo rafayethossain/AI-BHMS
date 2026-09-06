@@ -1,4 +1,4 @@
-# GC Feature Inclusion: Implementation Roadmap
+# target Feature Inclusion: Implementation Roadmap
 
 > [!IMPORTANT]
 > **SUPERSEDED — HISTORICAL REFERENCE ONLY (2026-08-03).** Kept for estimation intent
@@ -12,17 +12,17 @@
 ---
 
 ## Phase 0: Foundation (Sprint 0 — 2 weeks)
-*Pre-requisite for all GC features*
+*Pre-requisite for all target features*
 
 ### 0.1 — Celery Task Infrastructure
-**Story GC-000**: Enable async tasks for schedule management, debits, approvals
+**Story target-000**: Enable async tasks for schedule management, debits, approvals
 - **TDD**: Write test for task registration, task execution, error handling
 - **Impact**: No breaking changes — new infrastructure
 - **Models**: None
 - **Est**: 3 points
 
 ### 0.2 — Risk Indicator System
-**Story GC-001**: Color-coded risk levels across all order modules
+**Story target-001**: Color-coded risk levels across all order modules
 - **TDD**: Write test for RiskLevel model, transitions, default values
 - **Model**: `RiskLevel` (setup app) with choices: none/amber/green/red/cyan
 - **Extend**: Add `risk_level` FK to FileOpening, PurchaseOrder, Shipment
@@ -30,14 +30,14 @@
 - **Est**: 5 points
 
 ### 0.3 — Standardized Notes System
-**Story GC-002**: Notes with author initials, date stamp, ownership
+**Story target-002**: Notes with author initials, date stamp, ownership
 - **TDD**: Write test for Note model, author tracking, removal responsibility
 - **Model**: `Note` (abstract) with `author`, `text`, `created_at`, `is_active`
 - **Impact**: New model, no existing model changes
 - **Est**: 3 points
 
 ### 0.4 — Supplier Pre-Approval Workflow
-**Story GC-003**: Finance-gated supplier/trim approval
+**Story target-003**: Finance-gated supplier/trim approval
 - **TDD**: Write test for approval workflow, pre-approved list enforcement
 - **Extend**: Add `is_approved`, `approved_by`, `approved_at` to Vendor model
 - **Impact**: New fields, no behavior change for unapproved vendors yet
@@ -48,33 +48,33 @@
 ---
 
 ## Phase 1: Core Manufacturing Workflows (Sprints 1-3 — 6 weeks)
-*The "must-have" GC features that unlock garment-specific workflows*
+*The "must-have" target features that unlock garment-specific workflows*
 
 ### Sprint 1: Fabric Management Foundation
 
 #### 1.1 — Fabric Master Data
-**Story GC-004**: Fabric model with supplier, composition, width, category
+**Story target-004**: Fabric model with supplier, composition, width, category
 - **TDD**: Test Fabric CRUD, supplier validation, composition validation
 - **Model**: `Fabric` (setup app) with supplier, composition, width, category, is_active
 - **Impact**: Net-new, zero breaking changes
 - **Est**: 5 points
 
 #### 1.2 — Fabric Tolerance Tables
-**Story GC-005**: Customer-specific fabric tolerance rules
+**Story target-005**: Customer-specific fabric tolerance rules
 - **TDD**: Test tolerance calculation by customer type and quantity
 - **Model**: `FabricTolerance` with customer_type, qty_from, qty_to, tolerance_pct
 - **Impact**: Net-new
 - **Est**: 3 points
 
 #### 1.3 — Fabric Order with Lab Dip/Bulk Tracking
-**Story GC-006**: Fabric PO with lab dip required/actual/approval, bulk approval, ETD/onboard
+**Story target-006**: Fabric PO with lab dip required/actual/approval, bulk approval, ETD/onboard
 - **TDD**: Test fabric order lifecycle (raised→lab dip→bulk approval→onboard→cleared)
 - **Model**: `FabricOrder` with supplier, lab_dip_required_date, lab_dip_actual, lab_dip_approved, bulk_approved, onboard_date, eta_date, clearance_date
 - **Impact**: Net-new, linked to PurchaseOrder
 - **Est**: 8 points
 
 #### 1.4 — Fabric Risk & Schedule
-**Story GC-007**: Color risk on fabric orders, role-based date ownership
+**Story target-007**: Color risk on fabric orders, role-based date ownership
 - **TDD**: Test risk transitions, role-based date editing permissions
 - **Extend**: Add `risk_level` FK to FabricOrder; add `date_owner` field per date
 - **Impact**: New fields, permission checks
@@ -87,20 +87,20 @@
 ### Sprint 2: Trims, Labels & Hits
 
 #### 2.1 — Trim/Label Schedule
-**Story GC-008**: Full trim/label line item with supplier, quantity, delivered, ETA, status
+**Story target-008**: Full trim/label line item with supplier, quantity, delivered, ETA, status
 - **TDD**: Test trim schedule CRUD, supplier enforcement, status transitions (TBC→Completed)
 - **Extend**: BOMItem model with supplier_fk, ordered_qty, delivered_qty, eta_date, confirmed_date, actual_date, status (TBC/Completed)
 - **Impact**: Extends existing model with new optional fields
 - **Est**: 8 points
 
 #### 2.2 — Trim/Label Copy From Order
-**Story GC-009**: Copy trim/label details from previous order
+**Story target-009**: Copy trim/label details from previous order
 - **TDD**: Test copy with overwrite option, selective copy (detail/washcare)
 - **Impact**: New service/action, no model changes
 - **Est**: 5 points
 
 #### 2.3 — Hit Management
-**Story GC-010**: Hit numbers per PO item, delivery mode, factory transfer
+**Story target-010**: Hit numbers per PO item, delivery mode, factory transfer
 - **TDD**: Test hit creation, uniqueness per color, delivery mode choices
 - **Model**: `Hit` with po_item, hit_number, colour, delivery_mode, factory_override, original_delivery_date, actual_delivery_date
 - **Impact**: Net-new model linked to PurchaseOrderItem
@@ -113,27 +113,27 @@
 ### Sprint 3: Spec Management & Job Queue
 
 #### 3.1 — Fit Specification System
-**Story GC-011**: Fit specs with measurement data per order
+**Story target-011**: Fit specs with measurement data per order
 - **TDD**: Test fit spec CRUD, versioning, current-fit selection
 - **Model**: `FitSpec` with order, version, fit_number (Dev/1st/2nd/etc.), measurements JSON, notes, images, is_current
 - **Impact**: Net-new, linked to PurchaseOrder
 - **Est**: 8 points
 
 #### 3.2 — Fit Spec Copying
-**Story GC-012**: Copy fit spec from another order/style
+**Story target-012**: Copy fit spec from another order/style
 - **TDD**: Test copy with full-style-number search, picks ticked spec
 - **Impact**: New action on FitSpecViewSet
 - **Est**: 5 points
 
 #### 3.3 — Job Request/Queue System
-**Story GC-013**: Cross-department job requests (pattern, sample, 3D, mini-marker)
+**Story target-013**: Cross-department job requests (pattern, sample, 3D, mini-marker)
 - **TDD**: Test job creation, type filtering, assignment, queue ordering
 - **Model**: `JobRequest` with job_type, style, description, work_location, assigned_to, required_by_date, status, notes
 - **Impact**: Net-new model, new app or in `core`
 - **Est**: 8 points
 
 #### 3.4 — Job Queue Dashboard
-**Story GC-014**: Dynamic queue view with filters, priority, history
+**Story target-014**: Dynamic queue view with filters, priority, history
 - **TDD**: Test queue filtering, status aggregation, history endpoint
 - **Impact**: New views/serializers + frontend
 - **Est**: 5 points
@@ -149,14 +149,14 @@
 ### Sprint 4: Booking Schedule & Fabric Schedule
 
 #### 4.1 — Booking Schedule
-**Story GC-015**: Weekly booking schedule with status flow, risk, cut qty, garments ready
+**Story target-015**: Weekly booking schedule with status flow, risk, cut qty, garments ready
 - **TDD**: Test schedule creation, status flow (Live→In Work→Delivered), risk markers
 - **Model**: `BookingScheduleItem` with shipment, hit, status, cut_qty, garments_ready_qty, ex_factory_date, notes
 - **Impact**: Net-new, linked to Shipment/Hit
 - **Est**: 8 points
 
 #### 4.2 — Gold Seal Tracking
-**Story GC-016**: Gold seal sample sent/approval dates
+**Story target-016**: Gold seal sample sent/approval dates
 - **TDD**: Test gold seal lifecycle
 - **Model**: `GoldSeal` with shipment, sent_date, approval_date, notes
 - **Extend**: Shipment with gold_seal FK
@@ -164,14 +164,14 @@
 - **Est**: 3 points
 
 #### 4.3 — Fabric Schedule with Role Handoff
-**Story GC-017**: Role-based date chain (sales→merch→planning→logistics)
+**Story target-017**: Role-based date chain (sales→merch→planning→logistics)
 - **TDD**: Test date ownership, handoff triggers, permission enforcement
 - **Extend**: FabricOrder with date ownership tracking fields
 - **Impact**: Extends existing
 - **Est**: 5 points
 
 #### 4.4 — Booking Ref Management
-**Story GC-018**: Booking reference with 14-day minimum requirement
+**Story target-018**: Booking reference with 14-day minimum requirement
 - **TDD**: Test booking ref validation, 14-day alert
 - **Extend**: Shipment with `booking_reference`, `booking_ref_required_date`
 - **Impact**: New fields, alert logic
@@ -184,27 +184,27 @@
 ### Sprint 5: Order Manager & Dockets
 
 #### 5.1 — Order Manager Dashboard
-**Story GC-019**: Per-order risk overview with fabric/labels/trims/technical status
+**Story target-019**: Per-order risk overview with fabric/labels/trims/technical status
 - **TDD**: Test risk aggregation, color coding, completion-date ordering
 - **Impact**: New view/serializer + frontend (no new models)
 - **Est**: 8 points
 
 #### 5.2 — Docket Management
-**Story GC-020**: Docket with contract pricing, fabric over-200m handling
+**Story target-020**: Docket with contract pricing, fabric over-200m handling
 - **TDD**: Test docket creation, over-200m notification trigger
 - **Model**: `Docket` with shipment, contract_price, total_fabric_meters, notes
 - **Impact**: Net-new, linked to Shipment
 - **Est**: 5 points
 
 #### 5.3 — Final Hit Reconciliation
-**Story GC-021**: Quantity vs docket check at final hit
+**Story target-021**: Quantity vs docket check at final hit
 - **TDD**: Test reconciliation calculation, >20-unit short debit trigger
 - **Extend**: Shipment with `reconciled_at`, `reconciled_by`, `shortage_units`
 - **Impact**: New fields/actions
 - **Est**: 5 points
 
 #### 5.4 — Shipping Paperwork Comparison
-**Story GC-022**: Shipped qty vs ordered qty analysis
+**Story target-022**: Shipped qty vs ordered qty analysis
 - **TDD**: Test comparison calculation, garment producibility estimate
 - **Impact**: New service, no model changes
 - **Est**: 5 points
@@ -220,28 +220,28 @@
 ### Sprint 6: Debits, Invoice & Sales Confirmation
 
 #### 6.1 — Debit Note System
-**Story GC-023**: Pro forma debits with compliance workflow
+**Story target-023**: Pro forma debits with compliance workflow
 - **TDD**: Test debit creation, compliance email, over-tolerance enforcement
 - **Model**: `DebitNote` with type, amount, reason, status (pro_forma/issued/paid), compliance_email_sent
 - **Impact**: Net-new model in `commercial`
 - **Est**: 8 points
 
 #### 6.2 — Invoice Approval
-**Story GC-024**: Qty/date/price matching against GC data
+**Story target-024**: Qty/date/price matching against target data
 - **TDD**: Test invoice matching, mismatch alert, auto-approval flag
 - **Extend**: Existing invoice concept or net-new `InvoiceApproval` model
 - **Impact**: Net-new
 - **Est**: 5 points
 
 #### 6.3 — Sales Confirmation
-**Story GC-025**: 48-hour dispute window workflow
+**Story target-025**: 48-hour dispute window workflow
 - **TDD**: Test confirmation creation, 48h timer, auto-acceptance
 - **Model**: `SalesConfirmation` with order, sent_at, disputed_at, accepted_at
 - **Impact**: Net-new
 - **Est**: 5 points
 
 #### 6.4 — Quick Lead Time Orders
-**Story GC-026**: Yellow risk marking with agreement workflow
+**Story target-026**: Yellow risk marking with agreement workflow
 - **TDD**: Test quick lead marking, cross-screen visibility, agreement recording
 - **Extend**: FileOpening with `is_quick_lead`, `quick_lead_agreed_by` (JSON)
 - **Impact**: Minimal
@@ -254,28 +254,28 @@
 ### Sprint 7: Stock Fabric, Repeats, Compliance Audit
 
 #### 7.1 — Stock Fabric Management
-**Story GC-027**: Separate stock fabric FN with meter tracking
+**Story target-027**: Separate stock fabric FN with meter tracking
 - **TDD**: Test stock fabric creation, meter allocation/reduction, balance tracking
 - **Extend**: FileOpening with `is_stock_fabric`, `stock_fabric_description`, `total_meters`, `allocated_meters`, `balance_meters`, `stock_photo`
 - **Impact**: Extends FileOpening model
 - **Est**: 8 points
 
 #### 7.2 — Repeats Management
-**Story GC-028**: Create repeat from original FN with multi-department approval
+**Story target-028**: Create repeat from original FN with multi-department approval
 - **TDD**: Test repeat creation, department approval gates, original FN linking
 - **Extend**: FileOpening with `original_fn` FK (self-referencing), `is_repeat`
 - **Impact**: Self-referencing FK, new workflow
 - **Est**: 5 points
 
 #### 7.3 — Compliance Audit
-**Story GC-029**: Weekly order review with 10-point checklist
+**Story target-029**: Weekly order review with 10-point checklist
 - **TDD**: Test audit creation, checklist scoring, weekly schedule
 - **Model**: `ComplianceAudit` with order, week_start, scores (10 fields), overall_pass
 - **Impact**: Net-new model in `monitoring`
 - **Est**: 5 points
 
 #### 7.4 — Fabric Utilization & Monthly Reports
-**Story GC-030**: Monthly fabric utilization analysis with damged/unusable tracking
+**Story target-030**: Monthly fabric utilization analysis with damged/unusable tracking
 - **TDD**: Test utilization calculation, report generation
 - **Model**: `FabricUtilization` with FabricOrder FK, used_meters, wasted_meters, damaged_meters, efficiency_pct
 - **Impact**: Net-new
@@ -290,28 +290,28 @@
 ## Phase 4: Costing & Design Polish (Sprint 8 — 2 weeks)
 
 ### 8.1 — Order-Level Costing Enhancements
-**Story GC-031**: 8 cost categories, 5 sheet types, exchange rate, line-item changes
+**Story target-031**: 8 cost categories, 5 sheet types, exchange rate, line-item changes
 - **TDD**: Test category enforcement, sheet type filtering, landed cost calculation
 - **Extend**: Costing model with `cost_category`, `sheet_type`, `exchange_rate`, `is_single_size`, `size_ratio`
 - **Impact**: Extends existing
 - **Est**: 8 points
 
 ### 8.2 — Design Costing: Pattern Options
-**Story GC-032**: 4 patterned fabric options, single-size watermark, size ratio
+**Story target-032**: 4 patterned fabric options, single-size watermark, size ratio
 - **TDD**: Test pattern option calculation, watermark overlay logic, ratio input validation
 - **Extend**: Costing with `patterned_fabric_options` JSON, `single_size_watermark` bool
 - **Impact**: Extends existing
 - **Est**: 5 points
 
 ### 8.3 — Design Image Management
-**Story GC-033**: Main/range image roles, annotations, unsold analysis
+**Story target-033**: Main/range image roles, annotations, unsold analysis
 - **TDD**: Test image role assignment, annotation overlay, unsold query
 - **Extend**: Style with `image_main`, `image_range` fields; new `StyleAnnotation` model
 - **Impact**: Extends Style + net-new annotation model
 - **Est**: 5 points
 
 ### 8.4 — Not Sold Analysis
-**Story GC-034**: Quarterly unsold styles report from samples
+**Story target-034**: Quarterly unsold styles report from samples
 - **TDD**: Test unsold query, date range filtering, Job Queue integration
 - **Impact**: New report type
 - **Est**: 3 points
@@ -329,7 +329,7 @@
 | Phase 2: Prod/Logistics | 2 | 42 | Booking Schedule, Fabric Schedule, Order Manager, Dockets |
 | Phase 3: Commercial/QA | 2 | 44 | Debits, Invoice Approval, Sales Confirmation, Compliance |
 | Phase 4: Costing/Design | 1 | 21 | Costing Enhancements, Design Images, Not Sold Analysis |
-| **TOTAL** | **9** | **189** | **30 new stories (GC-000 → GC-034)** |
+| **TOTAL** | **9** | **189** | **30 new stories (target-000 → target-034)** |
 
 ### Total Sprint Plan: 9 sprints (18 weeks)
 

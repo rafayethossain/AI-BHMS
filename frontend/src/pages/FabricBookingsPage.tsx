@@ -1,16 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import DataTable from '../components/DataTable';
+import SpreadsheetGrid from '../components/SpreadsheetGrid';
+import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import { fabricApi } from '../api/client';
 import type { FabricBooking } from '../api/client';
-import type { Column } from '../components/DataTable';
 import { useToast } from '../contexts/ToastContext';
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-surface-alt text-muted', booked: 'bg-blue-500/20 text-blue-400',
-  confirmed: 'bg-emerald-500/20 text-badge-emerald', in_transit: 'bg-amber-500/20 text-amber-400',
-  delivered: 'bg-emerald-500/20 text-badge-emerald', cancelled: 'bg-red-500/20 text-badge-red',
-};
 
 const INITIAL_FORM = { booking_number: '', supplier: '', fabric_category: '', quantity_meters: '', status: 'pending', expected_delivery: '', notes: '' };
 
@@ -22,17 +16,13 @@ export default function FabricBookingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const pageSize = 10;
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { setPage(1); }, [search]);
 
   const load = async () => {
     try {
-      const res = await fabricApi.getBookings({ page_size: '100' });
+      const res = await fabricApi.getBookings({ page_size: '10000' });
       setItems(res.data.results);
     } catch { toast('error', 'Failed to load fabric bookings');
     } finally { setLoading(false); }
@@ -75,26 +65,21 @@ export default function FabricBookingsPage() {
     } catch { toast('error', 'Failed to delete'); setDeleteId(null); }
   };
 
-  const filtered = useMemo(() => items.filter(i => i.booking_number.toLowerCase().includes(search.toLowerCase())), [items, search]);
-  const pagedData = useMemo(() => { const s = (page - 1) * pageSize; return filtered.slice(s, s + pageSize); }, [filtered, page]);
-
-  const columns: Column[] = [
-    { key: 'booking_number', label: 'Booking #', sortable: true, render: (v) => <span className="font-mono text-heading">{String(v)}</span> },
-    { key: 'supplier_name', label: 'Supplier', sortable: true },
-    { key: 'fabric_category_name', label: 'Category', render: (v) => <span className="text-muted">{v ? String(v) : '-'}</span> },
-    { key: 'quantity_meters', label: 'Qty (m)', render: (v) => <span className="font-mono">{String(v)}</span> },
-    { key: 'status', label: 'Status', render: (_v, row) => {
-      const s = row.status as string;
-      return <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[s] || 'bg-surface-alt text-muted'}`}>{s}</span>;
-    }},
-    { key: 'expected_delivery', label: 'Expected', render: (v) => <span className="text-muted">{v ? String(v) : '-'}</span> },
-    { key: 'actions', label: 'Actions', className: 'text-right', render: (_v, row) => {
-      const item = row as unknown as FabricBooking;
-      return <><button onClick={(e) => { e.stopPropagation(); handleOpenModal(item); }} className="text-heading hover:text-emerald-500 mr-3 text-sm">Edit</button><button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} className="text-red-500 hover:text-red-400 text-sm">Delete</button></>;
-    }},
+  const columns: SpreadsheetColumn[] = [
+    { title: 'Booking #', field: 'booking_number', headerFilter: true },
+    { title: 'Supplier', field: 'supplier_name', headerFilter: true },
+    { title: 'Category', field: 'fabric_category_name' },
+    { title: 'Qty (m)', field: 'quantity_meters', hozAlign: 'right' },
+    { title: 'Status', field: 'status', headerFilter: true },
+    { title: 'Expected', field: 'expected_delivery' },
   ];
 
-  if (loading) return <Layout><div className="p-6 flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-2 border-emerald-400 border-t-transparent rounded-full" /></div></Layout>;
+  const gridData = items.map((i) => ({
+    ...i,
+    quantity_meters: Number(i.quantity_meters).toLocaleString(),
+    expected_delivery: i.expected_delivery || '—',
+    fabric_category_name: i.fabric_category_name || '—',
+  }));
 
   return (
     <Layout>
@@ -103,7 +88,21 @@ export default function FabricBookingsPage() {
           <h1 className="text-2xl font-bold">Fabric Bookings</h1>
           <button onClick={() => handleOpenModal()} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors">+ New Booking</button>
         </div>
-        <DataTable data={pagedData as unknown as Record<string, unknown>[]} columns={columns} totalCount={filtered.length} page={page} pageSize={pageSize} onPageChange={setPage} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search by booking number..." loading={loading} onRowClick={(row) => handleOpenModal(row as unknown as FabricBooking)} />
+        <SpreadsheetGrid
+          data={gridData as unknown as Record<string, unknown>[]}
+          columns={columns}
+          height={480}
+          toolbar
+          title="Fabric Bookings"
+          exportable
+          columnChooser
+          paginationSize={25}
+          actionColumn
+          onAdd={() => handleOpenModal()}
+          onEdit={(row) => handleOpenModal(row as unknown as FabricBooking)}
+          onDelete={(row) => handleDelete(String(row.id))}
+          loading={loading}
+        />
       </div>
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -124,7 +123,7 @@ export default function FabricBookingsPage() {
             </div>
             <div className="p-6 border-t border-border flex justify-end gap-3">
               <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-body hover:text-heading transition-colors">Cancel</button>
-              <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">{saving ? 'Saving...' : editingId ? 'Update' : 'Create'}</button>
+              <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg font-medium transition-colors disabled:opacity-50">{saving ? 'Saving...' : editingId ? 'Update' : 'Create'}</button>
             </div>
           </div>
         </div>
