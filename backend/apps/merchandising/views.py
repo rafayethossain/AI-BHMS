@@ -3336,11 +3336,6 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
             if buyer is not None
             else (source_tp.buyer if source_tp else None)
         )
-        garments_type = (
-            effective_product_type.name
-            if effective_product_type
-            else (source_tp.style_type if source_tp else "")
-        )
         style_reference = source_tp.style_number if source_tp else ""
 
         with transaction.atomic():
@@ -3351,7 +3346,6 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
                 style=source_tp.style if source_tp else None,
                 product_type=effective_product_type,
                 buyer=effective_buyer,
-                style_type=garments_type,
                 style_number=style_reference,
                 relationship=relationship,
                 block=data["block_reference"] or (source_tp.block if source_tp else ""),
@@ -3418,10 +3412,10 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
         sheets = self.filter_queryset(self.get_queryset()).order_by("-created_at")
 
         headers = [
-            "File Number", "Style Code", "Style Name", "Buyer", "Style Type",
-            "Product Type", "Block", "Based on", "Relationship", "Status",
+            "File Number", "Style Code", "Style Name", "Buyer", "Product Type",
+            "Product Category", "Block", "Based on", "Relationship", "Status",
             "Department", "Designer", "Pattern Cutter", "Issuer", "Cloth Code",
-            "Size", "Length", "Sketch", "Contains", "Risk Date",
+            "Size", "Length", "Sketch", "Risk Date",
             "Pattern Request Date", "Description", "Notes", "Live Orders",
             "Completed Orders",
         ]
@@ -3439,8 +3433,8 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
                 tp.style_code,
                 tp.style.name if tp.style_id else "",
                 tp.buyer_display_name(),
-                tp.style_type,
                 tp.product_type.name if tp.product_type_id else "",
+                tp.product_type.category.name if tp.product_type_id and tp.product_type.category_id else "",
                 tp.block,
                 tp.based_on,
                 tp.get_relationship_display(),
@@ -3453,7 +3447,6 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
                 tp.size,
                 tp.length,
                 tp.sketch,
-                tp.contains,
                 tp.risk_date,
                 tp.pattern_request_date,
                 tp.description,

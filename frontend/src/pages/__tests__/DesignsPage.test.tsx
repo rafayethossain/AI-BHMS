@@ -29,6 +29,7 @@ vi.mock('../../api/client', () => ({
     getDesignSheets: vi.fn(),
     initDesignSheet: vi.fn(),
     exportDesignSheets: vi.fn(),
+    updateStyle: vi.fn(),
   },
   setupApi: {
     getTypes: vi.fn(),
@@ -93,6 +94,7 @@ type SpreadsheetColumnLike = {
   headerFilter?: boolean;
   headerFilterType?: string;
   hozAlign?: string;
+  editor?: boolean | string;
 };
 
 const DESIGN_REGISTER_COLUMNS = [
@@ -100,13 +102,13 @@ const DESIGN_REGISTER_COLUMNS = [
   'Style Code',
   'Buyer',
   'Style Type',
+  'Category',
   'Based on',
   'Relationship',
   'Status',
   'Department',
   'Designer',
   'Risk Date',
-  'Contains',
   'Live Orders',
   'Completed Orders',
   'Pattern Request Date',
@@ -119,9 +121,9 @@ const design = {
   id: 'reg-1',
   style_code: 'REG-1001',
   style_name: 'Relaxed Jogger',
-  style_type: 'Jogger',
   product_type_id: 'pt-1',
   product_type_name: 'Jogger',
+  product_category_name: 'Apparel',
   based_on: '59073T',
   relationship: 'based_on',
   style_number: 'REG-1001',
@@ -133,7 +135,6 @@ const design = {
   department: 'Apparel',
   designer: 'Emmi.Huynh',
   risk_date: '2026-09-01',
-  contains: 'Div 3 / 3446',
   live_orders_count: 3,
   completed_orders_count: 2,
   pattern_request_date: '2026-08-15',
@@ -178,6 +179,9 @@ describe('DesignsPage (unified Design register grid)', () => {
     (merchApi.initDesignSheet as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { id: 'ds-new-1' },
     });
+    (merchApi.updateStyle as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {},
+    });
   });
 
   it('renders design rows through the Tabulator grid', async () => {
@@ -202,7 +206,7 @@ describe('DesignsPage (unified Design register grid)', () => {
     expect(columns?.map((c) => c.title)).toEqual(DESIGN_REGISTER_COLUMNS);
     const byField = Object.fromEntries((columns ?? []).map((c) => [c.field, c] as const));
     expect(byField['buyer']).toBeDefined();
-    for (const f of ['buyer', 'style_type', 'relationship', 'status', 'department']) {
+    for (const f of ['buyer', 'product_type', 'product_category', 'relationship', 'status', 'department']) {
       expect(byField[f]?.headerFilterType).toBe('list');
     }
     for (const f of ['design', 'style_code', 'based_on', 'designer']) {
@@ -259,6 +263,40 @@ describe('DesignsPage (unified Design register grid)', () => {
     createObjectURL.mockRestore();
   });
 
+  it('carries style_id in gridData and makes the Design column editable', async () => {
+    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: [{ ...design, style_id: 'sty-42' }], count: 1 },
+    });
+    renderPage();
+    await screen.findByText('REG-1001');
+    const data = gridCapture.lastProps?.data as Record<string, unknown>[] | undefined;
+    expect(data?.[0]?.style_id).toBe('sty-42');
+    const columns = gridCapture.lastProps?.columns as SpreadsheetColumnLike[] | undefined;
+    const designCol = columns?.find((c) => c.field === 'design');
+    expect(designCol).toBeDefined();
+    expect(designCol?.editor).toBe(true);
+  });
+
+  it('patches the Style name when the Design cell is edited', async () => {
+    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: [{ ...design, style_id: 'sty-42' }], count: 1 },
+    });
+    (merchApi.updateStyle as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByText('REG-1001');
+    const onCellEdited = gridCapture.lastProps?.onCellEdited as
+      | ((field: string, value: string, row: Record<string, unknown>) => void)
+      | undefined;
+    expect(onCellEdited).toBeDefined();
+    await act(async () => {
+      onCellEdited?.('design', 'Renamed Jogger', {
+        id: 'reg-1',
+        style_id: 'sty-42',
+      });
+    });
+    expect(merchApi.updateStyle).toHaveBeenCalledWith('sty-42', { name: 'Renamed Jogger' });
+  });
+
   it('maps register values to display labels for the grid', async () => {
     (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { results: [design], count: 1 },
@@ -270,14 +308,14 @@ describe('DesignsPage (unified Design register grid)', () => {
     const row = data?.[0];
     expect(row?.design).toBe('Relaxed Jogger');
     expect(row?.buyer).toBe('Alpha Buyer');
-    expect(row?.style_type).toBe('Jogger');
+    expect(row?.product_type).toBe('Jogger');
+    expect(row?.product_category).toBe('Apparel');
     expect(row?.based_on).toBe('59073T');
     expect(row?.relationship).toBe('Based on');
     expect(row?.status).toBe('New');
     expect(row?.department).toBe('Apparel');
     expect(row?.designer).toBe('Emmi.Huynh');
     expect(row?.risk_date).toBe('2026-09-01');
-    expect(row?.contains).toBe('Div 3 / 3446');
     expect(row?.live_orders).toBe(3);
     expect(row?.completed_orders).toBe(2);
     expect(row?.pattern_request_date).toBe('2026-08-15');
@@ -382,6 +420,9 @@ describe('DesignsPage (New Design flow)', () => {
     });
     (merchApi.initDesignSheet as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { id: 'ds-new-1' },
+    });
+    (merchApi.updateStyle as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {},
     });
     (setupApi.getTypes as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { results: setupTypes, count: 2 },

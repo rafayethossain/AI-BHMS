@@ -1032,7 +1032,6 @@ class DesignSheetSerializer(serializers.ModelSerializer):
     department = serializers.CharField(
         source="tech_pack.style.department.name", read_only=True, default=""
     )
-    style_type = serializers.CharField(source="tech_pack.style_type", read_only=True, default="")
     style_code = serializers.CharField(source="tech_pack.style_code", read_only=True, default="")
     product_type_id = serializers.CharField(
         source="tech_pack.product_type_id", read_only=True, default=""
@@ -1040,11 +1039,13 @@ class DesignSheetSerializer(serializers.ModelSerializer):
     product_type_name = serializers.CharField(
         source="tech_pack.product_type.name", read_only=True, default=""
     )
+    product_category_name = serializers.CharField(
+        source="tech_pack.product_type.category.name", read_only=True, default=""
+    )
     buyer_id = serializers.CharField(source="tech_pack.buyer_id", read_only=True, default="")
     relationship = serializers.CharField(
         source="tech_pack.relationship", read_only=True, default="new"
     )
-    contains = serializers.CharField(source="tech_pack.contains", read_only=True, default="")
     risk_date = serializers.DateField(
         source="tech_pack.risk_date", read_only=True, default=None, allow_null=True
     )
@@ -1065,7 +1066,7 @@ class DesignSheetSerializer(serializers.ModelSerializer):
             "size", "designer", "pattern_cutter", "issuer", "cloth_code",
             "length", "sketch", "description", "note", "sketch_annotations",
             "layout_order", "created_at", "updated_at",
-            "style_name", "department", "style_type", "contains",
+            "style_name", "department", "product_category_name",
             "risk_date", "pattern_request_date", "relationship",
             "style_code", "product_type_id", "product_type_name", "buyer_id",
             "live_orders_count", "completed_orders_count",

@@ -144,7 +144,6 @@ def source_sheet(tenant, style, product_type, source_buyer):
         product_type=product_type,
         buyer=source_buyer,
         style_code="OLD-CODE-1",
-        style_type="Jogger",
         style_number="SRC-STYLE-001",
         block="59080T",
         based_on="59070T",
@@ -219,7 +218,6 @@ class TestInitFresh:
         assert tp.product_type_id == product_type.id
         assert tp.buyer_id == buyer.id
         assert tp.customer == buyer.name
-        assert tp.style_type == "Jogger"
         assert tp.style_code.startswith("DS-")
         assert resp.data["style_code"] == tp.style_code
         assert resp.data["product_type_name"] == "Jogger"
@@ -261,7 +259,6 @@ class TestInitFresh:
         assert tp.relationship == "new"
         assert tp.product_type_id is None
         assert tp.buyer_id is None
-        assert tp.style_type == ""
         assert tp.customer == ""
         assert tp.style_number == ""
         assert tp.block == ""
@@ -308,7 +305,6 @@ class TestInitCopy:
         assert tp.product_type_id == source_sheet.tech_pack.product_type_id
         assert tp.buyer_id == source_sheet.tech_pack.buyer_id
         assert tp.customer == "Source Buyer"
-        assert tp.style_type == "Jogger"
         assert tp.style_number == "SRC-STYLE-001"
         assert tp.style_code != source_sheet.tech_pack.style_code
         assert tp.style_code.startswith("DS-")

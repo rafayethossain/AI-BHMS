@@ -79,7 +79,7 @@ def test_str_includes_techpack_number(ds_sheet):
 
 
 def test_status_choices_defined():
-    assert set(DesignSheet.Status.values) == {"new", "rejected", "closed", "archived"}
+    assert set(DesignSheet.Status.values) == {"new", "rejected", "closed", "production", "archived"}
 
 
 # ------------------------------------------------------ tech pack constraint
@@ -114,6 +114,12 @@ def test_transition_to_rejected(ds_sheet):
 def test_transition_to_archived(ds_sheet):
     ds_sheet.transition_to(DesignSheet.Status.ARCHIVED)
     assert ds_sheet.status == DesignSheet.Status.ARCHIVED
+
+
+def test_transition_to_production(ds_sheet):
+    ds_sheet.transition_to(DesignSheet.Status.PRODUCTION)
+    assert ds_sheet.status == DesignSheet.Status.PRODUCTION
+    assert ds_sheet.get_status_display() == "Production"
 
 
 def test_transition_roundtrip_reopen_to_new(ds_sheet):

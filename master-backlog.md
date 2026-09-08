@@ -4607,6 +4607,54 @@ to it → picks could never match other pages. Fix in `SpreadsheetGrid`:
   warnings baseline); vitest **360/360 (50 files)**. Dev servers live (5173/8000) for a browser refresh of
   `/design`.
 
+## Part 15 Addendum 2 — Design register product-master alignment: drop `style_type`, surface Product Category (2026-09-08)
+
+**Task status:** ✅ Completed. RED→GREEN→verify; backend + frontend.
+
+**What and why:** User asked to "connect necessary" setup entities and "remove unnecessary" ones. The
+register's **Style Type** column read the free-text `StyleTechPack.style_type`, while the authoritative
+`setup.ProductType` FK already existed and was set at init/copy — the two could diverge, and Product
+Category (`ProductType.category.name`) was never surfaced. Decision (user pick): **drop `style_type`
+entirely**; ProductType FK is the single source of truth (legacy rows without a product_type show blank);
+Department continues via `Style.department` (already correct).
+
+**What changed:**
+- Backend: `style_type` CharField removed (`models.py` + `migrations/0039`); `serializers.py` adds
+  `product_category_name = CharField(source="tech_pack.product_type.category.name", read_only=True,
+  default="")` and swaps `style_type` → `product_category_name` in Meta.fields; `views.py` init no longer
+  computes `garments_type`, export headers/rows use `tp.product_type.name` +
+  `tp.product_type.category.name`; `seed_design_register.py` links each register `style_type` key to
+  ProductCategory (Apparel/Knitwear/Outerwear) + ProductType (Jogger/Tee/Polo/Jacket) FKs.
+- Frontend: `DesignsPage.tsx` Style Type column ← `product_type_name`, new **Category** column ←
+  `product_category_name`; `NewDesignModal.tsx` copy-mode Garments Type ← `source.product_type_name`;
+  `client.ts` DesignSheet type drops `style_type?`, adds `product_category_name?`.
+- Tests: `test_design_register.py`/`test_design_sheet_export.py` assert Product Type / Product Category
+  and no `style_type`; `test_design_sheet_init.py` fixtures/asserts switched to `product_type`.
+- Verification: RED 2 fail → backend **23/23** + frontend **16/16**; `tsc -b` 0; oxlint 0 errors
+  (baseline); vitest **362/362 (50 files)**; full backend **1715 passed / 9 pre-existing env-failures**
+  (monitoring 404 `health/run_checks/` route, missing techpack-excel sample xlsx, not-sold date-range; none
+  touch the touched symbols). Dev DB migrated (`merchandising.0039`), :8000 restarted.
+
+## Part 15 Addendum 3 — Design register attribute-list revision: drop `Contains` column, add `production` status (2026-09-08)
+
+**Task status:** ✅ Completed. RED→GREEN→verify; backend + frontend.
+
+**What and why:** User re-supplied the register attribute list with two deltas: the **Contains** column
+is removed from the register (the tech-pack contents string stays on the model / tech-pack exports but
+is no longer a register column), and **`production`** joins the design-sheet lifecycle
+(`new / rejected / closed / production / archived`).
+
+**What changed:**
+- Backend: `DesignSheet.Status.PRODUCTION = "production"` (`models.py`); `contains` removed from
+  `DesignSheetSerializer` fields and from the register-export headers/rows (`views.py`).
+- Frontend: `DesignsPage.tsx` drops the Contains column and maps `production`; `designSheetFields.ts`
+  `DESIGN_SHEET_STATUSES`/`STATUS_LABELS` add `production`; `DesignSheetHeader.tsx` + `EntityCard.tsx`
+  add a production status style; `DesignSheetsListPage.tsx` label map updated; `client.ts` drops
+  `contains?`.
+- Verification: RED 3 fail → backend **54/54 targeted** + frontend **16/16**; `tsc -b` 0; oxlint 0 errors
+  (baseline); vitest **362/362 (50 files)**; full backend regression expected only in the 9 pre-existing
+  environment failures.
+
 ---
 
 *This is the single source of truth for the BHMS backlog and requirement status (workflow-ordered). Reframed: 2026-08-03*

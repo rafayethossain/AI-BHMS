@@ -118,7 +118,6 @@ def sheet(tenant, buyer, product_type):
         style_code="DS-1010",
         product_type=product_type,
         buyer=buyer,
-        style_type="Jogger",
         style_number="90123",
         block="59080T",
         based_on="59070T",
@@ -172,6 +171,10 @@ class TestDesignRegisterExport:
         assert "Buyer" in headers
         assert "Relationship" in headers
         assert "Status" in headers
+        assert "Product Type" in headers
+        assert "Product Category" in headers
+        assert "Style Type" not in headers
+        assert "Contains" not in headers
 
         rows = list(ws.iter_rows(min_row=2, values_only=True))
         assert any(r[0] == "TP-871" for r in rows)
@@ -181,6 +184,8 @@ class TestDesignRegisterExport:
         assert data_row[idx["Buyer"]] == "Prime Buyer"
         assert data_row[idx["Relationship"]] == "Based on"
         assert data_row[idx["Status"]] == "New"
+        assert data_row[idx["Product Type"]] == "Jogger"
+        assert data_row[idx["Product Category"]] == "Apparel"
 
         # Foreign tenant sheet is excluded (RBAC + tenant isolation)
         codes = [r[idx["Style Code"]] for r in rows]

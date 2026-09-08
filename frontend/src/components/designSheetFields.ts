@@ -1,11 +1,12 @@
 import type { DesignSheet } from '../api/client';
 
-export const DESIGN_SHEET_STATUSES = ['new', 'rejected', 'closed', 'archived'];
+export const DESIGN_SHEET_STATUSES = ['new', 'rejected', 'closed', 'production', 'archived'];
 
 export const STATUS_LABELS: Record<string, string> = {
   new: 'New',
   rejected: 'Rejected',
   closed: 'Closed',
+  production: 'Production',
   archived: 'Archived',
 };
 

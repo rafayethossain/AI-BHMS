@@ -10,6 +10,7 @@ const STATUS_STYLES: Record<string, string> = {
   planned: 'bg-blue-500/20 text-badge-blue',
   in_progress: 'bg-cyan-500/20 text-badge-blue',
   quality_check: 'bg-amber-500/20 text-badge-amber',
+  production: 'bg-amber-500/20 text-badge-amber',
   ready: 'bg-cyan-500/20 text-badge-blue',
   shipped: 'bg-indigo-500/20 text-indigo-400',
   delivered: 'bg-green-500/20 text-badge-green',

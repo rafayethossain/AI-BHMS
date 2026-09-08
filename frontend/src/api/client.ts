@@ -1917,12 +1917,11 @@ export interface DesignSheet {
   material_items?: DesignSheetMaterialItem[];
   style_name?: string;
   department?: string;
-  style_type?: string;
   product_type_id?: string;
   product_type_name?: string;
+  product_category_name?: string;
   buyer_id?: string;
   relationship?: string;
-  contains?: string;
   risk_date?: string | null;
   pattern_request_date?: string | null;
   live_orders_count?: number;

@@ -1021,7 +1021,6 @@ class StyleTechPack(TenantModel):
         related_name="tech_packs",
     )
     style_code = models.CharField(max_length=50, blank=True)
-    style_type = models.CharField(max_length=100, blank=True)
     contains = models.CharField(max_length=255, blank=True)
     risk_date = models.DateField(null=True, blank=True)
     pattern_request_date = models.DateField(null=True, blank=True)
@@ -1130,6 +1129,7 @@ class DesignSheet(TenantModel):
         NEW = "new", "New"
         REJECTED = "rejected", "Rejected"
         CLOSED = "closed", "Closed"
+        PRODUCTION = "production", "Production"
         ARCHIVED = "archived", "Archived"
 
     tech_pack = models.OneToOneField(

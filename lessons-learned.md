@@ -1289,6 +1289,22 @@ GREEN 51/51; tsc 0; lint 0 errors (81 warnings baseline); vitest 356/356 (50 fil
 export endpoint returned a valid 6680-byte workbook with 25 headers and populated Buyer values (DS-1001
 -> Addidas, DS-1002 -> Aldi); TDD_TRACKER evidence #57; master-backlog Part 15 addendum.
 
+# 2026-09-08 - Design register Design column now editable in-grid [evidence #57 fix follow-up]
+
+**What happened:** The "Design" column in the register grid showed `Style.name` but was read-only — the
+grid data didn't even carry `style_id`, so there was no way to PATCH the Style name back.
+
+**What to do differently / pattern:** To make a read-only display column editable end-to-end, (a) carry the
+entity pk into gridData (`style_id`), (b) set the column's `editor: true` so Tabulator renders an input on
+double-click, (c) wire SpreadsheetGrid's already-emitted `onCellEdited` (field, value, row) to
+`merchApi.updateStyle(id, { name })` and optimistically update local items state so the displayed label
+refreshes without a round-trip reload. Frontend-only because the StyleViewSet ModelViewSet already accepts
+PATCH on `name` (not in read_only_fields); no schema change, no migration.
+
+**Result:** RED 2 fail -> GREEN 16/16 (DesignsPage); tsc 0; oxlint 0 errors (81 warnings baseline); vitest
+362/362 (50 files). Backend live on :8000 serving the register; refresh `/design` and double-click the
+Design cell to rename.
+
 # 2026-09-06 - Design register list-column filters fixed [evidence #57 fix follow-up]
 
 **What happened:** Browser smoke showed the list-column header filters (Buyer, Status, Relationship,
@@ -1318,3 +1334,52 @@ library's parameter names; a mock-driven test can green-light a broken contract.
 
 **Result:** RED 10 fail -> GREEN 35/35 (SpreadsheetGridChrome); full vitest 360/360 (50 files); tsc 0;
 lint 0 errors (81 warnings baseline); dev servers live for browser refresh of `/design`.
+
+# 2026-09-08 - Design register style_type dropped in favour of product_type FK [evidence #58]
+
+**What happened:** The register's "Style Type" column read the free-text `StyleTechPack.style_type`,
+while the authoritative `setup.ProductType` FK (`StyleTechPack.product_type`) was already set from the
+same value at creation. The two diverged on rename/import, making the grid inconsistent with the
+product master; Product Category (`ProductType.category.name`) was never surfaced. Removed `style_type`
+entirely (user decision: ProductType FK is single source of truth, no fallback), surfaced Product
+Category in both the grid and the xlsx export, and rewired init/copy/seed to the FK.
+
+**What went wrong / caught:** (1) A free-text mirror column duplicates a FK while pretending to be
+authoritative - the ORM allowed both to drift. The grid should always render the FK's `__name`/
+chain-related value, never a parallel CharField. (2) Tests (`test_design_sheet_init.py`, export
+fixtures) still created techpacks with the `style_type=` kwarg and asserted `tp.style_type`; after
+removing the field, DELETE hits `TypeError: unexpected keyword` on create - a good reason to centralise
+fixture factories. (3) The full suite (1724 items) takes ~46 min; tailing the progress log while it runs
+is fine, but expect pre-existing environmental failures (monitoring `health/run_checks/` 404 - route
+never implemented; techpack-excel-import missing sample xlsx) that are unrelated to any slice; verify a
+change's blast radius by grepping the failing tests for the touched symbols rather than re-reading the
+whole failure.
+
+**What to do differently:** When aligning a grid column to a FK, (a) prefer related-name sources in the
+serializer (`source="...category.name"`) so the UI never reads a redundant scalar, (b) drop the
+parallel field with a dedicated migration and grep the entire backend for stragglers, (c) surface
+derived parents (Category) explicitly on the same slice since the data is already joined.
+
+**Result:** RED 2 fail -> GREEN backend 23/23 + frontend 16/16; tsc 0; lint 0 errors (baseline); vitest
+362/362 (50 files); full backend 1715 passed / 9 pre-existing env-failures; dev DB migrated
+(`merchandising.0039`), :8000 restarted.
+
+# 2026-09-08 - Design register attribute-list revision: drop Contains column, add production status [evidence #59]
+
+**What happened:** The user re-supplied the register attribute list with two deltas: **Contains** was
+removed as a register column, and **`production`** was added to the design-sheet lifecycle
+(`new / rejected / closed / production / archived`).
+
+**What went well:** Dropping the column stayed small because the register's `contains` was only a thin
+`DesignSheetSerializer` passthrough (`source="tech_pack.contains"`) plus one export header/row pair — the
+model field and the tech-pack-level exports were untouched, so no migration, no data loss. Red was proven
+on three axes: the model enum set assert, the register-row assert (`"contains" not in row`), and the
+export-header assert — a good reminder to test "absence" for removals, not just "change of value".
+
+**What to do differently:** When the user hands back an attribute list, diff it against the implemented
+grid column-by-column and turn each delta into its own RED assertion before coding; status lists tend to
+live in several files (register labels, header dropdown, entity-card styles) — grep for the old choice
+value across the frontend so the new status is styled everywhere, not just on the register.
+
+**Result:** RED 3 fail -> GREEN backend 54/54 targeted + frontend 16/16; tsc 0; lint 0 errors (baseline);
+vitest 362/362 (50 files); full backend regression expected only in the 9 pre-existing env-failures.

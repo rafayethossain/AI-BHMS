@@ -10,6 +10,7 @@ const STATUS_LABELS: Record<string, string> = {
   new: 'New',
   rejected: 'Rejected',
   closed: 'Closed',
+  production: 'Production',
   archived: 'Archived',
 };
 

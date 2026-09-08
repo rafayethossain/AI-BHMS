@@ -13,6 +13,7 @@ const STATUS_LABELS: Record<string, string> = {
   new: 'New',
   rejected: 'Rejected',
   closed: 'Closed',
+  production: 'Production',
   archived: 'Archived',
 };
 
@@ -46,17 +47,17 @@ export default function DesignsPage() {
   }, []);
 
   const columns: SpreadsheetColumn[] = [
-    { title: 'Design', field: 'design', headerFilter: true, headerFilterType: 'input' },
+    { title: 'Design', field: 'design', headerFilter: true, headerFilterType: 'input', editor: true },
     { title: 'Style Code', field: 'style_code', headerFilter: true, headerFilterType: 'input' },
     { title: 'Buyer', field: 'buyer', headerFilter: true, headerFilterType: 'list' },
-    { title: 'Style Type', field: 'style_type', headerFilter: true, headerFilterType: 'list' },
+    { title: 'Style Type', field: 'product_type', headerFilter: true, headerFilterType: 'list' },
+    { title: 'Category', field: 'product_category', headerFilter: true, headerFilterType: 'list' },
     { title: 'Based on', field: 'based_on', headerFilter: true, headerFilterType: 'input' },
     { title: 'Relationship', field: 'relationship', headerFilter: true, headerFilterType: 'list' },
     { title: 'Status', field: 'status', headerFilter: true, headerFilterType: 'list' },
     { title: 'Department', field: 'department', headerFilter: true, headerFilterType: 'list' },
     { title: 'Designer', field: 'designer', headerFilter: true, headerFilterType: 'input' },
     { title: 'Risk Date', field: 'risk_date', headerFilter: true, headerFilterType: 'date' },
-    { title: 'Contains', field: 'contains', headerFilter: true, headerFilterType: 'input' },
     { title: 'Live Orders', field: 'live_orders', hozAlign: 'right' },
     { title: 'Completed Orders', field: 'completed_orders', hozAlign: 'right' },
     { title: 'Pattern Request Date', field: 'pattern_request_date', headerFilter: true, headerFilterType: 'date' },
@@ -67,17 +68,18 @@ export default function DesignsPage() {
 
   const gridData = items.map(o => ({
     id: o.id,
+    style_id: o.style_id ?? '',
     design: o.style_name || o.style_code || '—',
     style_code: o.style_code || '—',
     buyer: o.buyer_name || '—',
-    style_type: o.style_type || '—',
+    product_type: o.product_type_name || '—',
+    product_category: o.product_category_name || '—',
     based_on: o.based_on || '—',
     relationship: (RELATIONSHIP_LABELS[o.relationship ?? ''] ?? '') || o.relationship || '—',
     status: STATUS_LABELS[o.status] ?? o.status.replace(/_/g, ' '),
     department: o.department || '—',
     designer: o.designer || '—',
     risk_date: o.risk_date || '—',
-    contains: o.contains || '—',
     live_orders: o.live_orders_count ?? 0,
     completed_orders: o.completed_orders_count ?? 0,
     pattern_request_date: o.pattern_request_date || '—',
@@ -85,6 +87,21 @@ export default function DesignsPage() {
     notes: o.note || '—',
     sketch: o.sketch || '—',
   }));
+
+  const handleCellEdited = async (field: string, value: unknown, row: Record<string, unknown>) => {
+    if (field !== 'design') return;
+    const styleId = row.style_id as string | undefined;
+    if (!styleId || typeof value !== 'string') return;
+    const nextName = value;
+    try {
+      await merchApi.updateStyle(styleId, { name: nextName });
+      setItems((prev) =>
+        prev.map((o) => (o.style_id === styleId ? { ...o, style_name: nextName } : o)),
+      );
+    } catch {
+      toast('error', 'Failed to update design name');
+    }
+  };
 
   const handleExport = async () => {
     if (exporting) return;
@@ -141,6 +158,7 @@ export default function DesignsPage() {
             paginationSize={20}
             loading={loading}
             onRowClick={(row) => navigate(`/design-sheets/${row.id}`)}
+            onCellEdited={handleCellEdited}
           />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">

@@ -8,6 +8,7 @@ const STATUS_STYLES: Record<string, string> = {
   new: 'bg-blue-500/20 text-badge-blue',
   rejected: 'bg-red-500/20 text-badge-red',
   closed: 'bg-surface-alt/50 text-muted',
+  production: 'bg-amber-500/20 text-badge-amber',
   archived: 'bg-surface-alt/20 text-muted',
 };
 

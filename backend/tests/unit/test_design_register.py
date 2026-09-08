@@ -27,15 +27,15 @@ from apps.merchandising.models import (
     Style,
     StyleTechPack,
 )
-from apps.setup.models import Buyer, Country, Factory, ProductDepartment
+from apps.setup.models import Buyer, Country, Factory, ProductCategory, ProductDepartment, ProductType
 from apps.tenants.models import Tenant
 from apps.users.models import Permission, Role, RolePermission, UserRole
 
 User = get_user_model()
 
 REGISTER_FIELDS = [
-    "style_code", "style_name", "style_type", "based_on", "status",
-    "department", "designer", "risk_date", "contains",
+    "style_code", "style_name", "product_type_name", "product_category_name", "based_on", "status",
+    "department", "designer", "risk_date",
     "live_orders_count", "completed_orders_count",
     "pattern_request_date", "sketch_annotations", "note", "sketch",
 ]
@@ -95,6 +95,20 @@ def department(tenant):
 
 
 @pytest.fixture
+def category(tenant):
+    return ProductCategory.objects.create(
+        tenant=tenant, code="APP", name="Apparel",
+    )
+
+
+@pytest.fixture
+def product_type(tenant, category):
+    return ProductType.objects.create(
+        tenant=tenant, code="JGR", name="Jogger", category=category,
+    )
+
+
+@pytest.fixture
 def buyer(tenant):
     Country.objects.create(tenant=tenant, name="Reg Land", code="RG1")
     return Buyer.objects.create(tenant=tenant, name="Reg Buyer", code="RGB1")
@@ -114,11 +128,12 @@ def style(tenant, buyer, department):
 
 
 @pytest.fixture
-def techpack(tenant, style):
+def techpack(tenant, style, product_type):
     return StyleTechPack.objects.create(
         tenant=tenant,
         techpack_number=StyleTechPack.next_techpack_number(tenant),
         style=style,
+        product_type=product_type,
     )
 
 
@@ -127,7 +142,6 @@ def design_sheet(tenant, techpack):
     sheet = DesignSheet.objects.create(tenant=tenant, tech_pack=techpack)
     techpack.based_on = "59073T"
     techpack.designer = "Emmi.Huynh"
-    techpack.style_type = "Jogger"
     techpack.contains = "Div 3 / 3446"
     techpack.risk_date = datetime.date(2026, 9, 1)
     techpack.pattern_request_date = datetime.date(2026, 8, 15)
@@ -176,12 +190,14 @@ class TestDesignRegisterAPI:
             assert key in row, f"missing register column: {key}"
         assert row["style_code"] == "REG-1001"
         assert row["style_name"] == "Relaxed Jogger"
-        assert row["style_type"] == "Jogger"
+        assert row["product_type_name"] == "Jogger"
+        assert row["product_category_name"] == "Apparel"
+        assert "style_type" not in row
+        assert "contains" not in row
         assert row["based_on"] == "59073T"
         assert row["department"] == "Apparel"
         assert row["designer"] == "Emmi.Huynh"
         assert row["risk_date"] == "2026-09-01"
-        assert row["contains"] == "Div 3 / 3446"
         assert row["pattern_request_date"] == "2026-08-15"
         assert row["note"] == "Front pocket change"
         assert row["sketch"] == "SK-REG-1001"

@@ -21,7 +21,7 @@ from apps.merchandising.models import (
     Style,
     StyleTechPack,
 )
-from apps.setup.models import Buyer, Factory, ProductDepartment
+from apps.setup.models import Buyer, Factory, ProductCategory, ProductDepartment, ProductType
 from apps.tenants.models import Tenant
 
 
@@ -129,11 +129,31 @@ class Command(BaseCommand):
         self.stdout.write(f"Seeding design register for: {tenant.name}")
 
         dept_map = {}
+        cat_map = {}
         for code, name in [("APP", "Apparel"), ("KTN", "Knitwear"), ("OUT", "Outerwear")]:
             dept, _ = ProductDepartment.objects.get_or_create(
                 tenant=tenant, code=code, defaults={"name": name},
             )
             dept_map[name] = dept
+            cat, _ = ProductCategory.objects.get_or_create(
+                tenant=tenant, code=code, defaults={"name": name},
+            )
+            cat_map[name] = cat
+
+        type_map = {}
+        for name in sorted({entry["style_type"] for entry in REGISTER}):
+            type_, _ = ProductType.objects.get_or_create(
+                tenant=tenant, code=name.upper()[:20], defaults={"name": name},
+            )
+            type_map[name] = type_
+        # Link each product type to its category via the first register entry that
+        # uses it, matching the global standard hierarchy Department > Category > Type.
+        for entry in REGISTER:
+            cat = cat_map[entry["department"]]
+            pt = type_map[entry["style_type"]]
+            if pt.category_id != cat.id:
+                pt.category = cat
+                pt.save(update_fields=["category"])
 
         buyer = Buyer.objects.filter(tenant=tenant).first()
         if not buyer:
@@ -165,7 +185,7 @@ class Command(BaseCommand):
             techpack.style = style
             techpack.based_on = entry["based_on"]
             techpack.designer = entry["designer"]
-            techpack.style_type = entry["style_type"]
+            techpack.product_type = type_map[entry["style_type"]]
             techpack.contains = entry["contains"]
             techpack.risk_date = entry["risk_date"]
             techpack.pattern_request_date = entry["pattern_request_date"]

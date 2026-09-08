@@ -1027,7 +1027,12 @@
       `headerFilterType` per column + `onExport` streaming the backend blob (download + toast);
       `merchApi.exportDesignSheets()` (`responseType:'blob'`). Full suite **tsc -b 0; lint 0 errors (81
       warnings, baseline; no new warnings); vitest 356/356 (50 files)**.
-    - Live verify: backend restarted (new PID on :8000); export 200
+    - Fix follow-up (Design column editable): the **Design** register column displayed `Style.name` but was
+      read-only. Now the Design column is `editor: true`, gridData carries `style_id`, and
+      `onCellEdited` PATCHes `merchApi.updateStyle(style_id, { name })` then updates local items
+      optimistically (frontend-only; StyleViewSet already allows PATCH on `name`, no migration). RED 2 fail
+      -> GREEN 16/16 (DesignsPage); tsc 0; oxlint 0 errors (baseline); vitest 362/362 (50 files).
+- Live verify: backend restarted (new PID on :8000); export 200
       `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, attachment
       `design_register.xlsx` (6680 bytes); parsed live workbook: 25 headers incl. Buyer at index 3,
       rows DS-1001 → Addidas, DS-1002 → Aldi. Browser check of filters/Export on `/design` left for a
@@ -1047,3 +1052,57 @@
       pagination survive. Targeted 35/35; **tsc -b 0; lint 0 errors (81 warnings, baseline); vitest
       360/360 (50 files)**; runtime confirmed `registerTableFunction("getHeaderFilterValue"|"setHeaderFilterValue")`
       resolve by field; dev servers live (5173/8000) for refresh.
+
+58. **Design register product-master alignment: drop redundant free-text `style_type`, surface Product
+    Category (A7 follow-up)** - user asked to "connect necessary" setup entities and "remove unnecessary"
+    ones. Root cause: the register's **Style Type** column read `StyleTechPack.style_type` (free-text
+    CharField) while the true source of truth is the `setup.ProductType` FK (`StyleTechPack.product_type`)
+    that already exists and is set at init/copy; also, Product Category (`ProductType.category.name`) was
+    never surfaced, and the xlsx export duplicated "Style Type"/"Product Type".
+    - Decision (user pick): **drop `style_type` entirely** — ProductType FK is the single source of truth;
+      legacy rows w/o a product_type show blank; no backward-compat fallback. Department stays as
+      `Style.department` (already correct in grid + serializer).
+    - RED (backend): `test_design_register.py` asserts `product_type_name == "Jogger"`,
+      `product_category_name == "Apparel"`, `"style_type" not in row`; `test_design_sheet_export.py`
+      asserts headers contain `Product Type` + `Product Category` and NOT `Style Type`, cells `Jogger` /
+      `Apparel`. 2 failed first, 21 passed.
+    - GREEN (backend): removed `style_type` field from `models.py`; `serializers.py` adds
+      `product_category_name = CharField(source="tech_pack.product_type.category.name", read_only=True,
+      default="")`, swaps `style_type` for it in Meta.fields; `views.py` drops the `garments_type`
+      computation and `style_type` on init, export headers/rows now use `tp.product_type.name` +
+      `tp.product_type.category.name`; `seed_design_register.py` maps register `style_type` keys →
+      ProductCategory (Apparel/Knitwear/Outerwear) + ProductType (Jogger/Tee/Polo/Jacket) FKs;
+      `migrations/0039` RemoveField. Tests updated in `test_design_sheet_init.py` (fixture + asserts to
+      product_type). Targeted **23/23 GREEN**.
+    - RED→GREEN (frontend): `DesignsPage.tsx` Style Type column maps `o.product_type_name`, new **Category**
+      column maps `o.product_category_name`; `NewDesignModal.tsx` copy-mode Garments Type reads
+      `source?.product_type_name`; `client.ts` DesignSheet type drops `style_type?`, adds
+      `product_category_name?`; `DesignsPage.test.tsx` fixture/columns/row-mapping updated (16 tests).
+      **tsc -b 0; lint 0 errors (81 warnings, baseline); vitest 362/362 (50 files)**.
+    - Full-suite: backend **1715 passed / 9 failed — all 9 pre-existing & unrelated** (monitoring health
+      checks → 404 missing `health/run_checks/` route; `test_techpack_excel_import` → missing sample file
+      `PDF Extract\Extracted_2026-07-13 .xlsx`; not-sold date-range; e2e lifecycle shares the monitoring
+      404). Migrated dev DB (`merchandising.0039`) + restarted :8000 (new PID).
+
+59. **Design register attribute-list revision: drop `Contains` column, add `production` status (A7
+    follow-up)** - user re-supplied the register attribute list with two deltas vs. the implemented grid:
+    (a) the **Contains** column is removed (register no longer surfaces the tech-pack contents string),
+    and (b) `DesignSheet.Status` gains a **`production`** state (`new / rejected / closed / production /
+    archived`).
+    - RED (backend): `test_design_sheet.py` status-set assert grows `"production"` + new
+      `test_transition_to_production`; `test_design_register.py` drops `contains` from REGISTER_FIELDS and
+      asserts `"contains" not in row`; `test_design_sheet_export.py` asserts `"Contains" not in headers`.
+      3 failed first, 35 passed.
+    - GREEN (backend): `DesignSheet.Status.PRODUCTION = "production"` in `models.py`; `contains` removed
+      from `DesignSheetSerializer` fields + from the register-export headers/row in `views.py` (the model
+      field + tech-pack-level exports keep it). Targeted **54/54 GREEN** (design_sheet, register, export,
+      init).
+    - RED→GREEN (frontend): `DesignsPage.tsx` removes the Contains column + maps `production` in
+      STATUS_LABELS; `designSheetFields.ts` `DESIGN_SHEET_STATUSES` + `STATUS_LABELS` add `production`;
+      `DesignSheetHeader.tsx` + `EntityCard.tsx` add a production status style; `DesignSheetsListPage.tsx`
+      label map updated; `client.ts` DesignSheet type drops `contains?`; `DesignsPage.test.tsx` column list
+      + row-mapping updated (16 tests). **tsc -b 0; lint 0 errors (81 warnings, baseline); vitest 362/362
+      (50 files)**.
+    - Full-suite: backend (in-progress background run) — regression expected only in the 9 pre-existing
+      environment failures (monitoring 404 / missing sample xlsx / not-sold date-range / e2e monitoring
+      404).

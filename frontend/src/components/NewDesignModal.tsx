@@ -186,7 +186,7 @@ export default function NewDesignModal({ items, onClose, onCreated }: NewDesignM
               {mode === 'copy' ? (
                 <input
                   id="nd-garments-type"
-                  value={source?.style_type || source?.product_type_name || ''}
+                  value={source?.product_type_name || ''}
                   disabled
                   className={readOnlyClass}
                 />
