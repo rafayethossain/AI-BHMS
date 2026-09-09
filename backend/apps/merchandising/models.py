@@ -40,6 +40,32 @@ class Style(TenantModel):
         default="draft"
     )
 
+    # ── Design info fields (techpack-equivalent, manual entry) ──────────
+    block = models.CharField(max_length=100, blank=True, default="")
+    based_on = models.CharField(max_length=100, blank=True, default="")
+    relationship = models.CharField(
+        max_length=20,
+        choices=[
+            ("new", "New"),
+            ("based_on", "Based on"),
+            ("na", "NA"),
+            ("recut", "Recut"),
+        ],
+        default="new",
+        blank=True,
+    )
+    customer = models.CharField(max_length=100, blank=True, default="")
+    designer = models.CharField(max_length=100, blank=True, default="")
+    pattern_cutter = models.CharField(max_length=100, blank=True, default="")
+    issuer = models.CharField(max_length=100, blank=True, default="")
+    cloth_code = models.CharField(max_length=255, blank=True, default="")
+    size = models.CharField(max_length=50, blank=True, default="")
+    length = models.CharField(max_length=50, blank=True, default="")
+    issue_date = models.DateField(null=True, blank=True)
+    risk_date = models.DateField(null=True, blank=True)
+    pattern_request_date = models.DateField(null=True, blank=True)
+    design_note = models.TextField(blank=True, default="")
+
     class Meta:
         ordering = ["-created_at"]
         unique_together = ["tenant", "style_number"]

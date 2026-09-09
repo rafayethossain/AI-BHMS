@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -17,8 +17,12 @@ vi.mock('../../api/client', () => ({
     getStyles: vi.fn(),
     createStyle: vi.fn(),
     deleteStyle: vi.fn(),
+    copyStyle: vi.fn(),
   },
-  setupApi: { getBuyers: vi.fn() },
+  setupApi: {
+    getBuyers: vi.fn(),
+    getTypes: vi.fn(),
+  },
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -34,7 +38,12 @@ const gridCapture = vi.hoisted(() => ({
 }));
 
 vi.mock('../../components/SearchableSelect', () => ({
-  default: () => <div data-testid="searchable-select" />,
+  default: ({ placeholder, onChange }: { placeholder?: string; onChange?: (v: string) => void }) => (
+    <div data-testid="searchable-select">
+      {placeholder && <span>{placeholder}</span>}
+      <button data-testid="select-trigger" onClick={() => onChange?.('test-id')}>select</button>
+    </div>
+  ),
 }));
 
 vi.mock('../../components/SpreadsheetGrid', () => ({
@@ -78,6 +87,8 @@ describe('StylesListPage (Tabulator grid chrome)', () => {
     vi.clearAllMocks();
     gridCapture.reset();
     (setupApi.getBuyers as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { results: [] } });
+    (setupApi.getTypes as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { results: [] } });
+    (merchApi.getStyles as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { count: 0, results: [] } });
   });
 
   const style = {
@@ -150,5 +161,46 @@ describe('StylesListPage (Tabulator grid chrome)', () => {
     renderPage();
     await screen.findByText('ST-001');
     expect(gridCapture.lastProps?.paginationSize).toBe(25);
+  });
+
+  it('opens the create modal with Fresh/Copy mode toggle', async () => {
+    renderPage();
+    fireEvent.click(screen.getByText('+ New Style'));
+    await waitFor(() => {
+      expect(screen.getByText('New Style')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Fresh Style')).toBeInTheDocument();
+    expect(screen.getByText('Copy From Existing')).toBeInTheDocument();
+  });
+
+  it('shows design details toggle in Fresh mode', async () => {
+    renderPage();
+    fireEvent.click(screen.getByText('+ New Style'));
+    await waitFor(() => {
+      expect(screen.getByText('Design Details (Optional)')).toBeInTheDocument();
+    });
+  });
+
+  it('expands design details when clicked', async () => {
+    renderPage();
+    fireEvent.click(screen.getByText('+ New Style'));
+    await waitFor(() => {
+      expect(screen.getByText('Design Details (Optional)')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Design Details (Optional)'));
+    expect(screen.getByText('Block')).toBeInTheDocument();
+    expect(screen.getByText('Designer')).toBeInTheDocument();
+    expect(screen.getByText('Pattern Cutter')).toBeInTheDocument();
+    expect(screen.getByText('Cloth Code')).toBeInTheDocument();
+  });
+
+  it('shows search selects for product type and buyer in Fresh mode', async () => {
+    renderPage();
+    fireEvent.click(screen.getByText('+ New Style'));
+    await waitFor(() => {
+      expect(screen.getByText('Product Type')).toBeInTheDocument();
+    });
+    const selects = screen.getAllByTestId('searchable-select');
+    expect(selects.length).toBeGreaterThanOrEqual(1);
   });
 });

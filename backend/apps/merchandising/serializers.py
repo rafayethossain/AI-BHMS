@@ -80,7 +80,11 @@ class StyleSerializer(serializers.ModelSerializer):
             "brand", "category", "product_type", "department", "season", "season_name",
             "tech_pack", "sketch_front", "sketch_back", "sketch_side", "sketch_detail",
             "current_version", "status", "file_openings_count",
-            "purchase_orders_count", "line_items", "main_image", "created_at"
+            "purchase_orders_count", "line_items", "main_image", "created_at",
+            # Design info fields (techpack-equivalent, manual entry)
+            "block", "based_on", "relationship", "customer", "designer",
+            "pattern_cutter", "issuer", "cloth_code", "size", "length",
+            "issue_date", "risk_date", "pattern_request_date", "design_note",
         ]
         read_only_fields = ["id", "created_at", "current_version", "style_number"]
         extra_kwargs = {}

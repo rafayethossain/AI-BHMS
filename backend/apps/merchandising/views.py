@@ -133,6 +133,7 @@ class StyleViewSet(viewsets.ModelViewSet):
         "list": "merchandising:view", "retrieve": "merchandising:view",
         "create": "merchandising:create", "update": "merchandising:edit",
         "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
+        "copy": "merchandising:create",
         "extract_techpack": "merchandising:create",
         "techpack_excel": "merchandising:view",
         "import_techpack": "merchandising:create",
@@ -153,6 +154,61 @@ class StyleViewSet(viewsets.ModelViewSet):
         else:
             num = 1001
         serializer.save(tenant=tenant, style_number=f"STY-{num:04d}", created_by=self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="copy")
+    def copy(self, request, pk=None):
+        """Create a new Style by copying fields from an existing Style.
+
+        Copies: name, buyer, product_type, brand, category, department, season,
+        and all design info fields (block, based_on, designer, etc.).
+        The new style gets status=draft, a fresh style_number, and
+        relationship is set to "based_on" pointing to the source.
+        """
+        source = self.get_object()
+        tenant = request.tenant
+
+        # Generate new style number
+        last = Style.objects.filter(tenant=tenant).order_by("-created_at").first()
+        if last and last.style_number.startswith("STY-"):
+            try:
+                num = int(last.style_number.split("-")[1]) + 1
+            except (IndexError, ValueError):
+                num = 1001
+        else:
+            num = 1001
+
+        new_style = Style.objects.create(
+            tenant=tenant,
+            style_number=f"STY-{num:04d}",
+            name=source.name,
+            description=source.description,
+            buyer=source.buyer,
+            brand=source.brand,
+            category=source.category,
+            product_type=source.product_type,
+            department=source.department,
+            season=source.season,
+            status="draft",
+            created_by=request.user,
+            # Design info fields
+            block=source.block,
+            based_on=source.style_number,
+            relationship="based_on",
+            customer=source.customer,
+            designer=source.designer,
+            pattern_cutter=source.pattern_cutter,
+            issuer=source.issuer,
+            cloth_code=source.cloth_code,
+            size=source.size,
+            length=source.length,
+            issue_date=source.issue_date,
+            risk_date=source.risk_date,
+            pattern_request_date=source.pattern_request_date,
+            design_note=source.design_note,
+        )
+
+        serializer = StyleSerializer(new_style, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["get"])
     def versions(self, request, pk=None):

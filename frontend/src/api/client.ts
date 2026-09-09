@@ -187,6 +187,21 @@ export interface Style {
   file_openings_count: number;
   purchase_orders_count: number;
   created_at: string;
+  // Design info fields (techpack-equivalent, manual entry)
+  block: string;
+  based_on: string;
+  relationship: string;
+  customer: string;
+  designer: string;
+  pattern_cutter: string;
+  issuer: string;
+  cloth_code: string;
+  size: string;
+  length: string;
+  issue_date: string | null;
+  risk_date: string | null;
+  pattern_request_date: string | null;
+  design_note: string;
 }
 
 export interface DesignImage {
@@ -1302,6 +1317,9 @@ export const merchApi = {
 
   createStyle: (data: Record<string, unknown>) =>
     api.post<Style>('/merchandising/styles/', data),
+
+  copyStyle: (sourceId: string) =>
+    api.post<Style>(`/merchandising/styles/${sourceId}/copy/`),
 
   updateStyle: (id: string, data: Record<string, unknown>) =>
     api.patch<Style>(`/merchandising/styles/${id}/`, data),

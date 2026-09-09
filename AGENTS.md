@@ -43,6 +43,8 @@ relevant to the current task and drives work through them *in dependency order* 
 dots **forward** (this decision enables what later?) and **backward** (what earlier decision/enabled
 this?).
 
+
+
 | # | Role | Mandate | Primary global skill(s) to load | Outputs |
 |---|------|---------|--------------------------------|---------|
 | 1 | **Business Analyst (BA)** | Turn gaps in the reference roadmap into precise, traceable requirements. | `spec-driven-development`, `api-and-interface-design`, `interview-me`, `idea-refine` | Requirement/user-story with acceptance criteria; `RQ-###` mapping; impact assessment |
@@ -52,9 +54,39 @@ this?).
 | 5 | **Tester** | Prove behavior; maintain a green, meaningful suite. | `test-driven-development`, `browser-testing-with-devtools`, `debugging-and-error-recovery`, `doubt-driven-development` | Failing-first test; full-suite green evidence; regression proof |
 | 6 | **Docs Writer** | Record decisions, lessons, progress; keep the roadmap/tracker current. | `documentation-and-adrs`, `code-review-and-quality`, `deprecation-and-migration` | Updated `TDD_TRACKER.md`, `master-backlog.md`, `lessons-learned.md`, ADRs |
 
-**Skill loading rule:** when a role is active, load its primary global skill via the `skill` tool and
-follow it. Skills compose — e.g., Dev + Tester run together under a TDD loop. Do **not** load a skill
-for a role that is inactive for the current task.
+**Skill Activation — enable skills by role & phase (MANDATORY):** 
+
+
+opencode ships **engineering workflow skills** installed globally at
+`C:\Users\This PC\.config\opencode\skills\`. They are **workflows, not suggestions** — each encodes a
+process a senior engineer follows, with an explicit verification step. A skill is **enabled by loading it
+with the `skill` tool** available to this agent; it is NOT auto-applied. **Every agent MUST load a matching
+skill before/during a task** (see `using-agent-skills`). Doing the *work* of a skill without loading it is
+a process violation — it skips the skill's guardrails and verification.
+
+Lifecycle → skill (the discovery tree, from `using-agent-skills`)
+
+```
+Define   idea unclear?      → interview-me / idea-refine / spec-driven-development
+Plan     have a spec?       → planning-and-task-breakdown
+Build    implementing?      → incremental-implementation (+ source-driven-development
+                             for doc-verified code, doubt-driven-development when stakes are high)
+         UI work?           → frontend-ui-engineering
+         API/interface?     → api-and-interface-design
+Verify   writing tests?     → test-driven-development
+         browser runtime?   → browser-testing-with-devtools
+         something broke?   → debugging-and-error-recovery
+Review   reviewing code?    → code-review-and-quality / code-simplification
+         security?          → security-and-hardening
+         performance?       → performance-optimization
+Ship     committing?        → git-workflow-and-versioning
+         CI/CD?             → ci-cd-and-automation
+         docs/ADR?          → documentation-and-adrs
+         logs/metrics?      → observability-and-instrumentation
+         deploying?         → shipping-and-launch
+         migrating?         → deprecation-and-migration
+```
+
 
 ---
 
