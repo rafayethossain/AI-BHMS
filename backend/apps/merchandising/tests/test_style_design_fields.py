@@ -196,3 +196,75 @@ class TestStyleDesignInfoFields:
         assert data["size"] == ""
         assert data["length"] == ""
         assert data["design_note"] == ""
+
+    def test_patch_update_design_info_fields(self, client, seed):
+        """PATCH a style to add/update design info fields."""
+        create_resp = self._create(client, seed, block="Old Block", designer="Old Designer")
+        assert create_resp.status_code == 201
+        style_id = create_resp.json()["id"]
+
+        patch_payload = {
+            "block": "New Block",
+            "designer": "New Designer",
+            "customer": "Target Corp",
+            "pattern_cutter": "PC Updated",
+            "issuer": "Issuer Updated",
+            "cloth_code": "CC-NEW",
+            "size": "S, M, L, XL",
+            "length": "70cm",
+            "issue_date": "2026-08-01",
+            "risk_date": "2026-10-01",
+            "pattern_request_date": "2026-09-01",
+            "design_note": "Updated note",
+            "relationship": "recut",
+        }
+        patch_resp = client.patch(
+            f"/api/v1/merchandising/styles/{style_id}/",
+            patch_payload, format="json",
+        )
+        assert patch_resp.status_code == 200, patch_resp.content
+        data = patch_resp.json()
+        assert data["block"] == "New Block"
+        assert data["designer"] == "New Designer"
+        assert data["customer"] == "Target Corp"
+        assert data["pattern_cutter"] == "PC Updated"
+        assert data["issuer"] == "Issuer Updated"
+        assert data["cloth_code"] == "CC-NEW"
+        assert data["size"] == "S, M, L, XL"
+        assert data["length"] == "70cm"
+        assert data["issue_date"] == "2026-08-01"
+        assert data["risk_date"] == "2026-10-01"
+        assert data["pattern_request_date"] == "2026-09-01"
+        assert data["design_note"] == "Updated note"
+        assert data["relationship"] == "recut"
+
+    def test_patch_clear_design_info_field(self, client, seed):
+        """PATCH can clear a design info field back to blank."""
+        create_resp = self._create(client, seed, block="To Clear")
+        assert create_resp.status_code == 201
+        style_id = create_resp.json()["id"]
+
+        patch_resp = client.patch(
+            f"/api/v1/merchandising/styles/{style_id}/",
+            {"block": "", "designer": ""}, format="json",
+        )
+        assert patch_resp.status_code == 200, patch_resp.content
+        data = patch_resp.json()
+        assert data["block"] == ""
+        assert data["designer"] == ""
+
+    def test_patch_preserves_unset_fields(self, client, seed):
+        """PATCH only updates supplied fields; others stay untouched."""
+        create_resp = self._create(client, seed, block="Keep Me", designer="Keep Designer")
+        assert create_resp.status_code == 201
+        style_id = create_resp.json()["id"]
+
+        patch_resp = client.patch(
+            f"/api/v1/merchandising/styles/{style_id}/",
+            {"customer": "Only Customer"}, format="json",
+        )
+        assert patch_resp.status_code == 200, patch_resp.content
+        data = patch_resp.json()
+        assert data["block"] == "Keep Me"
+        assert data["designer"] == "Keep Designer"
+        assert data["customer"] == "Only Customer"

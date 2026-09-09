@@ -65,6 +65,13 @@ export default function StyleDetailPage() {
   const [savingItem, setSavingItem] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [uoms, setUoms] = useState<UOM[]>([]);
+  const [designInfoEditing, setDesignInfoEditing] = useState(false);
+  const [designInfoForm, setDesignInfoForm] = useState({
+    block: '', based_on: '', relationship: '', customer: '', designer: '',
+    pattern_cutter: '', issuer: '', cloth_code: '', size: '', length: '',
+    issue_date: '', risk_date: '', pattern_request_date: '', design_note: '',
+  });
+  const [savingDesignInfo, setSavingDesignInfo] = useState(false);
 
   useEffect(() => {
     if (!previewSketch) return;
@@ -116,6 +123,63 @@ export default function StyleDetailPage() {
     setupApi.getVendors({ page_size: '500' }).then(r => setVendors(r.data.results)).catch(() => {});
     setupApi.getUOMs({ page_size: '500' }).then(r => setUoms(r.data.results)).catch(() => {});
   }, []);
+
+  const RELATIONSHIP_OPTIONS = [
+    { value: '', label: '—' },
+    { value: 'new', label: 'New' },
+    { value: 'based_on', label: 'Based On' },
+    { value: 'na', label: 'NA' },
+    { value: 'recut', label: 'Recut' },
+  ];
+
+  const startDesignInfoEdit = () => {
+    if (!style) return;
+    setDesignInfoForm({
+      block: style.block || '',
+      based_on: style.based_on || '',
+      relationship: style.relationship || '',
+      customer: style.customer || '',
+      designer: style.designer || '',
+      pattern_cutter: style.pattern_cutter || '',
+      issuer: style.issuer || '',
+      cloth_code: style.cloth_code || '',
+      size: style.size || '',
+      length: style.length || '',
+      issue_date: style.issue_date || '',
+      risk_date: style.risk_date || '',
+      pattern_request_date: style.pattern_request_date || '',
+      design_note: style.design_note || '',
+    });
+    setDesignInfoEditing(true);
+  };
+
+  const handleSaveDesignInfo = async () => {
+    if (!id) return;
+    setSavingDesignInfo(true);
+    try {
+      const DATE_FIELDS = new Set(['issue_date', 'risk_date', 'pattern_request_date']);
+      const TEXT_FIELDS = new Set([
+        'block', 'based_on', 'relationship', 'customer', 'designer',
+        'pattern_cutter', 'issuer', 'cloth_code', 'size', 'length', 'design_note',
+      ]);
+      const payload: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(designInfoForm)) {
+        if (DATE_FIELDS.has(key)) {
+          payload[key] = val || null;
+        } else if (TEXT_FIELDS.has(key)) {
+          payload[key] = val || '';
+        }
+      }
+      await api.patch(`/merchandising/styles/${id}/`, payload);
+      toast('success', 'Design information updated');
+      setDesignInfoEditing(false);
+      await fetchStyle();
+    } catch {
+      toast('error', 'Failed to update design information');
+    } finally {
+      setSavingDesignInfo(false);
+    }
+  };
 
   const handleTransition = async (newStatus: string) => {
     if (!id) return;
@@ -313,29 +377,158 @@ export default function StyleDetailPage() {
         </div>
 
         {tab === 'overview' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-surface rounded-xl border border-border p-6">
-              <h3 className="text-sm font-medium text-muted mb-4">Details</h3>
-              <dl className="space-y-3 text-sm">
-                <div className="flex justify-between"><dt className="text-muted">Buyer</dt><dd>{style.buyer_name}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted">Season</dt><dd>{style.season_name || '-'}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted">Version</dt><dd>v{style.current_version}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted">Description</dt><dd className="text-right max-w-xs">{style.description || '-'}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted">Tech Pack</dt><dd>{style.tech_pack ? 'Uploaded' : 'None'}</dd></div>
-              </dl>
-            </div>
-            <div className="bg-surface rounded-xl border border-border p-6">
-              <h3 className="text-sm font-medium text-muted mb-4">Quick Stats</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-input rounded-lg p-4 text-center">
-                  <p className="text-2xl font-bold text-emerald-400">{style.file_openings_count}</p>
-                  <p className="text-xs text-muted mt-1">File Openings</p>
-                </div>
-                <div className="bg-input rounded-lg p-4 text-center">
-                  <p className="text-2xl font-bold text-blue-400">{style.purchase_orders_count}</p>
-                  <p className="text-xs text-muted mt-1">Purchase Orders</p>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-surface rounded-xl border border-border p-6">
+                <h3 className="text-sm font-medium text-muted mb-4">Details</h3>
+                <dl className="space-y-3 text-sm">
+                  <div className="flex justify-between"><dt className="text-muted">Buyer</dt><dd>{style.buyer_name}</dd></div>
+                  <div className="flex justify-between"><dt className="text-muted">Season</dt><dd>{style.season_name || '-'}</dd></div>
+                  <div className="flex justify-between"><dt className="text-muted">Version</dt><dd>v{style.current_version}</dd></div>
+                  <div className="flex justify-between"><dt className="text-muted">Description</dt><dd className="text-right max-w-xs">{style.description || '-'}</dd></div>
+                  <div className="flex justify-between"><dt className="text-muted">Tech Pack</dt><dd>{style.tech_pack ? 'Uploaded' : 'None'}</dd></div>
+                </dl>
+              </div>
+              <div className="bg-surface rounded-xl border border-border p-6">
+                <h3 className="text-sm font-medium text-muted mb-4">Quick Stats</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-input rounded-lg p-4 text-center">
+                    <p className="text-2xl font-bold text-emerald-400">{style.file_openings_count}</p>
+                    <p className="text-xs text-muted mt-1">File Openings</p>
+                  </div>
+                  <div className="bg-input rounded-lg p-4 text-center">
+                    <p className="text-2xl font-bold text-blue-400">{style.purchase_orders_count}</p>
+                    <p className="text-xs text-muted mt-1">Purchase Orders</p>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-surface rounded-xl border border-border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-muted">Design Information</h3>
+                {designInfoEditing ? (
+                  <div className="flex gap-2">
+                    <button onClick={() => setDesignInfoEditing(false)}
+                      className="px-3 py-1.5 text-sm text-muted hover:text-heading transition-colors">Cancel</button>
+                    <button onClick={handleSaveDesignInfo} disabled={savingDesignInfo}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm rounded-lg transition-colors">
+                      {savingDesignInfo ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={startDesignInfoEdit}
+                    className="px-3 py-1.5 bg-surface-alt hover:bg-input border border-border text-heading text-sm rounded-lg transition-colors">
+                    Edit
+                  </button>
+                )}
+              </div>
+
+              {designInfoEditing ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Block</label>
+                    <input value={designInfoForm.block} onChange={(e) => setDesignInfoForm({ ...designInfoForm, block: e.target.value })}
+                      placeholder="e.g. A-Block"
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Based On</label>
+                    <input value={designInfoForm.based_on} disabled
+                      placeholder="Set via copy from source"
+                      className="w-full px-3 py-2 bg-surface-alt border border-input-border rounded-lg text-sm text-faint cursor-not-allowed" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Relationship</label>
+                    <select value={designInfoForm.relationship} onChange={(e) => setDesignInfoForm({ ...designInfoForm, relationship: e.target.value })}
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+                      {RELATIONSHIP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Customer</label>
+                    <input value={designInfoForm.customer} onChange={(e) => setDesignInfoForm({ ...designInfoForm, customer: e.target.value })}
+                      placeholder="Customer name"
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Designer</label>
+                    <input value={designInfoForm.designer} onChange={(e) => setDesignInfoForm({ ...designInfoForm, designer: e.target.value })}
+                      placeholder="Designer name"
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Pattern Cutter</label>
+                    <input value={designInfoForm.pattern_cutter} onChange={(e) => setDesignInfoForm({ ...designInfoForm, pattern_cutter: e.target.value })}
+                      placeholder="Pattern cutter name"
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Issuer</label>
+                    <input value={designInfoForm.issuer} onChange={(e) => setDesignInfoForm({ ...designInfoForm, issuer: e.target.value })}
+                      placeholder="Issuer name"
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Cloth Code</label>
+                    <input value={designInfoForm.cloth_code} onChange={(e) => setDesignInfoForm({ ...designInfoForm, cloth_code: e.target.value })}
+                      placeholder="e.g. CC-001"
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Size</label>
+                    <input value={designInfoForm.size} onChange={(e) => setDesignInfoForm({ ...designInfoForm, size: e.target.value })}
+                      placeholder="e.g. S/M/L"
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Length</label>
+                    <input value={designInfoForm.length} onChange={(e) => setDesignInfoForm({ ...designInfoForm, length: e.target.value })}
+                      placeholder="e.g. 32 inches"
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Issue Date</label>
+                    <input type="date" value={designInfoForm.issue_date} onChange={(e) => setDesignInfoForm({ ...designInfoForm, issue_date: e.target.value })}
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Risk Date</label>
+                    <input type="date" value={designInfoForm.risk_date} onChange={(e) => setDesignInfoForm({ ...designInfoForm, risk_date: e.target.value })}
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Pattern Request Date</label>
+                    <input type="date" value={designInfoForm.pattern_request_date} onChange={(e) => setDesignInfoForm({ ...designInfoForm, pattern_request_date: e.target.value })}
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs text-muted mb-1">Design Note</label>
+                    <textarea value={designInfoForm.design_note} onChange={(e) => setDesignInfoForm({ ...designInfoForm, design_note: e.target.value })} rows={3}
+                      placeholder="Additional design notes..."
+                      className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                  </div>
+                </div>
+              ) : (
+                <dl className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Block</dt><dd className="text-heading">{style.block || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Based On</dt><dd className="text-heading">{style.based_on || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Relationship</dt><dd className="text-heading capitalize">{style.relationship || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Customer</dt><dd className="text-heading">{style.customer || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Designer</dt><dd className="text-heading">{style.designer || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Pattern Cutter</dt><dd className="text-heading">{style.pattern_cutter || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Issuer</dt><dd className="text-heading">{style.issuer || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Cloth Code</dt><dd className="text-heading">{style.cloth_code || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Size</dt><dd className="text-heading">{style.size || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Length</dt><dd className="text-heading">{style.length || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Issue Date</dt><dd className="text-heading">{style.issue_date || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Risk Date</dt><dd className="text-heading">{style.risk_date || '—'}</dd></div>
+                  <div className="bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Pattern Request Date</dt><dd className="text-heading">{style.pattern_request_date || '—'}</dd></div>
+                  {style.design_note && (
+                    <div className="md:col-span-3 bg-surface-alt/40 rounded-lg px-3 py-2"><dt className="text-xs text-muted">Design Note</dt><dd className="text-heading whitespace-pre-wrap">{style.design_note}</dd></div>
+                  )}
+                </dl>
+              )}
             </div>
           </div>
         )}
