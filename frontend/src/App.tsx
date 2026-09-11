@@ -5,7 +5,6 @@ import { ToastProvider } from './contexts/ToastContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
-import StylesListPage from './pages/StylesListPage';
 import DesignsPage from './pages/DesignsPage';
 import StyleDetailPage from './pages/StyleDetailPage';
 import FileOpeningsListPage from './pages/FileOpeningsListPage';
@@ -78,7 +77,6 @@ import OrderManagerDashboardPage from './pages/OrderManagerDashboardPage';
 import BookingSchedulePage from './pages/BookingSchedulePage';
 import PaperworkComparisonPage from './pages/PaperworkComparisonPage';
 import TechPackImportWizardPage from './pages/TechPackImportWizardPage';
-import DesignSheetsListPage from './pages/DesignSheetsListPage';
 import DesignSheetPage from './pages/DesignSheetPage';
 import DesignSheetPrintPage from './pages/DesignSheetPrintPage';
 import DesignCostingsListPage from './pages/DesignCostingsListPage';
@@ -112,7 +110,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-            <Route path="/styles" element={<ProtectedRoute><StylesListPage /></ProtectedRoute>} />
+            <Route path="/styles" element={<ProtectedRoute><Navigate to="/design" replace /></ProtectedRoute>} />
             <Route path="/styles/:id" element={<ProtectedRoute><StyleDetailPage /></ProtectedRoute>} />
             <Route path="/file-openings" element={<ProtectedRoute><FileOpeningsListPage /></ProtectedRoute>} />
             <Route path="/file-openings/:id" element={<ProtectedRoute><FileOpeningDetailPage /></ProtectedRoute>} />
@@ -183,7 +181,7 @@ function App() {
 <Route path="/logistics/summary-reports" element={<ProtectedRoute><SummaryReportsPage /></ProtectedRoute>} />
             <Route path="/fit-specs" element={<ProtectedRoute><FitSpecsPage /></ProtectedRoute>} />
             <Route path="/styles/techpack-import" element={<ProtectedRoute><TechPackImportWizardPage /></ProtectedRoute>} />
-            <Route path="/design-sheets" element={<ProtectedRoute><DesignSheetsListPage /></ProtectedRoute>} />
+            <Route path="/design-sheets" element={<ProtectedRoute><Navigate to="/design" replace /></ProtectedRoute>} />
             <Route path="/design" element={<ProtectedRoute><DesignsPage /></ProtectedRoute>} />
             <Route path="/design-sheets/:id" element={<ProtectedRoute><DesignSheetPage /></ProtectedRoute>} />
             <Route path="/design-sheets/:id/print" element={<ProtectedRoute><DesignSheetPrintPage /></ProtectedRoute>} />

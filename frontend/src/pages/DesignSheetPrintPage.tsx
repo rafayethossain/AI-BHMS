@@ -4,8 +4,8 @@ import { merchApi } from '../api/client';
 import { DESIGN_INFO_FIELDS } from '../components/designSheetFields';
 import type { DesignSheet, DesignSheetMaterialItem } from '../api/client';
 
-const PRINT_AREA_BG = '#f8f3e6';
-const GREY_SURROUND = '#e2e8f0';
+const PRINT_AREA_BG = '#ffffff';
+const GREY_SURROUND = '#eef2f7';
 
 const MATERIAL_COLUMNS: { key: keyof DesignSheetMaterialItem; title: string; align?: 'right' }[] = [
   { key: 'type', title: 'Type' },
@@ -17,6 +17,15 @@ const MATERIAL_COLUMNS: { key: keyof DesignSheetMaterialItem; title: string; ali
   { key: 'qty', title: 'Qty', align: 'right' },
   { key: 'match', title: 'Match' },
 ];
+
+function SectionTitle({ children }: { children: string }) {
+  return (
+    <h2 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-700">
+      <span className="inline-block h-3 w-1 rounded-full bg-emerald-600" aria-hidden="true" />
+      {children}
+    </h2>
+  );
+}
 
 export default function DesignSheetPrintPage() {
   const { id } = useParams<{ id: string }>();
@@ -145,75 +154,108 @@ export default function DesignSheetPrintPage() {
 
           {sheet && (
             <>
-              <header data-testid="print-header" className="border-b border-slate-400 pb-4">
-                <div className="flex items-end justify-between gap-4">
-                  <h1 className="text-xl font-bold uppercase tracking-wide">Design Sheet</h1>
-                  <p className="text-sm">
-                    File: <span className="font-semibold">{sheet.file_number}</span>
-                    <span className="mx-2 text-slate-400">·</span>
-                    Style: <span className="font-semibold">{sheet.style_code}</span>
-                    <span className="mx-2 text-slate-400">·</span>
-                    <span>{sheet.buyer_name}</span>
-                  </p>
+              <header data-testid="print-header" className="border-b-2 border-slate-800 pb-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex shrink-0 items-center justify-center rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold tracking-widest text-white">
+                      BHMS
+                    </span>
+                    <h1 className="text-lg font-bold uppercase tracking-tight text-slate-900">
+                      Design Sheet
+                    </h1>
+                  </div>
+                  <div className="text-right text-xs text-slate-500">
+                    <p>
+                      File <span className="font-semibold text-slate-800">{sheet.file_number}</span>
+                    </p>
+                    <p className="mt-0.5">
+                      {sheet.department ? `${sheet.department} · ` : ''}
+                      <span className="capitalize">{sheet.status || '—'}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">
+                      Buyer
+                    </p>
+                    <p
+                      data-testid="print-buyer-name"
+                      className="mt-0.5 truncate text-xl font-bold leading-tight text-emerald-900"
+                    >
+                      {sheet.buyer_name || '—'}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                      Style
+                    </p>
+                    <p
+                      data-testid="print-style-code"
+                      className="mt-0.5 truncate text-xl font-bold leading-tight text-slate-900"
+                    >
+                      {sheet.style_code || '—'}
+                    </p>
+                  </div>
                 </div>
               </header>
 
               <section aria-label="Design information" className="mt-4">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                  Design Information
-                </h2>
-                <table data-testid="print-design-info" className="w-full text-sm">
-                  <tbody>
-                    {DESIGN_INFO_FIELDS.map(({ key, label }) => {
-                      const value = sheet[key];
-                      return (
-                        <tr key={key} className="border-b border-slate-200">
-                          <td className="py-1 pr-4 align-top w-40 text-slate-500">{label}</td>
-                          <td className="py-1 align-top font-medium">{value ? String(value) : '—'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <SectionTitle>Design Information</SectionTitle>
+                <dl data-testid="print-design-info" className="mt-1.5 grid grid-cols-2 gap-x-6 gap-y-0.5">
+                  {DESIGN_INFO_FIELDS.map(({ key, label }) => {
+                    const value = sheet[key];
+                    return (
+                      <div
+                        key={key}
+                        className="flex items-baseline justify-between gap-3 border-b border-slate-100 py-1"
+                      >
+                        <dt className="text-[11px] uppercase tracking-wide text-slate-500">{label}</dt>
+                        <dd className="text-right text-sm font-medium text-slate-900">
+                          {value ? String(value) : '—'}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
               </section>
 
-              <section aria-label="Sketch" className="mt-6">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Sketch</h2>
-                <div data-testid="print-sketch" className="border border-slate-300 p-3">
+              <section aria-label="Sketch" className="mt-5">
+                <SectionTitle>Sketch</SectionTitle>
+                <div data-testid="print-sketch" className="mt-1.5 border border-slate-200 p-3">
                   {sheet.sketch_url ? (
                     <img
                       src={sheet.sketch_url}
                       alt="Design sheet sketch"
-                      className="mx-auto max-h-80 object-contain"
+                      className="mx-auto max-h-72 object-contain"
                     />
                   ) : (
-                    <p className="text-sm text-slate-500 text-center py-8">No sketch uploaded</p>
+                    <p className="py-6 text-center text-sm text-slate-500">No sketch uploaded</p>
                   )}
                 </div>
               </section>
 
-              <section aria-label="Fit specs" className="mt-6">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                  Fit Specs
-                </h2>
-                <div data-testid="print-fit-specs" className="border border-slate-300">
+              <section aria-label="Fit specs" className="mt-5">
+                <SectionTitle>Fit Specs</SectionTitle>
+                <div data-testid="print-fit-specs" className="mt-1.5 border border-slate-200">
                   {visibleFitSpecs.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-4">No fit specs</p>
+                    <p className="py-3 text-center text-sm text-slate-500">No fit specs</p>
                   ) : (
                     <table className="w-full text-xs border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-400">
-                          <th className="py-1.5 px-2 text-left font-semibold text-slate-600 w-8">Print</th>
-                          <th className="py-1.5 px-2 text-left font-semibold text-slate-600">Fit</th>
-                          <th className="py-1.5 px-2 text-left font-semibold text-slate-600">Date</th>
-                          <th className="py-1.5 px-2 text-left font-semibold text-slate-600">Description</th>
-                          <th className="py-1.5 px-2 text-left font-semibold text-slate-600">Notes</th>
+                        <tr className="border-b border-slate-300 bg-slate-50">
+                          <th className="px-2 py-1 text-left font-semibold text-slate-600 w-8">Print</th>
+                          <th className="px-2 py-1 text-left font-semibold text-slate-600">Fit</th>
+                          <th className="px-2 py-1 text-left font-semibold text-slate-600">Date</th>
+                          <th className="px-2 py-1 text-left font-semibold text-slate-600">Description</th>
+                          <th className="px-2 py-1 text-left font-semibold text-slate-600">Notes</th>
                         </tr>
                       </thead>
                       <tbody>
                         {visibleFitSpecs.map((fs) => (
-                          <tr key={fs.id} className="border-b border-slate-200">
-                            <td className="py-1 px-2">
+                          <tr key={fs.id} className="border-b border-slate-100">
+                            <td className="px-2 py-1">
                               <input
                                 type="checkbox"
                                 data-testid={`print-fitspec-tick-${fs.id}`}
@@ -223,13 +265,13 @@ export default function DesignSheetPrintPage() {
                                 className="accent-emerald-600"
                               />
                             </td>
-                            <td className="py-1 px-2 font-semibold">
+                            <td className="px-2 py-1 font-semibold">
                               {fs.fit_number}
                               {fs.is_selected && <span className="ml-1 text-emerald-700">✓</span>}
                             </td>
-                            <td className="py-1 px-2">{fs.fit_date || '—'}</td>
-                            <td className="py-1 px-2">{fs.description || '—'}</td>
-                            <td className="py-1 px-2">{fs.notes || '—'}</td>
+                            <td className="px-2 py-1">{fs.fit_date || '—'}</td>
+                            <td className="px-2 py-1">{fs.description || '—'}</td>
+                            <td className="px-2 py-1">{fs.notes || '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -238,18 +280,16 @@ export default function DesignSheetPrintPage() {
                 </div>
               </section>
 
-              <section aria-label="Material breakdown" className="mt-6">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                  Material Breakdown
-                </h2>
-                <table data-testid="print-material-grid" className="w-full text-xs border-collapse">
+              <section aria-label="Material breakdown" className="mt-5">
+                <SectionTitle>Material Breakdown</SectionTitle>
+                <table data-testid="print-material-grid" className="mt-1.5 w-full text-xs border-collapse">
                   <thead>
-                    <tr className="border-y border-slate-400">
-                      <th className="py-1.5 px-1 text-left font-semibold text-slate-600 w-8">Print</th>
+                    <tr className="border-y border-slate-300 bg-slate-50">
+                      <th className="px-1 py-1 text-left font-semibold text-slate-600 w-8">Print</th>
                       {MATERIAL_COLUMNS.map((col) => (
                         <th
                           key={col.key}
-                          className={`py-1.5 px-1 text-left font-semibold text-slate-600 ${
+                          className={`px-1 py-1 text-left font-semibold text-slate-600 ${
                             col.align === 'right' ? 'text-right' : ''
                           }`}
                         >
@@ -261,14 +301,14 @@ export default function DesignSheetPrintPage() {
                   <tbody>
                     {visibleMaterials.length === 0 && (
                       <tr>
-                        <td colSpan={gridColSpan} className="py-4 text-center text-slate-500">
+                        <td colSpan={gridColSpan} className="py-3 text-center text-slate-500">
                           No material items
                         </td>
                       </tr>
                     )}
                     {visibleMaterials.map((item) => (
-                      <tr key={item.id} className="border-b border-slate-200">
-                        <td className="py-1 px-1">
+                      <tr key={item.id} className="border-b border-slate-100">
+                        <td className="px-1 py-1">
                           <input
                             type="checkbox"
                             data-testid={`print-item-tick-${item.id}`}
@@ -281,7 +321,7 @@ export default function DesignSheetPrintPage() {
                         {MATERIAL_COLUMNS.map((col) => (
                           <td
                             key={col.key}
-                            className={`py-1 px-1 align-top ${col.align === 'right' ? 'text-right' : ''}`}
+                            className={`px-1 py-1 align-top ${col.align === 'right' ? 'text-right' : ''}`}
                           >
                             {item[col.key] === null || item[col.key] === '' || item[col.key] === undefined
                               ? ''
@@ -291,11 +331,11 @@ export default function DesignSheetPrintPage() {
                       </tr>
                     ))}
                     {visibleMaterials.length > 0 && (
-                      <tr className="border-t border-slate-400">
-                        <td className="py-1.5 px-1 font-semibold" colSpan={MATERIAL_COLUMNS.length}>
+                      <tr className="border-t border-slate-300 bg-slate-50">
+                        <td className="px-1 py-1.5 font-semibold" colSpan={MATERIAL_COLUMNS.length}>
                           Total
                         </td>
-                        <td data-testid="material-total" className="py-1.5 px-1 text-right font-semibold">
+                        <td data-testid="material-total" className="px-1 py-1.5 text-right font-semibold">
                           {totalQty.toLocaleString()}
                         </td>
                       </tr>
@@ -304,12 +344,12 @@ export default function DesignSheetPrintPage() {
                 </table>
               </section>
 
-              <footer data-testid="print-footer" className="mt-8 pt-3 border-t border-slate-400 text-center">
-                <p className="text-sm font-semibold">CARMEL APPARELS</p>
-                <p className="text-xs text-slate-500">
-                  © {printedAt.getFullYear()} Carmel Apparels — BHMS Design Sheet
+              <footer data-testid="print-footer" className="mt-6 border-t border-slate-300 pt-3 text-center">
+                <p className="text-sm font-bold tracking-[0.2em] text-slate-800">BHMS — Design Sheet</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  © {printedAt.getFullYear()} BHMS. All rights reserved.
                 </p>
-                <p data-testid="print-timestamp" className="text-xs text-slate-500">
+                <p data-testid="print-timestamp" className="mt-0.5 text-[11px] text-slate-500">
                   Printed on {printedAt.toLocaleString()}
                 </p>
               </footer>

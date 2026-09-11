@@ -54,7 +54,6 @@ class Style(TenantModel):
         default="new",
         blank=True,
     )
-    customer = models.CharField(max_length=100, blank=True, default="")
     designer = models.CharField(max_length=100, blank=True, default="")
     pattern_cutter = models.CharField(max_length=100, blank=True, default="")
     issuer = models.CharField(max_length=100, blank=True, default="")
@@ -1025,7 +1024,6 @@ class StyleTechPack(TenantModel):
         max_length=20, choices=Relationship.choices, default="new", blank=True,
         help_text="Relationship of this design to a base (Based on / NA / Recut / New)",
     )
-    customer = models.CharField(max_length=100, blank=True)
     style_number = models.CharField(max_length=50, blank=True)
     size = models.CharField(max_length=50, blank=True)
     designer = models.CharField(max_length=100, blank=True)
@@ -1067,12 +1065,12 @@ class StyleTechPack(TenantModel):
         unique_together = ["tenant", "techpack_number"]
 
     def buyer_display_name(self):
-        """Buyer name for register/export: style buyer → tech-pack buyer → customer."""
+        """Buyer name for register/export: style buyer → tech-pack buyer."""
         if self.style_id and self.style.buyer_id:
             return self.style.buyer.name
         if self.buyer_id:
             return self.buyer.name
-        return self.customer or ""
+        return ""
 
     def __str__(self):
         number = self.style_number or (self.style.style_number if self.style else "") or "unlinked"

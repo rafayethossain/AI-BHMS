@@ -49,7 +49,7 @@ def test_defaults(tp_tenant):
     assert tp.errors == []
     assert tp.warnings == []
     assert tp.issue_date is None
-    for field in ("block", "based_on", "customer", "style_number", "size",
+    for field in ("block", "based_on", "style_number", "size",
                   "designer", "pattern_cutter", "issuer", "cloth_code",
                   "length", "sketch", "description", "note"):
         assert getattr(tp, field) == ""

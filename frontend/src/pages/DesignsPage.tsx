@@ -130,7 +130,7 @@ export default function DesignsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Design Register</h1>
-            <p className="text-sm text-muted">Styles and design sheets across the buying house</p>
+            <p className="text-sm text-muted">Design sheets across the buying house</p>
           </div>
           <div className="flex items-center gap-2">
             <button

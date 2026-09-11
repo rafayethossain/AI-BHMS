@@ -4655,6 +4655,163 @@ is no longer a register column), and **`production`** joins the design-sheet lif
   (baseline); vitest **362/362 (50 files)**; full backend regression expected only in the 9 pre-existing
   environment failures.
 
+## Part 15 Addendum 4 — Merged scope: Design Information editable on the design-sheet detail (2026-09-10)
+
+**Task status:** ✅ Completed. RED→GREEN→verify; backend + frontend.
+
+**What and why:** The Style detail page (`/styles/:id`) gained an editable Design Information section, but
+the user's workspace is the **merged Design Register** (`/design` → row click → `/design-sheets/:id`).
+Since Style and Design are one scope, the design-sheet detail is the register entry for the linked
+**Style**: its Design Information now mirrors the Style (single source of truth) with the imported
+tech-pack snapshot as fallback, and the header carries the same Edit/Save UI (Based On read-only,
+Relationship dropdown, date pickers, Design Note textarea) that PATCHes the Style and refetches.
+
+**What changed:**
+- Backend: `DesignSheetSerializer.to_representation` overrides the design-info keys from the linked Style
+  when non-empty (`block/based_on/relationship/customer/size/designer/pattern_cutter/issuer/cloth_code/
+  length/description` + `note ← style.design_note`; dates `issue_date/risk_date/pattern_request_date` via
+  `isoformat()`), leaving the tech-pack field sources as fallback for blank Style values / unlinked
+  sheets. Unlinked `style_id` stays `None` (falsy).
+- Frontend: `DesignSheetHeader.tsx` gains Edit/Save/Cancel with the StyleDetailPage field-type rules
+  (from `designSheetFields.ts`: `RELATIONSHIP_LABELS`, `RELATIONSHIP_OPTIONS`, and
+  `relationship`/`risk_date`/`pattern_request_date` added to the read grid). Save PATCHes
+  `/merchandising/styles/{style_id}/` (text → `""` on clear, dates → `null`) then refetches the sheet;
+  no Edit button when no Style is linked.
+- Tests: `test_design_sheet_api.py` `TestDesignSheetDesignInfoFromStyle` (+4: detail/list mirror someone
+  Style PATCH, tech-pack fallback, unlinked fallback); `DesignSheetHeader.test.tsx` (+4 edit-flow tests).
+- Verification: backend RED 3 fail → GREEN **4/4** + design-sheet adjacency **124/124** + owning app
+  **51/51**; frontend RED → GREEN **9/9**; `tsc -b` 0; oxlint 0 errors (baseline); vitest **366/370 (4
+  pre-existing GuidedTour localStorage env failures)**. GATE_A — serializer change is shared, so every
+  `DesignSheetSerializer` consumer's tests were run; full 1746-test backend regression deferred as a
+  milestone gate.
+
+**Follow-up (same day, same Addendum) — every register entry editable, Style-linked or not.**
+Fresh "New Design" init creates sheets with an **unlinked** tech-pack (`style=None` when no source), yet
+the Edit UI was gated on `style_id` — so freshly-created register entries could not be saved. Added a
+write path:
+- Backend: `PATCH /merchandising/design-sheets/{id}/design-info/` (`DesignSheetViewSet.design_info`,
+  perm `merchandising:edit`) writes the design-info fields onto the linked Style when present (single
+  source of truth) and onto the tech-pack otherwise (`design_note` → `note`; dates → `null` on clear,
+  text → `""`; `relationship` validated against `new/based_on/na/recut`). Class constants
+  `DESIGN_INFO_FIELDS` / `DESIGN_INFO_DATES` / `DESIGN_INFO_RELATIONSHIPS`.
+- Frontend: the header now **always** shows Edit (read-only hint removed); `handleSave` routes every
+  save through `merchApi.updateDesignSheetDesignInfo` (the merged endpoint decides the target);
+  `client.ts` gains `updateDesignSheetDesignInfo(id, data)`.
+- Tests: backend `TestDesignSheetDesignInfoWrite` (+4, all failed first on the missing route); frontend
+  header tests re-targeted to the merged endpoint (2 failed first — no Edit for unlinked sheets).
+- Verification: backend targeted **8/8** + `test_design_sheet_api.py` **37/37** + adjacency **44/44**
+  + owning app **51/51**; frontend **10/10**; `tsc -b` 0; oxlint 0 errors (baseline); vitest
+  **367/370 (GATE_A, allowlist only)**. Home-screen path `/design` → `/design-sheets/:id` → Edit on any
+  sheet (e.g., TP-1003) → Save persists to the tech-pack (unlinked) or the Style (linked).
+
+**Follow-up 3 (same Addendum) — save-500 fix + Customer as Setup→Buyer dropdown.**
+User-reported on the always-editable form: (1) the Update button failed for Style-linked sheets — root
+cause: the `design-info` action wrote date strings verbatim onto the model, and the
+`DesignSheetSerializer` Style-mirror called `.isoformat()` on them → `'str' object has no attribute
+'isoformat'` (500) on every linked save. Fixed with date coercion in the action
+(`_coerce_design_date`, 400 on malformed, `''`→`null`) + a defensive serializer date guard.
+Live-verified HTTP 200 on TP-1002 (dates ISO; cleared dates null). (2) `Customer` is now a dropdown
+of **Setup→Buyer** names (`setupApi.getBuyers`, alphabetic, legacy value preserved, `''` clears the
+field). Verification: backend `test_design_sheet_api.py` **38/38** + adjacency **44/44** + owning app
+**51/51**; frontend header **12/12**, `tsc -b` 0, lint 0 errors, vitest **369/373 (allowlist only)**.
+
+**Follow-up 4 (same Addendum) — blank-relationship 400 + Style-page Customer dropdown.**
+Browser feedback: "updated name is not storing". Root cause: the always-editable header sends every
+field and its Relationship select offers "—"; when relationship was empty the `design-info` action
+rejected `""` with `Invalid relationship` (400) and NO field persisted. Fix: `''` is now a valid clear
+(still rejects unknown non-empty values). Also unified the **Style detail** page's Design Information:
+Customer was a free text input → now the same Setup→Buyer dropdown (preselected, alphabetised, legacy
+value preserved). Verification: backend blank-relationship RED→GREEN (6/6, live HTTP 200 + clear);
+`StyleDetailPage.test.tsx` RED→GREEN; real-browser: style page `isSelect:true`, `API PERSISTED
+customer:Lidl`; design-sheet API + e2e **45/45**, owning app **51/51**; frontend `tsc -b` 0, lint 0
+errors, vitest **370/374 (allowlist only)**.
+
+**Follow-up 2 (same Addendum) — always-editable Design Information, no toggle.**
+User feedback after follow-up 1: even with the (fresh) code live, the toggle was still not discoverable —
+"no visible save button, no field editable". The Edit/Save toggle was removed entirely: the Design
+Information card on the design-sheet detail now renders the 14 fields as **always-enabled inputs** with a
+prominent **"Update Design Information"** primary button (and a Discard button that re-syncs the form
+from the latest sheet). The form re-syncs from the `sheet` prop via `useEffect` after a save-refetch.
+Same `design-info` endpoint and field-kind payload split (text → `""`, dates → `null`) as follow-up 1.
+Tests rewritten to the always-editable contract (6 failed first), targeted **10/10**; `tsc -b` 0; lint 0
+errors (baseline); vitest **367/370 (allowlist only)**.
+
+## Part 15 Addendum 5 — Merged scope close-out: register reflects editable Customer + duplicate Style surfaces removed (2026-09-11)
+
+**Task status:** ✅ Completed. RED→GREEN→verify; frontend only.
+
+**What and why:** Two close-out items after Addendum 4. (1) User reported the **register** did not
+reflect the Customer edit made on the design-sheet detail — the grid mapped `buyer_name` (the immutable
+tech-pack snapshot FK) instead of the merged editable `customer`; the list response already carried the
+updated value via `DesignSheetSerializer.to_representation`, so it was purely a frontend mapping bug.
+(2) The Style surface still duplicated Design: extra list pages/routes and a Style detail page that
+re-hosted the Design Information editor. Chose one register (`/design`), one edit surface
+(`/design-sheets/:id`).
+
+**What changed:**
+- `DesignsPage.tsx`: column renamed **Buyer → Customer**, mapped `customer: o.customer || o.buyer_name
+  || '—'`, subtitle → "Design sheets across the buying house". (No backend change — serializer already
+  merged the field for both endpoints.)
+- Style surface close-out: `/styles` and `/design-sheets` routes → `<Navigate to="/design" replace />`;
+  `StylesListPage` and `DesignSheetsListPage` (and their test suites) deleted; `StyleDetailPage` demoted
+  to a read-only dossier (kept its unique deep tabs: Versions, Line Items, BOM, Tech Packs, Sketches —
+  not present on the design sheet) with an **Open in Design** action mapping `style_id → sheet id` via
+  `getDesignSheets`, falling back to `/design` when unlinked.
+- Tests: `DesignsPage.test.tsx` Customer-column/merged-mapping (RED first — column still Buyer);
+  `StyleDetailPage.test.tsx` rewritten (read-only, Open in Design navigation + fallback, RED first).
+- Verification: frontend `tsc -b` 0; oxlint 0 errors (baseline warnings only); vitest **361 passed / 4
+  pre-existing GuidedTour jsdom failures (allowlist)**. GATE_A — frontend-only, no backend gate.
+
+---
+
+## Part 15 Addendum 6 — Buyer/Customer concept merge: single `Setup.Buyer` source of truth
+(DS-1002, 2026-09-11)
+
+The duplicated `buyer` + `customer` concepts (Adidas buyer vs Decathlon customer) collapse to **one
+Buyer field** app-wide. Style-pack imports store the pack's Customer text into `buyer`; "Customer" is
+removed as a label/app field; Buyer is the single source of truth.
+
+- **Contract (user decisions):** style pack wins — a resolved pack customer overrides an existing
+  chosen buyer on extract/import; master data required — non-empty unresolvable pack customer → 400
+  (no auto-create); `design-info` PATCH accepts `buyer` as a tenant-scoped **Buyer UUID (FK id)**; the
+  old `customer` text key is removed. Extract ordering fixed: buyer resolution runs BEFORE techpack
+  creation (was: techpack created first, 400 left an orphan).
+- Backend: `techpack/buyer_resolve.py` (`resolve_buyer_by_name`, case-insensitive); `Style.customer` +
+  `StyleTechPack.customer` removed + `buyer_display_name()`; migration `0041_buyer_merge.py`
+  (pack `customer` → `buyer` backfill + RemoveField ×2); serializers drop `customer`, design-sheet
+  adds read-only `buyer_id`; views extract/import/design-info/init/copy updated; seed command uses
+  `buyer=buyers[0]`. DTO carrier `customer` in `columns.py`/`excel_export.py`/`pdf_parser.py`/
+  `import_service.py` left untouched so Excel round-trips survive.
+- Frontend: `client.ts` types drop `customer`; `DesignSheetHeader` Buyer = id-based `<select>` of
+  `setupApi.getBuyers` (sends `buyer: <uuid>`, keeps legacy current value as an option); customer row
+  removed from `designSheetFields.ts` + import-wizard fields; `DesignsPage` + `StyleDetailPage` show
+  `buyer_name`.
+- Tests: new `tests/unit/test_buyer_merge.py` (13, RED first) + legacy design-sheet/techpack/style
+  suites reworked (customer → buyer; techpack fixture "DOTTI"). Scoped gate: backend **109/109**;
+  frontend `tsc -b` 0; oxlint 0 errors; vitest **358 passed / 4 pre-existing GuidedTour jsdom failures
+  (allowlist)** (5 suites RED→GREEN, net new id-select test). GATE_A — merchandising-scoped +
+  full frontend suite.
+
+---
+
+## Part 15 Addendum 7 — Design-sheet print page: modern compact redesign + BHMS branding (2026-09-11)
+
+User feedback on the print/PDF view: standardise to a modern software design sheet, compact layout,
+emphasise Buyer and Style, and remove the legacy "CARMEL APPARELS" wordmark — the footer (and page at
+large) should say only **BHMS**.
+
+- Frontend: `DesignSheetPrintPage.tsx` rewritten — white paper on soft slate surround; header leads
+  with a BHMS emerald badge + "Design Sheet" title and right-aligned File/status line; **Buyer**
+  (emerald) and **Style** (slate) as two emphasised `text-xl` bold cards (`print-buyer-name` /
+  `print-style-code`); Design Information as a compact 2-column label/value `<dl>`; denser Fit Specs /
+  Material tables (`text-xs`, `py-1`, `bg-slate-50` headers); footer "BHMS — Design Sheet" + `© <year>
+  BHMS` + printed timestamp (Carmel removed).
+- Tests: `DesignSheetPrintPage.test.tsx` — buyer/style emphasis assertion + no-Carmel check on the
+  header; footer test renamed to BHMS-branded/no-Carmel/time+year. RED first (2 failed on the old
+  layout). Targeted **15/15**.
+- Verification: frontend `tsc -b` 0; oxlint 0 errors (baseline warnings only); vitest **358 passed /
+  4 pre-existing GuidedTour jsdom failures (allowlist)**. GATE_A — isolated frontend-only page.
+
 ---
 
 *This is the single source of truth for the BHMS backlog and requirement status (workflow-ordered). Reframed: 2026-08-03*

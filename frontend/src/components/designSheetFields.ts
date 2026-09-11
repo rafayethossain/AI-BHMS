@@ -10,11 +10,25 @@ export const STATUS_LABELS: Record<string, string> = {
   archived: 'Archived',
 };
 
+export const RELATIONSHIP_LABELS: Record<string, string> = {
+  new: 'New',
+  based_on: 'Based On',
+  na: 'NA',
+  recut: 'Recut',
+};
+
+export const RELATIONSHIP_OPTIONS: { value: string; label: string }[] = [
+  { value: 'new', label: 'New' },
+  { value: 'based_on', label: 'Based On' },
+  { value: 'na', label: 'NA' },
+  { value: 'recut', label: 'Recut' },
+];
+
 export const DESIGN_INFO_FIELDS: { key: keyof DesignSheet; label: string }[] = [
   { key: 'issue_date', label: 'Issue Date' },
   { key: 'block', label: 'Block' },
   { key: 'based_on', label: 'Based On' },
-  { key: 'customer', label: 'Customer' },
+  { key: 'relationship', label: 'Relationship' },
   { key: 'style_number', label: 'Style Number' },
   { key: 'season', label: 'Season' },
   { key: 'size', label: 'Size' },
@@ -23,6 +37,8 @@ export const DESIGN_INFO_FIELDS: { key: keyof DesignSheet; label: string }[] = [
   { key: 'issuer', label: 'Issuer' },
   { key: 'cloth_code', label: 'Cloth Code' },
   { key: 'length', label: 'Length' },
+  { key: 'risk_date', label: 'Risk Date' },
+  { key: 'pattern_request_date', label: 'Pattern Request Date' },
   { key: 'sketch', label: 'Sketch' },
   { key: 'description', label: 'Description' },
   { key: 'note', label: 'Note' },

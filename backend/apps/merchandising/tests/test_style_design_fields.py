@@ -95,11 +95,6 @@ class TestStyleDesignInfoFields:
         assert resp.status_code == 201, resp.content
         assert resp.json()["relationship"] == "based_on"
 
-    def test_create_with_customer(self, client, seed):
-        resp = self._create(client, seed, customer="Zara")
-        assert resp.status_code == 201, resp.content
-        assert resp.json()["customer"] == "Zara"
-
     def test_create_with_designer(self, client, seed):
         resp = self._create(client, seed, designer="John Doe")
         assert resp.status_code == 201, resp.content
@@ -154,7 +149,7 @@ class TestStyleDesignInfoFields:
         """Full payload: all design info fields at once."""
         resp = self._create(client, seed,
             block="Block B", based_on="59080T", relationship="recut",
-            customer="H&M", designer="Alice", pattern_cutter="Bob",
+            designer="Alice", pattern_cutter="Bob",
             issuer="Buyer Co", cloth_code="CC-99999", size="S, M, L",
             length="65cm", issue_date="2026-06-01", risk_date="2026-09-01",
             pattern_request_date="2026-07-15", design_note="French Terry",
@@ -164,7 +159,7 @@ class TestStyleDesignInfoFields:
         assert data["block"] == "Block B"
         assert data["based_on"] == "59080T"
         assert data["relationship"] == "recut"
-        assert data["customer"] == "H&M"
+        assert data["buyer_name"] == seed["buyer"].name
         assert data["designer"] == "Alice"
         assert data["pattern_cutter"] == "Bob"
         assert data["issuer"] == "Buyer Co"
@@ -188,7 +183,6 @@ class TestStyleDesignInfoFields:
         data = resp.json()
         assert data["block"] == ""
         assert data["based_on"] == ""
-        assert data["customer"] == ""
         assert data["designer"] == ""
         assert data["pattern_cutter"] == ""
         assert data["issuer"] == ""
@@ -206,7 +200,6 @@ class TestStyleDesignInfoFields:
         patch_payload = {
             "block": "New Block",
             "designer": "New Designer",
-            "customer": "Target Corp",
             "pattern_cutter": "PC Updated",
             "issuer": "Issuer Updated",
             "cloth_code": "CC-NEW",
@@ -226,7 +219,6 @@ class TestStyleDesignInfoFields:
         data = patch_resp.json()
         assert data["block"] == "New Block"
         assert data["designer"] == "New Designer"
-        assert data["customer"] == "Target Corp"
         assert data["pattern_cutter"] == "PC Updated"
         assert data["issuer"] == "Issuer Updated"
         assert data["cloth_code"] == "CC-NEW"
@@ -261,10 +253,9 @@ class TestStyleDesignInfoFields:
 
         patch_resp = client.patch(
             f"/api/v1/merchandising/styles/{style_id}/",
-            {"customer": "Only Customer"}, format="json",
+            {"designer": "Only Designer"}, format="json",
         )
         assert patch_resp.status_code == 200, patch_resp.content
         data = patch_resp.json()
         assert data["block"] == "Keep Me"
-        assert data["designer"] == "Keep Designer"
-        assert data["customer"] == "Only Customer"
+        assert data["designer"] == "Only Designer"

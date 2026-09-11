@@ -149,7 +149,6 @@ def source_sheet(tenant, style, product_type, source_buyer):
         based_on="59070T",
         description="Base jogger description",
         note="Source design note",
-        customer="Source Buyer",
         size="M",
         designer="Emmi.Huynh",
         pattern_cutter="Sam.Cutter",
@@ -217,7 +216,6 @@ class TestInitFresh:
         assert tp.style_id is None
         assert tp.product_type_id == product_type.id
         assert tp.buyer_id == buyer.id
-        assert tp.customer == buyer.name
         assert tp.style_code.startswith("DS-")
         assert resp.data["style_code"] == tp.style_code
         assert resp.data["product_type_name"] == "Jogger"
@@ -259,7 +257,6 @@ class TestInitFresh:
         assert tp.relationship == "new"
         assert tp.product_type_id is None
         assert tp.buyer_id is None
-        assert tp.customer == ""
         assert tp.style_number == ""
         assert tp.block == ""
         assert tp.style_code.startswith("DS-")
@@ -304,14 +301,12 @@ class TestInitCopy:
         assert tp.relationship == "based_on"
         assert tp.product_type_id == source_sheet.tech_pack.product_type_id
         assert tp.buyer_id == source_sheet.tech_pack.buyer_id
-        assert tp.customer == "Source Buyer"
         assert tp.style_number == "SRC-STYLE-001"
         assert tp.style_code != source_sheet.tech_pack.style_code
         assert tp.style_code.startswith("DS-")
         assert tp.based_on == source_sheet.tech_pack.techpack_number
         assert tp.block == "59080T"
         assert tp.description == "Base jogger description"
-        assert tp.customer == "Source Buyer"
         assert tp.size == "M"
         assert tp.designer == "Emmi.Huynh"
         assert tp.pattern_cutter == "Sam.Cutter"
@@ -368,7 +363,6 @@ class TestInitCopy:
         assert resp.status_code == status.HTTP_201_CREATED
         tp = DesignSheet.objects.get(id=resp.data["id"]).tech_pack
         assert tp.buyer_id == buyer.id
-        assert tp.customer == buyer.name
         assert tp.product_type_id == source_sheet.tech_pack.product_type_id
 
     def test_copy_requires_source_design_sheet(self, client):

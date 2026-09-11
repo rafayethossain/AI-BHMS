@@ -150,20 +150,20 @@ class TestDesignSheetAPI:
         assert row["status"] == "new"
 
     DESIGN_INFO_FIELDS = [
-        "issue_date", "block", "based_on", "customer", "style_number",
+        "issue_date", "block", "based_on", "style_number",
         "size", "designer", "pattern_cutter", "issuer", "cloth_code",
         "length", "sketch", "description", "note",
     ]
 
     def test_design_sheet_detail_returns_design_info_fields(
-        self, ds_client, ds_techpack, ds_design_sheet
+        self, ds_client, ds_techpack, ds_design_sheet, ds_buyer
     ):
         import datetime
 
         ds_techpack.issue_date = datetime.date(2026, 8, 1)
         ds_techpack.block = "Main Block"
         ds_techpack.based_on = "Base 2026"
-        ds_techpack.customer = "DS Buyer"
+        ds_techpack.buyer = ds_buyer
         ds_techpack.style_number = "DS-STYLE-001"
         ds_techpack.size = "S-2XL"
         ds_techpack.designer = "Alice"
@@ -184,7 +184,8 @@ class TestDesignSheetAPI:
             assert key in resp.data, f"missing {key}"
         assert resp.data["block"] == "Main Block"
         assert resp.data["based_on"] == "Base 2026"
-        assert resp.data["customer"] == "DS Buyer"
+        assert resp.data["buyer_name"] == "DS Buyer"
+        assert resp.data["buyer_id"] == str(ds_buyer.id)
         assert resp.data["style_number"] == "DS-STYLE-001"
         assert resp.data["size"] == "S-2XL"
         assert resp.data["designer"] == "Alice"
@@ -373,6 +374,249 @@ class TestDesignSheetLayoutOrder:
     def test_layout_order_must_be_a_list(self, ds_client, ds_design_sheet):
         url = f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/"
         resp = ds_client.patch(url, {"layout_order": "header,sketch"}, format="json")
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+# =============== DESIGN INFO MIRROR FROM LINKED STYLE (MERGED SCOPE)
+
+
+@pytest.mark.django_db
+class TestDesignSheetDesignInfoFromStyle:
+    """Merged Style + Design scope (see data-model.md "Design Information").
+
+    The design sheet detail is the merged register entry. Its Design
+    Information must reflect the linked ``Style`` — edits made through
+    ``PATCH /api/v1/merchandising/styles/{id}/`` appear on the design sheet
+    detail and in the merged list. When no Style value exists (or no Style is
+    linked at all) the imported tech-pack snapshot is the fallback.
+    """
+
+    STYLE_DESIGN_INFO = {
+        "block": "Block B",
+        "based_on": "59080T",
+        "relationship": "recut",
+        "designer": "Dana",
+        "pattern_cutter": "Pat",
+        "issuer": "Ian",
+        "cloth_code": "CC-77",
+        "size": "M-XL",
+        "length": "34in",
+        "issue_date": "2026-08-10",
+        "risk_date": "2026-09-01",
+        "pattern_request_date": "2026-09-20",
+        "design_note": "Style design note",
+        "description": "Style description",
+    }
+
+    def test_design_sheet_detail_reflects_linked_style_after_style_patch(
+        self, ds_client, ds_style, ds_design_sheet
+    ):
+        resp = ds_client.patch(
+            f"/api/v1/merchandising/styles/{ds_style.id}/",
+            self.STYLE_DESIGN_INFO,
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+
+        detail = ds_client.get(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/"
+        )
+        assert detail.status_code == status.HTTP_200_OK
+        for key, value in self.STYLE_DESIGN_INFO.items():
+            mapped = "note" if key == "design_note" else key
+            assert detail.data[mapped] == value, (
+                f"{mapped}: {detail.data[mapped]!r} != {value!r}"
+            )
+        assert detail.data["relationship"] == "recut"
+        assert detail.data["risk_date"] == "2026-09-01"
+        assert detail.data["pattern_request_date"] == "2026-09-20"
+        assert detail.data["note"] == "Style design note"
+        assert detail.data["issue_date"] == "2026-08-10"
+
+    def test_design_sheet_list_reflects_linked_style_after_style_patch(
+        self, ds_client, ds_style, ds_design_sheet
+    ):
+        resp = ds_client.patch(
+            f"/api/v1/merchandising/styles/{ds_style.id}/",
+            {"block": "List Block", "relationship": "based_on"},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+
+        rows = ds_client.get("/api/v1/merchandising/design-sheets/")
+        row = rows.data["results"][0]
+        assert row["block"] == "List Block"
+        assert row["relationship"] == "based_on"
+
+    def test_design_info_falls_back_to_techpack_when_style_empty(
+        self, ds_client, ds_techpack, ds_design_sheet, ds_buyer
+    ):
+        import datetime
+
+        ds_techpack.block = "TP Block"
+        ds_techpack.based_on = "TP Base"
+        ds_techpack.buyer = ds_buyer
+        ds_techpack.note = "TP Note"
+        ds_techpack.issue_date = datetime.date(2026, 8, 1)
+        ds_techpack.save()
+
+        detail = ds_client.get(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/"
+        )
+        assert detail.status_code == status.HTTP_200_OK
+        assert detail.data["block"] == "TP Block"
+        assert detail.data["based_on"] == "TP Base"
+        assert detail.data["buyer_name"] == "DS Buyer"
+        assert detail.data["note"] == "TP Note"
+        assert detail.data["issue_date"] == "2026-08-01"
+
+    def test_design_info_falls_back_to_techpack_when_no_style_linked(
+        self, ds_client, ds_tenant
+    ):
+        from apps.merchandising.models import DesignSheet, StyleTechPack
+
+        orphan = StyleTechPack.objects.create(
+            tenant=ds_tenant,
+            techpack_number=StyleTechPack.next_techpack_number(ds_tenant),
+            style=None,
+            block="Orphan Block",
+            note="Orphan Note",
+        )
+        sheet = DesignSheet.objects.create(tenant=ds_tenant, tech_pack=orphan)
+        detail = ds_client.get(
+            f"/api/v1/merchandising/design-sheets/{sheet.id}/"
+        )
+        assert detail.status_code == status.HTTP_200_OK
+        assert not detail.data["style_id"]
+        assert detail.data["block"] == "Orphan Block"
+        assert detail.data["note"] == "Orphan Note"
+
+
+@pytest.mark.django_db
+class TestDesignSheetDesignInfoWrite:
+    """Design Information is editable on every register entry.
+
+    ``PATCH /api/v1/merchandising/design-sheets/{id}/design-info/`` writes the
+    fields onto the linked Style when one exists (single source of truth) and
+    onto the tech-pack record otherwise — sheets created fresh from the
+    register have no linked Style and must stay editable.
+    """
+
+    def test_design_info_writes_techpack_when_no_style_linked(
+        self, ds_client, ds_tenant
+    ):
+        from apps.merchandising.models import DesignSheet, StyleTechPack
+
+        tp = StyleTechPack.objects.create(
+            tenant=ds_tenant,
+            techpack_number=StyleTechPack.next_techpack_number(ds_tenant),
+            style=None,
+        )
+        sheet = DesignSheet.objects.create(tenant=ds_tenant, tech_pack=tp)
+        resp = ds_client.patch(
+            f"/api/v1/merchandising/design-sheets/{sheet.id}/design-info/",
+            {
+                "block": "Block C",
+                "relationship": "recut",
+                "designer": "Dana",
+                "design_note": "Note written via register",
+                "issue_date": "2026-08-15",
+                "risk_date": "",
+                "pattern_request_date": "2026-10-01",
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        tp.refresh_from_db()
+        assert tp.block == "Block C"
+        assert tp.relationship == "recut"
+        assert tp.designer == "Dana"
+        assert tp.note == "Note written via register"
+        assert tp.issue_date.isoformat() == "2026-08-15"
+        assert tp.risk_date is None
+        assert tp.pattern_request_date.isoformat() == "2026-10-01"
+        detail = ds_client.get(
+            f"/api/v1/merchandising/design-sheets/{sheet.id}/"
+        )
+        assert detail.data["note"] == "Note written via register"
+        assert detail.data["block"] == "Block C"
+        assert detail.data["relationship"] == "recut"
+
+    def test_design_info_writes_linked_style(self, ds_client, ds_style, ds_design_sheet):
+        resp = ds_client.patch(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/design-info/",
+            {
+                "block": "Style Block",
+                "relationship": "based_on",
+                "design_note": "Via style",
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        ds_style.refresh_from_db()
+        assert ds_style.block == "Style Block"
+        assert ds_style.relationship == "based_on"
+        assert ds_style.design_note == "Via style"
+        detail = ds_client.get(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/"
+        )
+        assert detail.data["block"] == "Style Block"
+        assert detail.data["note"] == "Via style"
+
+    def test_design_info_send_dates_on_linked_style(self, ds_client, ds_style, ds_design_sheet):
+        from datetime import date
+
+        resp = ds_client.patch(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/design-info/",
+            {
+                "issue_date": "2026-08-27",
+                "risk_date": "",
+                "pattern_request_date": "2026-10-01",
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert resp.data["issue_date"] == "2026-08-27"
+        assert resp.data["risk_date"] is None
+        assert resp.data["pattern_request_date"] == "2026-10-01"
+        ds_style.refresh_from_db()
+        assert isinstance(ds_style.issue_date, date)
+        assert ds_style.issue_date.isoformat() == "2026-08-27"
+        assert ds_style.pattern_request_date.isoformat() == "2026-10-01"
+        assert ds_style.risk_date is None
+
+    def test_design_info_rejects_unknown_relationship(self, ds_client, ds_design_sheet):
+        resp = ds_client.patch(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/design-info/",
+            {"relationship": "variant"},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_design_info_accepts_blank_relationship(self, ds_client, ds_design_sheet, ds_style, ds_buyer):
+        # The UI always sends every design-info field and the Relationship
+        # select exposes "—" to clear; an empty relationship is a valid clear,
+        # not a validation error, and the other fields still persist.
+        ds_style.relationship = "recut"
+        ds_style.save()
+        resp = ds_client.patch(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/design-info/",
+            {"relationship": "", "block": "Blank-Rel Block", "buyer": str(ds_buyer.id)},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert resp.data["block"] == "Blank-Rel Block"
+        assert resp.data["buyer_id"] == str(ds_buyer.id)
+        assert resp.data["buyer_name"] == "DS Buyer"
+        ds_style.refresh_from_db()
+        assert ds_style.relationship == ""
+
+    def test_design_info_requires_at_least_one_field(self, ds_client, ds_design_sheet):
+        resp = ds_client.patch(
+            f"/api/v1/merchandising/design-sheets/{ds_design_sheet.id}/design-info/",
+            {},
+            format="json",
+        )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
 

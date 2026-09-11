@@ -17,9 +17,10 @@ Before ANY task, load context in this order:
 
 1. **This file** — workflow, roles, gates, DoD.
 2. `REPLICATION_ROADMAP.md` — the primary execution plan (Workstream A grid layer, Workstream B domain
-   gap-closure, Definition of Done).
+   gap-closure, slices A1–A6 / B1–B10, Definition of Done).
 3. `PRD.md` — what the product must do (source of requirements truth).
-4. `TDD_TRACKER.md` — current task-completion progress (status per slice; the live scoreboard).
+4. `TDD_TRACKER.md` — current task-completion progress (status per slice; the live scoreboard; read the
+   **latest entries first** — recent work sets the conventions for this session).
 5. `master-backlog.md` — the consolidated backlog (`RQ-###` requirements, US story backlog) and its
    cross-references; find the next requirement / task.
 6. Domain references as needed: `business-rules.md`, `data-model.md`, `api-design.md`,
@@ -51,7 +52,7 @@ this?).
 | 2 | **Product / Project Manager (PM)** | Prioritise, sequence, estimate scope, plan parallel work. | `planning-and-task-breakdown`, `git-workflow-and-versioning`, `ci-cd-and-automation`, `shipping-and-launch` | Ordered task breakdown; roadmap/backlog updates; release readiness |
 | 3 | **UI/UX** | Design accessible, responsive, Excel-familiar interfaces and interactions. | `frontend-ui-engineering`, `browser-testing-with-devtools` | Component/page; interaction spec; theme/contrast pass (light+dark) |
 | 4 | **Dev** | Implement with source-grounded, idiomatic code; small incremental steps. | `source-driven-development`, `incremental-implementation`, `code-simplification`, `performance-optimization`, `security-and-hardening` | Code in RED→GREEN increments; no breaking changes |
-| 5 | **Tester** | Prove behavior; maintain a green, meaningful suite. | `test-driven-development`, `browser-testing-with-devtools`, `debugging-and-error-recovery`, `doubt-driven-development` | Failing-first test; full-suite green evidence; regression proof |
+| 5 | **Tester** | Prove behavior; maintain a green, meaningful suite. | `test-driven-development`,  `debugging-and-error-recovery`, `doubt-driven-development` | Failing-first test; full-suite green evidence; regression proof |
 | 6 | **Docs Writer** | Record decisions, lessons, progress; keep the roadmap/tracker current. | `documentation-and-adrs`, `code-review-and-quality`, `deprecation-and-migration` | Updated `TDD_TRACKER.md`, `master-backlog.md`, `lessons-learned.md`, ADRs |
 
 **Skill Activation — enable skills by role & phase (MANDATORY):** 
@@ -64,28 +65,6 @@ with the `skill` tool** available to this agent; it is NOT auto-applied. **Every
 skill before/during a task** (see `using-agent-skills`). Doing the *work* of a skill without loading it is
 a process violation — it skips the skill's guardrails and verification.
 
-Lifecycle → skill (the discovery tree, from `using-agent-skills`)
-
-```
-Define   idea unclear?      → interview-me / idea-refine / spec-driven-development
-Plan     have a spec?       → planning-and-task-breakdown
-Build    implementing?      → incremental-implementation (+ source-driven-development
-                             for doc-verified code, doubt-driven-development when stakes are high)
-         UI work?           → frontend-ui-engineering
-         API/interface?     → api-and-interface-design
-Verify   writing tests?     → test-driven-development
-         browser runtime?   → browser-testing-with-devtools
-         something broke?   → debugging-and-error-recovery
-Review   reviewing code?    → code-review-and-quality / code-simplification
-         security?          → security-and-hardening
-         performance?       → performance-optimization
-Ship     committing?        → git-workflow-and-versioning
-         CI/CD?             → ci-cd-and-automation
-         docs/ADR?          → documentation-and-adrs
-         logs/metrics?      → observability-and-instrumentation
-         deploying?         → shipping-and-launch
-         migrating?         → deprecation-and-migration
-```
 
 
 ---
@@ -95,7 +74,7 @@ Ship     committing?        → git-workflow-and-versioning
 Before implementing anything, the orchestrator (with PM + BA) must answer:
 
 **Backward (why this / what enables it):**
-- Which `RQ-###` requirement / `REPLICATION_ROADMAP.md` slice does this serve? (A1–A6, B1–B10)
+- Which `RQ-###` requirement /
 - Which business rule (`business-rules.md`) and data-model entity (`data-model.md`) does it touch?
 - Which existing screen/component/endpoint/test does it depend on or modify?
 - What prior decision (ADRs, `lessons-learned.md`, past migrations) constrains it?
@@ -111,8 +90,6 @@ Before implementing anything, the orchestrator (with PM + BA) must answer:
 - `TRACE` = the forward+backward path (Requirement → Slice → Task → Test → evidence).
 - `GATE_PLAN` = which verify commands apply (frontend, backend, or both).
 
-Prioritise by: risk to shipping blockers (P0) > high-value domain gaps (B1–B3) > grid rollouts (A3) >
-medium/low (B4–B10). Never reorder work that a later slice depends on.
 
 ---
 
@@ -125,8 +102,9 @@ loop, going through the **Tester** and **Dev** roles together.
    the evidence the behavior is not yet there. No implementation without a failing test.
 2. **GREEN** — write the smallest implementation that makes the test pass, using the Dev + source
    skills. Do not over-build.
-3. **VERIFY** — run the *real* project commands for the touched area and the full suite; confirm no
-   regression and that traceability is cited.
+3. **VERIFY** — run the *real* project commands for the touched area per the **Scoped gate (GATE_A)**
+   below; record the gate used. Full regression (GATE_B) is a milestone/release gate, not a per-task
+   cost.
 
 **Test environment caveats (trust but verify in the real browser):**
 - jsdom **cannot** reproduce Tabulator module binding (`download` / `getModule` are `undefined` in
@@ -134,19 +112,57 @@ loop, going through the **Tester** and **Dev** roles together.
   an app bug — supplement with a real-browser check (CDP / devtools MCP) for browser-dependent UI.
 - Pure logic / data-transform helpers should be unit-tested in jsdom with a mocked Tabulator.
 
-### Verify commands (the project's real gates)
-Frontend (`workdir: frontend`):
-```
-npx tsc -b        # must exit 0
-npm run lint      # oxlint — 0 errors
-npx vitest run    # full frontend suite
-```
-Backend (`workdir: backend`, using its venv):
-```
-python -m pytest <file> -q    # targeted
-python -m pytest -q           # full suite
-```
-A task is **VERIFIED** only when its targeted commands pass **and** the full suite stays green.
+### Test gates: scoped per task, full regression only at milestones (the project's real gates)
+
+Testing is gated in **two tiers**. A task is **VERIFIED** when the **Scoped gate** passes; the **Full
+gate** is a release/milestone gate, NOT a per-task cost (the full backend suite is ~1746 tests / ~35 min
+— running it on every isolated change burns time without catching anything the scoped gate misses).
+
+**GATE_A / Scoped gate (default for every task)** — run only the impacted scope:
+
+1. **Targeted** — the new/changed test file(s), RED→GREEN.
+   ```
+   # frontend (workdir: frontend)
+   npx tsc -b        # must exit 0
+   npm run lint      # oxlint — 0 errors (baseline warnings are pre-existing; do not chase them)
+   npx vitest run    # full frontend suite (~2-3 min) — frontend is fast, always run it fully
+   # backend (workdir: backend, using its venv)
+   .\venv\Scripts\python.exe -m pytest <file(s)> -q
+   ```
+2. **Owning app** — the whole app that owns the changed model/endpoint/page (e.g. `apps\merchandising`,
+   `apps\logistics`, `apps\quality`), to prove the change didn't break sibling views in the same app:
+   ```
+   .\venv\Scripts\python.exe -m pytest apps\<app> -q
+   ```
+3. **Cross-app adjacency** — find tests OUTSIDE the owning app that call the changed endpoints/models
+   and run them. Discover via grep, then run the hits:
+   ```
+   rg -l "merchandising/styles/" backend/tests backend/apps --type py   # example for Style
+   .\venv\Scripts\python.exe -m pytest <adjacency files> -q
+   ```
+   A change with **BLAST_RADIUS = isolated** (additive nullable model fields, private component) still
+   needs steps 1–2; steps 3 only where the grep returns hits. A change touching a **shared** layer
+   (`SpreadsheetGrid`, `client.ts` types, base serializers/viewsets) expands the adjacency search to
+   every consumer and, if it spans apps, escalates to **GATE_B**.
+
+**GATE_B / Full gate (milestone, release, or shared-blast-radius change)**
+- Full backend suite, run detached/background so the session isn't blocked:
+  ```
+  .\venv\Scripts\python.exe -m pytest -q
+  ```
+- Evaluate against the **known env-failure allowlist** (pre-existing, NOT regressions — do not "fix"
+  these): monitoring `health/run_checks/` 404 (route gap) / missing sample fixtures
+  (`PDF Extract\Sample style doc.pdf`, `Extracted_2026-07-13 .xlsx`) / hard-coded not-sold date window /
+  e2e lifecycle sharing the monitoring 404 / frontend `GuidedTour.test.tsx` `localStorage.clear is not a
+  function` (jsdom env). A gate passes if **every failure is on this allowlist and the green count grew
+  or stayed flat** vs. the last recorded baseline in TDD_TRACKER.
+
+**GATE_PLAN (from §2 triage)** must record WHICH tier applies before coding; default to GATE_A and
+escalate only when §2 analysis shows shared blast radius or multi-app reach.
+
+**Time budget for thin air (what each gate typically costs):** targeted ~1–3 min · owning app ~2–7 min ·
+frontend full suite ~2–3 min · GATE_B ~35 min. If a task starts exceeding ~10 min of back-end test time
+on a scoped change, stop and re-check the scope rather than letting the suite balloon.
 
 ---
 
@@ -185,7 +201,9 @@ Guardrails on traceability:
 After any slice or task completes or its status changes, the **Docs Writer** role **must** update:
 
 1. `TDD_TRACKER.md` — flip the slice status row (`⬜` → `🔴` → `🟢` → `✅ VERIFIED`) with test evidence.
-   Note: a slice is `✅ VERIFIED` only when full verify commands are green and traceability is cited.
+   Note: a slice is `✅ VERIFIED` only when the **Scoped gate (GATE_A)** passes and traceability is
+   cited; record WHICH gate was used. If the task escalated to **GATE_B**, cite the full-suite count and
+   the allowlist check.
 2. `master-backlog.md` — mark the task/`RQ-###` status; keep "Current Open Work" current.
 3. `lessons-learned.md` — append a dated retrospective entry (see §6).
 
@@ -212,8 +230,9 @@ requirement. Use `documentation-and-adrs` for architectural decisions that need 
 
 A task is **done** when *all* of the following hold — omit none:
 - [ ] Behavior covered by a test that **failed first** (RED→GREEN verified).
-- [ ] Full suite passes with the **real** project commands (frontend `tsc -b`, `lint`, `vitest`; backend
-      `pytest`).
+- [ ] **Scoped gate (GATE_A) green** with the real commands — frontend `tsc -b` / `lint` / `vitest`;
+      backend targeted + owning-app + documented adjacency `pytest`. GATE_B only where §2/§3 escalation
+      requires it, with the full-suite count + allowlist cited.
 - [ ] Target requirement + business rule cited; no conflicting rule.
 - [ ] ERD/model fields aligned; migration present where schema changes.
 - [ ] RBAC + tenant isolation respected on every data endpoint.

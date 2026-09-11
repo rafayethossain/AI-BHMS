@@ -206,6 +206,7 @@ describe('DesignsPage (unified Design register grid)', () => {
     expect(columns?.map((c) => c.title)).toEqual(DESIGN_REGISTER_COLUMNS);
     const byField = Object.fromEntries((columns ?? []).map((c) => [c.field, c] as const));
     expect(byField['buyer']).toBeDefined();
+    expect(byField['customer']).toBeUndefined();
     for (const f of ['buyer', 'product_type', 'product_category', 'relationship', 'status', 'department']) {
       expect(byField[f]?.headerFilterType).toBe('list');
     }
@@ -308,6 +309,7 @@ describe('DesignsPage (unified Design register grid)', () => {
     const row = data?.[0];
     expect(row?.design).toBe('Relaxed Jogger');
     expect(row?.buyer).toBe('Alpha Buyer');
+    expect(row?.customer).toBeUndefined();
     expect(row?.product_type).toBe('Jogger');
     expect(row?.product_category).toBe('Apparel');
     expect(row?.based_on).toBe('59073T');
@@ -322,6 +324,17 @@ describe('DesignsPage (unified Design register grid)', () => {
     expect(row?.annotation).toBe('2 marks');
     expect(row?.notes).toBe('Front pocket changed');
     expect(row?.sketch).toBe('SK-REG-1001');
+  });
+
+  it('maps a missing buyer to an em dash in the register row', async () => {
+    const { buyer_name: _b, ...noBuyerName } = design;
+    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: [{ ...noBuyerName }], count: 1 },
+    });
+    renderPage();
+    await screen.findByText('REG-1001');
+    const data = gridCapture.lastProps?.data as Record<string, unknown>[] | undefined;
+    expect(data?.[0]?.buyer).toBe('—');
   });
 
   it('drills into the design sheet detail when a row is clicked', async () => {

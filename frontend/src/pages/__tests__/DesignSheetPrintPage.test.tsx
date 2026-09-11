@@ -22,7 +22,6 @@ const baseSheet: DesignSheet = {
   issue_date: '2026-08-01',
   block: 'BLK-9',
   based_on: 'TP-0901',
-  customer: 'GC London',
   style_number: 'DS-67741',
   size: 'XS-XXL',
   designer: 'E. Rahman',
@@ -94,14 +93,16 @@ describe('DesignSheetPrintPage', () => {
     expect(merchApiMock.getDesignSheet).toHaveBeenCalledWith('ds-1');
   });
 
-  it('renders the header section with file, style and buyer', async () => {
+  it('renders the header with emphasised buyer and style blocks', async () => {
     merchApiMock.getDesignSheet.mockResolvedValue({ data: sheetWithData });
     renderPrint();
     const header = await screen.findByTestId('print-header');
     expect(header).toHaveTextContent('Design Sheet');
     expect(header).toHaveTextContent('TP-1002');
-    expect(header).toHaveTextContent('67741T');
-    expect(header).toHaveTextContent('CMT Apparel');
+    expect(screen.getByTestId('print-buyer-name')).toHaveTextContent('CMT Apparel');
+    expect(screen.getByTestId('print-style-code')).toHaveTextContent('67741T');
+    expect(header).not.toHaveTextContent('Carmel');
+    expect(header).not.toHaveTextContent('CARMEL');
   });
 
   it('renders the full design information table', async () => {
@@ -143,10 +144,12 @@ describe('DesignSheetPrintPage', () => {
     expect(screen.getByTestId('material-total')).toHaveTextContent('5.25');
   });
 
-  it('renders the footer with the Carmel copyright and a timestamp', async () => {
+  it('renders a BHMS-branded footer (no Carmel) with a timestamp', async () => {
     renderPrint();
     const footer = await screen.findByTestId('print-footer');
-    expect(footer).toHaveTextContent('Carmel');
+    expect(footer).toHaveTextContent('BHMS');
+    expect(footer).not.toHaveTextContent('Carmel');
+    expect(footer).not.toHaveTextContent('CARMEL');
     expect(screen.getByTestId('print-timestamp')).not.toHaveTextContent('');
     expect(screen.getByTestId('print-timestamp')).toHaveTextContent(String(new Date().getFullYear()));
   });

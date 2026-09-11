@@ -17,7 +17,6 @@ const DESIGN_FIELDS: { key: string; label: string }[] = [
   { key: 'issue_date', label: 'Issue Date' },
   { key: 'block', label: 'Block' },
   { key: 'based_on', label: 'Based On' },
-  { key: 'customer', label: 'Customer' },
   { key: 'style_number', label: 'Style Number' },
   { key: 'size', label: 'Size' },
   { key: 'designer', label: 'Designer' },

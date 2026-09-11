@@ -1383,3 +1383,307 @@ value across the frontend so the new status is styled everywhere, not just on th
 
 **Result:** RED 3 fail -> GREEN backend 54/54 targeted + frontend 16/16; tsc 0; lint 0 errors (baseline);
 vitest 362/362 (50 files); full backend regression expected only in the 9 pre-existing env-failures.
+
+---
+
+# 2026-09-10 - Style design-info fields + editable Design Information on the Style detail page
+
+**What happened:** Product asked the Style detail page to carry the techpack-equivalent design info
+(block, based on, relationship, customer, designer, pattern cutter, issuer, cloth code, size, length,
+issue/risk/pattern-request dates, design note) and to allow editing/updating that section in place, with
+proper field types (read-only, dropdown, date picker, textarea).
+
+**What went wrong / caught (field-type mismatch):** The first-cut backend PATCH test used `relationship:
+"variant"` and `designer: None`. Both failed: (1) the model's real choices are only `new / based_on / na /
+recut`, and the frontend dropdown initially offered a different set (`original/duplicate/variant/
+evolution`) — the two option lists disagreed, which would have silently written invalid rows; (2) the text
+fields use `blank=True, default=""` (no `null=True`), so sending `null` for a cleared field is
+rejected. The lesson: align the frontend's dropdown enum with the model's `choices` verbatim, and treat
+"clear" as empty string for text fields vs `null` for dates only — the payload builder must branch by
+field kind.
+
+**What went well:** The save handler builds the PATCH payload from a `DATE_FIELDS`/`TEXT_FIELDS` split, so
+empty boxes clear text to `""` and dates to `null` — matching the serializer. `Based On` is rendered
+read-only (only meaningful when a style was copied), with a hint "Set via copy from source". Backend tests
+prove update + clear + touch-nothing PATCH semantics.
+
+**What to do differently:** When a frontend form exposes model choices, port the exact tuple from
+`models.py` into the option list and assert it in a backend test (valid-choice check), so the two can't
+silently drift again. Full regression on every change costs ~35 min for 1746 tests; for isolated
+additive changes the impacted scope (merchandising app + Style-CRUD API tests + frontend suite) is the
+right gate, with a full backend run reserved for milestone verification.
+
+**Linked slice/requirement:** Style dual-mode creation + design-info fields (14 additive columns, migration
+0040) -> detail-page Design Information edit section. **Result:** backend 21/21 (styles design fields) +
+51/51 (merchandising) + 35/35 Style-CRUD API, frontend tsc 0, lint 0 errors, vitest 362/362.
+
+---
+
+# 2026-09-10 (2) - Merged scope: Design Information must live where the user actually clicks
+
+**What happened:** The editable Design Information section (see previous entry) was implemented on the
+Style detail page (`/styles/:id`). The user could not find it — their daily workspace is the **merged
+Design Register** (`/design`), and clicking a row opens the design-sheet detail (`/design-sheets/:id`).
+The register and its detail **are** the Style+Design surface; the parallel `/styles/:id` page is not
+part of their flow.
+
+**What went wrong:** Feature placement followed the entity (Style) rather than the user's workflow
+(Design Register). The two surfaces disagree about which is authoritative, so work put on the "correct"
+backend model was invisible where it mattered.
+
+**What went well (the fix):** Kept **Style as the single source of truth** and made the merged surface
+read it: `DesignSheetSerializer.to_representation` now mirrors the linked Style's design-info fields
+(text map incl. `note ← style.design_note`, dates via `isoformat()`) with the imported tech-pack
+snapshot as fallback when the Style value is blank or no Style is linked. The design-sheet header then
+gained the same Edit/Save UI, PATCHing `/merchandising/styles/{id}/` and refetching — edits made in the
+Register now persist to the Style and are re-shown by the serializer. Because the serializer is shared,
+verification ran the full design-sheet adjacency set (124 tests), not just the owning app.
+
+**What to do differently:** Before placing a feature, ask "where does the user open this in the UI?" —
+build on the merged Register detail, and have the register surface mirror the master model rather than
+shipping two parallel edit surfaces. When a serializer is the mirror layer, treat it as a **shared**
+blast-radius change for the adjacency gate (run every consumer's tests).
+
+**Linked slice/requirement:** TDD_TRACKER #62 (Design Information editable on the design-sheet detail).
+**Result:** backend 4/4 new + 124/124 adjacency + 51/51 merchandising; frontend 9/9 header, tsc 0, lint 0
+errors, vitest 366/370 (4 pre-existing GuidedTour jsdom env failures).
+
+---
+
+# 2026-09-10 (3) - "Edit" must exist before it can be clicked: fresh register entries had no linked Style
+
+**What happened:** After the merged-scope edit UI shipped (previous entry), the user still could not edit
+Design Information from `/design`. Live-probing the register proved why: the header gated Edit on
+`sheet.style_id`, and fresh "New Design" init creates sheets with an **unlinked** tech-pack
+(`style=source_tp.style if source_tp else None` → `None`). The registered sheet TP-1003 had
+`style_id=''`, so a whole class of register entries — the freshly-created ones — showed no Edit button
+("Read-only — link a Style to edit") and had no save route at all.
+
+**What went wrong:** The read-mirroring serializer made unlinked sheets *displayable*, but the save path
+still assumed a linked Style (`api.patch('/merchandising/styles/{id}/')`). The render layer and the write
+layer made different assumptions about what structure a register entry can have. Two bugs in one: a UI
+gate that hid the affordance, and no backend endpoint that a fresh, unlinked sheet could write to.
+
+**What went well (the fix):** Added `PATCH /merchandising/design-sheets/{id}/design-info/` on the
+`DesignSheetViewSet` (perm `merchandising:edit`) that writes the design-info fields onto the **linked
+Style when present** (single source of truth) and onto the **tech-pack otherwise** (`design_note` → the
+tech-pack's `note` field; dates → `null` on clear, text → `""`; `relationship` validated against the
+model's four choices). The frontend now always shows Edit and sends every save through that one merged
+endpoint — the server decides the target. One write route, both structures covered, no client-side split.
+
+**What to do differently:** When a detail surface mirrors a master model with a fallback, check the write
+path for BOTH branches of the fallback, not just the happy path — i.e. prove an entry in the fallback
+state (unlinked/no master) can still be saved, and don't gate the Edit affordance on linkage. Prefer one
+server-side endpoint that resolves its own write target over branching the client on optional fields.
+
+**Linked slice/requirement:** TDD_TRACKER #62 (write path added to the merged design-sheet detail).
+**Result:** backend 8/8 new + 37/37 design-sheet API + 44/44 adjacency + 51/51 merchandising; frontend
+10/10 header, tsc 0, lint 0 errors, vitest 367/370 (GATE_A, allowlist only).
+
+---
+
+# 2026-09-10 (4) - A toggle that the user never sees is the same as no edit UI at all
+
+**What happened:** After fixing the unlinked-styles save path, the user reported the same core symptom
+from `/design-sheets/:id`: "no visible save/update button, no field editable". The page paste proved the
+fresh code WAS live (the "Edit" button rendered next to the "Design Information" title) — but that
+single small button was the entire affordance, and the user did not treat "click a small 'Edit' to
+unlock the form" as a usable edit flow.
+
+**What went wrong:** The interaction was correct by test and by DOM inspection (Edit → inputs + Save),
+yet failed by acceptance: discoverability. A muted secondary button toggling into a different mode is
+too subtle for a form the user expects to fill in directly — their mental model ("fields are editable,
+plus a save button") was contradicted by a read-only grid behind a toggle.
+
+**What went well (the fix):** Removed the toggle and mode entirely. The Design Information card now
+renders its 14 fields as **always-enabled inputs** (Based On stays read-only with its hint) plus a
+prominent primary **"Update Design Information"** button and a Discard button that re-syncs from the
+latest sheet (`useEffect` on the `sheet` prop). The save route, payload field-kind split, and backend
+endpoint are unchanged — only the chrome changed. Tests were rewritten to assert the always-editable
+contract (inputs + Update button present by default, no Edit/Save buttons).
+
+**What to do differently:** For Excel-familiar desktop workflows, default to direct inline editing with
+an explicit save action; reserve "edit modes/toggles" for read-only surfaces that genuinely need them.
+When a user twice reports "I can't edit this", stop verifying only that the affordance *renders* and
+reconsider whether the affordance matches their expected interaction at all — the remedy may be a UX
+change, not a bug fix.
+
+**Linked slice/requirement:** TDD_TRACKER #62 (always-editable Design Information on the design-sheet
+detail). **Result:** frontend 10/10 header (6 RED first), tsc 0, lint 0 errors, vitest 367/370
+(allowlist only); backend unchanged.
+
+---
+
+# 2026-09-11 (5) - Custom-action writes must round-trip the serializer on the happy path (date 500)
+
+**What happened:** The `design-info` action on `DesignSheetViewSet` wrote date **strings** verbatim onto
+the linked Style; the Style-mirror in `DesignSheetSerializer.to_representation` then rendered every
+non-None value with `.isoformat()`, so any linked-sheet save carrying a date 500'd with
+`'str' object has no attribute 'isoformat'`. Content was persisted client-side, but the response never
+came back — the user saw "update failed" while the data half-saved.
+
+**What went wrong:** The write target (datetime model fields) and the read path (Serializer mirror)
+assumed different wire types. A unit test that only PATCHed the endpoint without dates, or mocked the
+serializer, never exercised this.
+
+**What to do differently:** For custom action writes feeding a mirroring serializer, coerce values in
+the action (`''`→`None`, `datetime.date.fromisoformat`, 400 `ValidationError` on malformed) and guard
+the ISO-format call with `isinstance(value, (datetime, date))`. Write the RED test with real dates +
+cleared dates through the actual PATCH route — it caught the exact 500. Tooling aside: PowerShell
+`Set-Content -Encoding UTF8` writes a UTF-8 BOM, which yields a misleading DRF `400 "JSON parse error -
+Unexpected UTF-8 BOM"`; write curl bodies with a no-BOM UTF8 encoder.
+
+**Linked slice/requirement:** TDD_TRACKER #62 (Design Information editing). **Result:** backend
+`test_design_sheet_api.py` 38/38 (+1 date test), adjacency 44/44, owning app 51/51; live PATCH on the
+real linked sheet TP-1002 → HTTP 200 (dates ISO, cleared dates null).
+
+---
+
+# 2026-09-11 (6) - Master-data lookups should come from the setup API, not free text
+
+**What happened:** The design-sheet Design Information card rendered `Customer` as a free-text input.
+User feedback: "Customer should be a setup->buyer dropdown". The Setup→Buyer master already existed
+(`setupApi.getBuyers`, `/setup/buyers/`), so the select was wired to it with no new endpoint.
+
+**What went wrong:** Case-sensitivity drift risk + user expectation of Excel-familiar master lookup.
+
+**What to do differently:** When a reference workbook field maps 1:1 to a setup master table, render a
+select from the master API. Two implementation gotchas: (1) a `useEffect` API fetch added to a
+component breaks **every** existing render test until the mocked client supplies a default resolved
+value (`mockResolvedValue` in `beforeEach`, override per-test) — the effect fires in all tests, not
+just new ones; (2) always include the current value as an option even if it is a legacy value absent
+from Setup, so echo-reading an old record never silently blanks.
+
+**Linked slice/requirement:** TDD_TRACKER #62 (Design Information editing, follow-up). **Result:**
+frontend header 12/12 (+2 dropdown tests RED first), tsc 0, lint 0 errors, vitest 369/373 (GATE_A,
+allowlist only).
+
+---
+
+# 2026-09-11 (7) - Servers can be right while the page still "doesn't save": chase the full-payload repro
+
+**What happened:** User reported again that on the Design Information "updated information is not
+storing". Tool-driven single-field PATCHs against the live API all returned 200, and a real-browser
+(puppeteer) run proved the header DOES persist and DOES preselect the current buyer. The actual broken
+case was a **full-payload** one: the UI always sends every field, the Relationship select offers "—",
+and the `design-info` action rejected `relationship:""` with `Invalid relationship` (400) — so any save
+on a sheet with an empty relationship failed for ALL fields at once, not just one.
+
+**What went wrong:** The unit tests covered single-field payloads and valid relationships; the
+full-client short-circuit (all 14 keys, one of them `""`) was only reachable when relationship was
+empty — invisible to every prior test.
+
+**What to do differently (3 lessons):**
+1. When a UI form always submits all fields, add a backend test that sends the EXACT full form payload
+   (including the empty `""`/`null` options the UI exposes), not just the fields you happen to change.
+2. `relationship and relationship not in {...}` (falsy `""` → skip, unknown non-empty → 400) — choices
+   validation must treat the UI's "clear" option as valid.
+3. Reuse the same master-lookup pattern everywhere the same field appears: the Style detail page still
+   had Customer as free text; unify onto `setupApi.getBuyers` dropdowns (preselected current value,
+   alphabetised, legacy value kept as an option).
+
+**Linked slice/requirement:** TDD_TRACKER #62 (Design Information, browser feedback round 4).
+**Result:** blank-relationship RED→GREEN backend 6/6 (live HTTP 200 + clear); `StyleDetailPage.test.tsx`
+RED→GREEN; real-browser style page `isSelect:true` + `API PERSISTED customer:Lidl`; full gate backend
+45/45 + 51/51, frontend tsc 0 / lint 0 / vitest 370/374 (allowlist only).
+
+---
+
+# 2026-09-11 (8) - A register grid is a mirror of the detail field; test the round-trip, not the single screen
+
+**What happened:** After Customer became an editable dropdown on the design-sheet detail (round 3/4), the
+user reported the **register** still showed the old buyer after an edit. Root cause: `DesignsPage.tsx`
+mapped the grid column to `o.buyer_name` — the tech-pack snapshot FK, which is read-only — while the
+editable value lives in the merged `customer` field. The list API already returns the correct merged
+value (same `DesignSheetSerializer.to_representation` as detail), so the bug was one mapping line in the
+register; unit tests existed for both screens but none asserted what the register shows **after** a
+detail edit.
+
+**What went wrong:** Tests verified the detail edit persists and the register renders, but never the
+round-trip "edit on detail → register reflects it". The grid column name/label also drifted from the
+editable field (Buyer vs Customer) because the register was built from a different field than the
+detail surface.
+
+**What to do differently (3 lessons):**
+1. When the same field is editable on a detail page and displayed on a register, assert the **round-trip
+   mapping**: the register test must map the post-edit value (`customer || buyer_name || placeholder`),
+   and the column should carry the SAME label as the editable field (Customer) — "Buyer" was legacy
+   naming from the FK snapshot.
+2. Collapse duplicate surfaces in the same slice as the field fix: the /styles and /design-sheets list
+   pages were still reachable and the Style detail page re-hosted the Design Information editor. Removed
+   the dead list routes (redirect → /design) and deleted both pages + their suites, demoting
+   `StyleDetailPage` to a read-only dossier with an "Open in Design" deeplink (`style_id → sheet id`) so
+   there is exactly one register and one edit surface.
+3. Deleting dead pages lowers the total test count even though tracked behavior is better covered —
+   explain the drop in the tracker/evidence ("net −9 total vs the round-4 baseline: two dead-page suites
+   deleted + register/detail tests reworked"), otherwise a reviewer sees vitest fall (370→361) and reads
+   it as regression instead of cleanup.
+
+**Linked slice/requirement:** TDD_TRACKER #63 (register reflects Customer + Style/Design merge close-out,
+A7 continuation). **Result:** `DesignsPage.test.tsx` Customer round-trip RED→GREEN; `StyleDetailPage` read-only
++ Open in Design RED→GREEN; routes redirect; dead pages deleted; frontend tsc 0 / lint 0 / vitest 361+4
+allowlist (GATE_A, frontend-only).
+
+---
+
+# 2026-09-11 (9) - A legacy "partner" label is not a second field; keep the DTO carrier, change the storage
+
+**What happened:** The app stored the pack's "Customer" text on `buyer` AND an editable `customer`
+concept, so the same party appeared under two labels (buyer vs customer) depending on screen. User
+decision (DS-1002): merge to a **single Buyer**, master-data-backed — the pack customer (if any) wins
+over an already-chosen buyer on import; unresolvable pack customer → 400 (no auto-create); edits send
+the Buyer **UUID**, not a name/text.
+
+**What went wrong:** (a) The DTO internally keeps calling the party "customer" (`columns.py`,
+`excel_export.py`, `pdf_parser.py`, `import_service.py`); that is a round-trip carrier, NOT a second
+field — don't delete it or rename it to buyer in the same slice, or Excel import/export round-trips
+break. Only model storage + serializer + UI change. (b) Extract created the techpack BEFORE the customer
+resolution check, leaving an orphan techpack on 400 — resolution must run before object creation.
+(c) Test-only friction: a buyer_name now legitimately renders in two places on one page
+(`getByText` → `getAllByText`), and `userEvent.selectOptions` matched option *values* where jsdom is
+fragile — the id-only assertion is more robust via `fireEvent.change`.
+
+**What to do differently (3 lessons):**
+1. When collapsing a duplicated concept, decide explicitly what the DTO keeps calling the value. If it
+   exists purely so Excel fields survive a round-trip, leave it; changing it is a separate, riskier
+   slice (import/export + parser + fixture tests all touched).
+2. Validate required lookups before creating any object that the validation can orph an (extract:
+   resolve buyer first, then create the techpack). A failing check that already created a parent record
+   leaves half-mounted state.
+3. Prefer an id-based contract for master-data pickers on the wire and name-based UI in the browser:
+   the header now sends `buyer: <uuid>` while the dropdown renders names. Tests should drive selects via
+   `fireEvent.change(... {value})` when asserting the id payload, and use `getAllByText` when the value
+   spans multiple render sites.
+
+**Linked slice/requirement:** TDD_TRACKER #64 (Buyer/Customer merge, DS-1002).
+**Result:** backend `test_buyer_merge.py` 13/13 GREEN + legacy rework → scoped gate **109/109**;
+frontend tsc 0 / lint 0 / vitest 358 pass + 4 allowlisted GuidedTour jsdom failures (GATE_A,
+merchandising-scoped + full frontend suite).
+
+---
+
+# 2026-09-11 (10) - User brand identity must win over reference-manual boilerplate on printed output
+
+**What happened:** The design-sheet print/PDF page footer still carried "CARMEL APPARELS" — the
+reference product's company name leaked into user-facing output. User asked for a modern, compact,
+software-style design sheet that emphasises Buyer + Style and says only **BHMS** everywhere.
+
+**What went wrong:** The legacy footer was copied verbatim from the reference manual's print template
+with no thought to the user's own brand; the page layout was a wide single-column doc with the beige
+paper colour from the original. Print/PDF output is a customer-facing surface — branding errors there
+are more visible than on-screen UI.
+
+**What to do differently (3 lessons):**
+1. Any template/wordmark text on printed output is subject to the same "no external reference product
+   name" rule as docs/code — sweep for it (grep `CARMEL|Carmel` across the repo before/after) whenever
+   editing a print surface.
+2. Emphasise the two identity fields users most care about (Buyer, Style) as dedicated highlighted
+   blocks at the top of the print header rather than a thin inline "File · Style · Buyer" line; tests
+   should assert them via dedicated testids so the emphasis can't silently regress to plain text.
+3. Keep DTO/DOM testids stable when restyling (I preserved `print-design-info` when moving from a
+   `<table>` to a compact 2-column `<dl>`) — separate the *structure* tests depend on from the surface
+   restyle, or a redesign churns the whole suite for no behavior gain.
+
+**Linked slice/requirement:** TDD_TRACKER #65 (design-sheet print page redesign, A7 continuation).
+**Result:** header + footer tests RED→GREEN (2 failed first); targeted **15/15**; frontend tsc 0 /
+lint 0 / vitest 358 pass + 4 allowlisted GuidedTour jsdom failures (GATE_A, isolated page).

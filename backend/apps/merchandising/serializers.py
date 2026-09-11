@@ -1,7 +1,7 @@
 """
 Merchandising serializers for BHMS.
 """
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from django.utils import timezone
@@ -82,7 +82,7 @@ class StyleSerializer(serializers.ModelSerializer):
             "current_version", "status", "file_openings_count",
             "purchase_orders_count", "line_items", "main_image", "created_at",
             # Design info fields (techpack-equivalent, manual entry)
-            "block", "based_on", "relationship", "customer", "designer",
+            "block", "based_on", "relationship", "designer",
             "pattern_cutter", "issuer", "cloth_code", "size", "length",
             "issue_date", "risk_date", "pattern_request_date", "design_note",
         ]
@@ -158,7 +158,7 @@ class StyleTechPackSerializer(serializers.ModelSerializer):
             "id", "techpack_number", "style", "status",
             "source_pdf_url", "excel_url", "sketch_image_url",
             "sketch_thumbnail_url", "bom_items_count",
-            "issue_date", "block", "based_on", "customer", "style_number",
+            "issue_date", "block", "based_on", "style_number",
             "size", "designer", "pattern_cutter", "issuer", "cloth_code",
             "length", "sketch", "description", "note",
             "sketch_image", "sketch_thumbnail", "other_images",
@@ -1021,7 +1021,6 @@ class DesignSheetSerializer(serializers.ModelSerializer):
     issue_date = serializers.DateField(source="tech_pack.issue_date", read_only=True, default=None, allow_null=True)
     block = serializers.CharField(source="tech_pack.block", read_only=True, default="")
     based_on = serializers.CharField(source="tech_pack.based_on", read_only=True, default="")
-    customer = serializers.CharField(source="tech_pack.customer", read_only=True, default="")
     style_number = serializers.CharField(source="tech_pack.style_number", read_only=True, default="")
     size = serializers.CharField(source="tech_pack.size", read_only=True, default="")
     designer = serializers.CharField(source="tech_pack.designer", read_only=True, default="")
@@ -1066,7 +1065,7 @@ class DesignSheetSerializer(serializers.ModelSerializer):
             "id", "tech_pack", "status", "style_code", "buyer_name",
             "file_number", "sketch_url", "fit_specs", "job_requests",
             "material_items", "style_id", "season",
-            "issue_date", "block", "based_on", "customer", "style_number",
+            "issue_date", "block", "based_on", "style_number",
             "size", "designer", "pattern_cutter", "issuer", "cloth_code",
             "length", "sketch", "description", "note", "sketch_annotations",
             "layout_order", "created_at", "updated_at",
@@ -1093,14 +1092,44 @@ class DesignSheetSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         if not data.get("layout_order"):
             data["layout_order"] = list(DesignSheet.BLOCK_KEYS)
-        if not data.get("style_code"):
-            style = (
-                instance.tech_pack.style
-                if instance.tech_pack and instance.tech_pack.style_id
-                else None
-            )
-            if style:
+        style = (
+            instance.tech_pack.style
+            if instance.tech_pack and instance.tech_pack.style_id
+            else None
+        )
+        if style:
+            if not data.get("style_code"):
                 data["style_code"] = style.style_number
+            if style.buyer_id:
+                data["buyer_id"] = str(style.buyer_id)
+            # Merged Style + Design scope: the design sheet is the register
+            # entry for the linked Style, so its Design Information mirrors
+            # the Style (single source of truth). Blank Style values leave the
+            # imported tech-pack snapshot (the serializer field sources) in
+            # place as the fallback.
+            text_keys = {
+                "block": "block",
+                "based_on": "based_on",
+                "relationship": "relationship",
+                "size": "size",
+                "designer": "designer",
+                "pattern_cutter": "pattern_cutter",
+                "issuer": "issuer",
+                "cloth_code": "cloth_code",
+                "length": "length",
+                "description": "description",
+                "note": "design_note",
+            }
+            for out_key, style_attr in text_keys.items():
+                value = getattr(style, style_attr)
+                if value:
+                    data[out_key] = value
+            for out_key in ("issue_date", "risk_date", "pattern_request_date"):
+                value = getattr(style, out_key)
+                if isinstance(value, (datetime, date)):
+                    data[out_key] = value.isoformat()
+                elif value:
+                    data[out_key] = str(value)
         return data
 
     def get_buyer_name(self, obj):

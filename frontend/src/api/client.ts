@@ -191,7 +191,6 @@ export interface Style {
   block: string;
   based_on: string;
   relationship: string;
-  customer: string;
   designer: string;
   pattern_cutter: string;
   issuer: string;
@@ -1786,6 +1785,8 @@ export const merchApi = {
     api.patch<{ annotations: SketchAnnotation[] }>(`/merchandising/design-sheets/${id}/annotations/`, { annotations }),
   updateDesignSheet: (id: string, data: { layout_order: string[] }) =>
     api.patch<DesignSheet>(`/merchandising/design-sheets/${id}/`, data),
+  updateDesignSheetDesignInfo: (id: string, data: Record<string, unknown>) =>
+    api.patch<DesignSheet>(`/merchandising/design-sheets/${id}/design-info/`, data),
   initDesignSheet: (data: {
     mode: 'fresh' | 'copy';
     source_design_sheet?: string;
@@ -1844,7 +1845,6 @@ export interface StyleTechPack {
   issue_date: string | null;
   block: string;
   based_on: string;
-  customer: string;
   style_number: string;
   size: string;
   designer: string;
@@ -1917,7 +1917,6 @@ export interface DesignSheet {
   issue_date: string | null;
   block: string;
   based_on: string;
-  customer: string;
   style_number: string;
   size: string;
   designer: string;

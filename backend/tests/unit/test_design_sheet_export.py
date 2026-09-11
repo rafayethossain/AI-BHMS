@@ -129,7 +129,6 @@ def sheet(tenant, buyer, product_type):
         risk_date=date(2026, 9, 1),
         pattern_request_date=date(2026, 8, 15),
         relationship=StyleTechPack.Relationship.BASED_ON,
-        customer="Prime Buyer",
     )
     return DesignSheet.objects.create(
         tenant=tenant,
@@ -144,7 +143,6 @@ def foreign_sheet(other_tenant):
         tenant=other_tenant,
         techpack_number="TP-9999",
         style_code="DS-FOREIGN",
-        customer="Other Buyer",
     )
     return DesignSheet.objects.create(
         tenant=other_tenant, tech_pack=tp, status=DesignSheet.Status.NEW,

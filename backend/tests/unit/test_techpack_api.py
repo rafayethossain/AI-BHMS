@@ -88,7 +88,7 @@ def _user(tenant, role, username, email):
 @pytest.fixture
 def tp_api_buyer(tp_api_tenant):
     Country.objects.create(tenant=tp_api_tenant, name="TP Land", code="TP1")
-    return Buyer.objects.create(tenant=tp_api_tenant, name="TP Buyer", code="TPB1")
+    return Buyer.objects.create(tenant=tp_api_tenant, name="DOTTI", code="TPB1")
 
 
 @pytest.fixture
@@ -208,7 +208,7 @@ class TestExtractTechPack:
         assert tp.status == StyleTechPack.Status.EXTRACTED
         assert tp.style_number == "67741T"
         assert tp.cloth_code == "SANDWASH LINEN"
-        assert tp.customer == "DOTTI"
+        assert tp.buyer == tp_api_buyer
         assert tp.source_pdf.name != ""
         assert tp.extracted_data["bom_rows"]
 

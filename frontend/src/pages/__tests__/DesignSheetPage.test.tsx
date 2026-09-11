@@ -128,7 +128,6 @@ const baseSheet: DesignSheet = {
   issue_date: null,
   block: '',
   based_on: '',
-  customer: '',
   style_number: 'DS-STYLE-001',
   size: '',
   designer: '',

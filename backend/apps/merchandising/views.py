@@ -4,7 +4,7 @@ Merchandising views for BHMS.
 import csv
 import uuid
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date as datetime_date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from io import StringIO
 
@@ -86,6 +86,7 @@ from .serializers import (
     TASerializer,
 )
 from .services import NoCurrentFitSpecError, NoTrimItemsError, copy_fit_spec, copy_trim_items
+from .techpack.buyer_resolve import resolve_buyer_by_name
 from .techpack.excel_export import write_techpack_workbook
 from .techpack.excel_import import parse_techpack_workbook
 from .techpack.image_utils import process_sketch_image
@@ -194,7 +195,6 @@ class StyleViewSet(viewsets.ModelViewSet):
             block=source.block,
             based_on=source.style_number,
             relationship="based_on",
-            customer=source.customer,
             designer=source.designer,
             pattern_cutter=source.pattern_cutter,
             issuer=source.issuer,
@@ -293,6 +293,15 @@ class StyleViewSet(viewsets.ModelViewSet):
         if doc.errors:
             return Response({"error": "; ".join(doc.errors)}, status=status.HTTP_400_BAD_REQUEST)
 
+        design = doc.design_info
+        pack_customer = getattr(design, "customer", "") or ""
+        pack_buyer = resolve_buyer_by_name(request.tenant, pack_customer)
+        if pack_customer.strip() and pack_buyer is None:
+            return Response(
+                {"error": f"Customer '{pack_customer.strip()}' is not registered in Setup -> Buyers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         techpack = StyleTechPack.objects.create(
             tenant=request.tenant,
             techpack_number=StyleTechPack.next_techpack_number(request.tenant),
@@ -300,13 +309,17 @@ class StyleViewSet(viewsets.ModelViewSet):
             created_by=request.user,
         )
         techpack.mark_extracted(doc.to_dict())
-        design = doc.design_info
         for field in (
-            "issue_date", "block", "based_on", "customer", "style_number", "size",
+            "issue_date", "block", "based_on", "style_number", "size",
             "designer", "pattern_cutter", "issuer", "cloth_code", "length",
             "sketch", "description", "note",
         ):
             setattr(techpack, field, getattr(design, field))
+
+        if pack_buyer is not None:
+            techpack.buyer = pack_buyer
+        techpack.save(update_fields=["buyer", "updated_at"])
+
         techpack.excel_file.save(
             f"{techpack.techpack_number}.xlsx", ContentFile(write_techpack_workbook(doc).getvalue())
         )
@@ -371,10 +384,19 @@ class StyleViewSet(viewsets.ModelViewSet):
         if doc.errors:
             return Response({"error": "; ".join(doc.errors)}, status=status.HTTP_400_BAD_REQUEST)
 
+        pack_customer = getattr(doc.design_info, "customer", "") or ""
+        pack_buyer = resolve_buyer_by_name(request.tenant, pack_customer)
+        if pack_customer.strip() and pack_buyer is None:
+            return Response(
+                {"error": f"Customer '{pack_customer.strip()}' is not registered in Setup -> Buyers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        effective_buyer = pack_buyer if pack_buyer is not None else buyer
+
         try:
             with transaction.atomic():
                 result = import_style_from_techpack(
-                    tenant=request.tenant, user=request.user, buyer=buyer,
+                    tenant=request.tenant, user=request.user, buyer=effective_buyer,
                     doc=doc, techpack=techpack,
                 )
         except Exception:
@@ -3305,7 +3327,29 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
         "create": "merchandising:create", "update": "merchandising:edit",
         "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
         "init": "merchandising:create", "export": "merchandising:view",
+        "design_info": "merchandising:edit",
     }
+
+    # Key → model field, shared by Style and StyleTechPack (design_note maps
+    # to Style.design_note but StyleTechPack.note).
+    DESIGN_INFO_FIELDS = {
+        "block": "block",
+        "based_on": "based_on",
+        "relationship": "relationship",
+        "buyer": "buyer",
+        "designer": "designer",
+        "pattern_cutter": "pattern_cutter",
+        "issuer": "issuer",
+        "cloth_code": "cloth_code",
+        "size": "size",
+        "length": "length",
+        "issue_date": "issue_date",
+        "risk_date": "risk_date",
+        "pattern_request_date": "pattern_request_date",
+        "design_note": "design_note",
+    }
+    DESIGN_INFO_DATES = {"issue_date", "risk_date", "pattern_request_date"}
+    DESIGN_INFO_RELATIONSHIPS = {"new", "based_on", "na", "recut"}
 
     def get_queryset(self):
         return DesignSheet.objects.filter(tenant=self.request.tenant).select_related(
@@ -3407,7 +3451,6 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
                 block=data["block_reference"] or (source_tp.block if source_tp else ""),
                 description=data["description"] or (source_tp.description if source_tp else ""),
                 based_on=(source_tp.techpack_number if source_tp else ""),
-                customer=(effective_buyer.name if effective_buyer else ""),
                 size=source_tp.size if source_tp else "",
                 designer=source_tp.designer if source_tp else "",
                 pattern_cutter=source_tp.pattern_cutter if source_tp else "",
@@ -3455,6 +3498,75 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
         if pk is None:
             return None
         return model.objects.filter(tenant=tenant, id=pk).first()
+
+    @action(detail=True, methods=["patch"], url_path="design-info")
+    def design_info(self, request, pk=None):
+        """Update the Design Information of the merged register entry.
+
+        Writes the design-info fields onto the linked Style when one is set
+        (single source of truth) and onto the tech-pack record otherwise, so
+        the Design Information stays editable on every sheet — fresh designs
+        created from the register have no linked Style yet.
+        """
+        updates = {
+            k: v for k, v in request.data.items()
+            if k in self.DESIGN_INFO_FIELDS
+        }
+        if not updates:
+            return Response(
+                {"detail": "No design info fields provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        relationship = updates.get("relationship")
+        if relationship and relationship not in self.DESIGN_INFO_RELATIONSHIPS:
+            return Response(
+                {"detail": "Invalid relationship."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        sheet = self.get_object()
+        techpack = sheet.tech_pack
+        style = techpack.style if techpack and techpack.style_id else None
+        target = style if style else techpack
+        field_map = dict(self.DESIGN_INFO_FIELDS)
+        if target is techpack:
+            field_map["design_note"] = "note"
+        field_updates = {}
+
+        buyer_value = updates.pop("buyer", None)
+        if buyer_value not in (None, ""):
+            buyer_obj = self._resolve_setup_model(Buyer, request.tenant, buyer_value)
+            if buyer_obj is None:
+                return Response(
+                    {"detail": "Selected buyer was not found for this tenant."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            field_updates["buyer"] = buyer_obj
+
+        for key, value in updates.items():
+            field = field_map[key]
+            if key in self.DESIGN_INFO_DATES:
+                field_updates[field] = self._coerce_design_date(value)
+            else:
+                field_updates[field] = value or ""
+        for field, value in field_updates.items():
+            setattr(target, field, value)
+        target.save(update_fields=list(field_updates))
+        target.refresh_from_db()
+        return Response(self.get_serializer(sheet).data)
+
+    @staticmethod
+    def _coerce_design_date(value):
+        """Return a real date for a date picker value ('' clears to None)."""
+        if value in (None, ""):
+            return None
+        if isinstance(value, datetime_date):
+            return value
+        try:
+            return datetime_date.fromisoformat(str(value))
+        except ValueError:
+            raise ValidationError({
+                "detail": f"Invalid date value: {value!r}.",
+            }) from None
 
     @action(detail=False, methods=["get"], url_path="export")
     def export(self, request):
