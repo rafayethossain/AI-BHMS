@@ -5,9 +5,11 @@ import SpreadsheetGrid from '../components/SpreadsheetGrid';
 import type { SpreadsheetColumn } from '../components/SpreadsheetGrid';
 import EntityCard, { CardListToggle } from '../components/EntityCard';
 import NewDesignModal from '../components/NewDesignModal';
-import { merchApi } from '../api/client';
+import { merchApi, setupApi } from '../api/client';
 import type { DesignSheet } from '../api/client';
 import { useToast } from '../contexts/ToastContext';
+
+type MasterOption = { id: string; name: string; code: string };
 
 const STATUS_LABELS: Record<string, string> = {
   new: 'New',
@@ -28,6 +30,8 @@ export default function DesignsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [items, setItems] = useState<DesignSheet[]>([]);
+  const [productTypes, setProductTypes] = useState<MasterOption[]>([]);
+  const [productCategories, setProductCategories] = useState<MasterOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'grid' | 'list'>('list');
   const [showNewDesign, setShowNewDesign] = useState(false);
@@ -46,12 +50,20 @@ export default function DesignsPage() {
     })();
   }, []);
 
+  useEffect(() => {
+    setupApi.getTypes().then((res) => setProductTypes(res.data.results)).catch(() => undefined);
+    setupApi.getCategories().then((res) => setProductCategories(res.data.results)).catch(() => undefined);
+  }, []);
+
+  const masterValues = (list: MasterOption[]) =>
+    Object.fromEntries(list.map((o) => [o.name, o.name]));
+
   const columns: SpreadsheetColumn[] = [
     { title: 'Design', field: 'design', headerFilter: true, headerFilterType: 'input', editor: true },
     { title: 'Style Code', field: 'style_code', headerFilter: true, headerFilterType: 'input' },
     { title: 'Buyer', field: 'buyer', headerFilter: true, headerFilterType: 'list' },
-    { title: 'Style Type', field: 'product_type', headerFilter: true, headerFilterType: 'list' },
-    { title: 'Category', field: 'product_category', headerFilter: true, headerFilterType: 'list' },
+    { title: 'Style Type', field: 'product_type', headerFilter: true, headerFilterType: 'list', editor: 'select', editorParams: { values: masterValues(productTypes) } },
+    { title: 'Category', field: 'product_category', headerFilter: true, headerFilterType: 'list', editor: 'select', editorParams: { values: masterValues(productCategories) } },
     { title: 'Based on', field: 'based_on', headerFilter: true, headerFilterType: 'input' },
     { title: 'Relationship', field: 'relationship', headerFilter: true, headerFilterType: 'list' },
     { title: 'Status', field: 'status', headerFilter: true, headerFilterType: 'list' },
@@ -89,17 +101,48 @@ export default function DesignsPage() {
   }));
 
   const handleCellEdited = async (field: string, value: unknown, row: Record<string, unknown>) => {
-    if (field !== 'design') return;
     const styleId = row.style_id as string | undefined;
     if (!styleId || typeof value !== 'string') return;
-    const nextName = value;
-    try {
-      await merchApi.updateStyle(styleId, { name: nextName });
-      setItems((prev) =>
-        prev.map((o) => (o.style_id === styleId ? { ...o, style_name: nextName } : o)),
-      );
-    } catch {
-      toast('error', 'Failed to update design name');
+    if (field === 'design') {
+      const nextName = value;
+      try {
+        await merchApi.updateStyle(styleId, { name: nextName });
+        setItems((prev) =>
+          prev.map((o) => (o.style_id === styleId ? { ...o, style_name: nextName } : o)),
+        );
+      } catch {
+        toast('error', 'Failed to update design name');
+      }
+      return;
+    }
+    if (field === 'product_type') {
+      const match = productTypes.find((t) => t.name === value);
+      if (!match) return;
+      try {
+        await merchApi.updateStyle(styleId, { product_type: match.id });
+        setItems((prev) =>
+          prev.map((o) =>
+            o.style_id === styleId ? { ...o, product_type_name: match.name } : o,
+          ),
+        );
+      } catch {
+        toast('error', 'Failed to update style type');
+      }
+      return;
+    }
+    if (field === 'product_category') {
+      const match = productCategories.find((c) => c.name === value);
+      if (!match) return;
+      try {
+        await merchApi.updateStyle(styleId, { category: match.id });
+        setItems((prev) =>
+          prev.map((o) =>
+            o.style_id === styleId ? { ...o, product_category_name: match.name } : o,
+          ),
+        );
+      } catch {
+        toast('error', 'Failed to update category');
+      }
     }
   };
 

@@ -264,6 +264,42 @@ class TestDesignRegisterAPI:
         assert row["live_orders_count"] == 0
         assert row["completed_orders_count"] == 0
 
+    def test_register_prefers_style_product_type_and_category(
+        self, reg_client, tenant, style, techpack
+    ):
+        other_cat = ProductCategory.objects.create(
+            tenant=tenant, code="KTN", name="Knitwear",
+        )
+        other_type = ProductType.objects.create(
+            tenant=tenant, code="TEE", name="Tee", category=other_cat,
+        )
+        style.product_type = other_type
+        style.category = other_cat
+        style.save()
+        DesignSheet.objects.create(tenant=tenant, tech_pack=techpack)
+        resp = reg_client.get("/api/v1/merchandising/design-sheets/")
+        row = resp.data["results"][0]
+        assert row["product_type_id"] == str(other_type.id)
+        assert row["product_type_name"] == "Tee"
+        assert row["product_category_name"] == "Knitwear"
+
+    def test_register_category_follows_style_type_when_no_explicit_category(
+        self, reg_client, tenant, style, techpack
+    ):
+        other_cat = ProductCategory.objects.create(
+            tenant=tenant, code="KTN", name="Knitwear",
+        )
+        other_type = ProductType.objects.create(
+            tenant=tenant, code="TEE", name="Tee", category=other_cat,
+        )
+        style.product_type = other_type
+        style.save()
+        DesignSheet.objects.create(tenant=tenant, tech_pack=techpack)
+        resp = reg_client.get("/api/v1/merchandising/design-sheets/")
+        row = resp.data["results"][0]
+        assert row["product_type_name"] == "Tee"
+        assert row["product_category_name"] == "Knitwear"
+
     def test_unlinked_style_still_returns_safe_defaults(
         self, reg_client, tenant,
     ):

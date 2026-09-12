@@ -1351,4 +1351,42 @@
       nice-to-have if the chrome-devtools MCP gets connected; jsdom coverage here is meaningful (no
       Tabulator/browser binding on this page).
 
+66. **Design register grid: Style Type + Category become editable master-data dropdowns (A7
+    continuation)** - user request: the Design register grid columns "Design / Style Type / Category"
+    should be available for inline update ("plain text input field or dropdown where appropriate") and
+    the updated information stored. "Design" (style name) was already editable + stored via
+    `updateStyle(styleId, { name })`; this slice extends the same pattern to the two master-data
+    columns.
+    - **Read path (GREEN backend):** `DesignSheetSerializer.to_representation` previously served
+      `product_type_name` / `product_category_name` straight from the stale `tech_pack.product_type`
+      snapshot even when the linked Style carried its own master FKs — i.e. a Style edit never
+      surfaced in the register. Added the same Style-preferred merge already used for `buyer`:
+      when the linked Style has a `product_type`, `product_type_id`/`product_type_name` come from the
+      Style and `product_category_name` resolves Style.category → Style.product_type.category →
+      techpack snapshot.
+    - RED (backend): `tests/unit/test_design_register.py` — 2 new tests
+      (`test_register_prefers_style_product_type_and_category`,
+      `test_register_category_follows_style_type_when_no_explicit_category`) failed first (register
+      still showed Jogger/Apparel from the stale techpack snapshot);
+      `apps/merchandising/tests/test_style_design_fields.py` — 1 new test proving
+      PATCH `/merchandising/styles/{id}/` accepts `product_type` + `category` UUIDs and echoes them
+      (write path already existed; kept as the persistence proof). Failed first on the two serializer
+      assertions.
+    - GREEN (backend): `serializers.py` `to_representation` override added. Targeted **28/28**
+      (test_design_register 7 + style_design_fields 21).
+    - GREEN (frontend): `DesignsPage.tsx` — fetches `setupApi.getTypes()` +
+      `setupApi.getCategories()` on mount; Style Type and Category columns gain `editor: 'select'`
+      with `editorParams.values` keyed by master name; `handleCellEdited` extended: `product_type`
+      / `product_category` edits look up the chosen name in the loaded masters, PATCH the linked Style
+      via `updateStyle(styleId, { product_type: <id> })` / `{ category: <id> }`, and update the local
+      row optimistically (same try/catch + toast as the existing Design column). Design-name edit
+      unchanged.
+    - RED (frontend): `DesignsPage.test.tsx` — 3 new tests (columns configure select editors with the
+      master values; Style Type edit PATCHes `{ product_type: 'pt-2' }`; Category edit PATCHes
+      `{ category: 'cat-2' }`). Failed first (columns had no editor, handler only handled `design`).
+    - Gates (GATE_A): backend targeted + adjacency **98/98** (design-sheet API/export/init/material/
+      fit-spec/e2e + buyer_merge) + owning app **51/51**; frontend `tsc -b` exit 0; lint 0 errors
+      (baseline warnings); vitest **361 passed + 4 pre-existing GuidedTour jsdom failures (allowlist)
+      / 365 total** (3 new tests, net +3). **VERIFIED.**
+
 ---

@@ -4814,4 +4814,28 @@ large) should say only **BHMS**.
 
 ---
 
+## Part 15 Addendum 8 — Design register grid: Style Type + Category editable dropdowns (2026-09-11)
+
+User request: the register grid columns **Design / Style Type / Category** must be available for
+inline update ("plain text input field or dropdown where appropriate") with the updated information
+stored. "Design" (style name) was already inline-editable + persisted via
+`updateStyle(styleId, { name })`; this closes the gap for the two master-data columns.
+
+- Read path (backend): `DesignSheetSerializer.to_representation` served `product_type_name` /
+  `product_category_name` from the stale `tech_pack.product_type` snapshot even when the linked Style
+  had its own FKs — Style edits never surfaced in the register. Added the Style-preferred merge already
+  used for `buyer`: linked-Style `product_type_id`/`product_type_name`, and `product_category_name` =
+  Style.category → Style.product_type.category → techpack snapshot.
+- Write path (frontend): `DesignsPage.tsx` loads `setupApi.getTypes()` + `setupApi.getCategories()`;
+  Style Type and Category columns are `select` editors keyed by master name; `handleCellEdited` maps the
+  chosen name → master id and PATCHes the linked Style (`updateStyle(styleId, { product_type })` /
+  `{ category }`), then updates the row optimistically (same toast/err handling as the Design column).
+- Tests: backend 3 new (2 register-read RED-first + 1 write-path proof) → targeted **28/28**, adjacency
+  **98/98**, owning app **51/51**; frontend 3 new DesignsPage tests RED-first → `tsc -b` 0, oxlint 0
+  errors (baseline), vitest **361 passed + 4 allowlisted / 365**.
+- **GATE_A: VERIFIED.** No schema change (Style already owns both FKs; `StyleSerializer` already
+  writable) — no migration.
+
+---
+
 *This is the single source of truth for the BHMS backlog and requirement status (workflow-ordered). Reframed: 2026-08-03*

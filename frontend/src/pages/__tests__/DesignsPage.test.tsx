@@ -33,6 +33,7 @@ vi.mock('../../api/client', () => ({
   },
   setupApi: {
     getTypes: vi.fn(),
+    getCategories: vi.fn(),
     getBuyers: vi.fn(),
   },
 }));
@@ -95,6 +96,7 @@ type SpreadsheetColumnLike = {
   headerFilterType?: string;
   hozAlign?: string;
   editor?: boolean | string;
+  editorParams?: Record<string, unknown>;
 };
 
 const DESIGN_REGISTER_COLUMNS = [
@@ -152,6 +154,11 @@ const setupTypes = [
   { id: 'pt-2', name: 'Tee', code: 'TEE', category_name: 'Apparel', status: 'active' },
 ];
 
+const setupCategories = [
+  { id: 'cat-1', name: 'Apparel', code: 'APP', status: 'active' },
+  { id: 'cat-2', name: 'Knitwear', code: 'KTN', status: 'active' },
+];
+
 const setupBuyers = [
   { id: 'b-1', name: 'Alpha Buyer', code: 'ABB', is_active: true },
   { id: 'b-2', name: 'Beta Buyer', code: 'BB2', is_active: true },
@@ -181,6 +188,12 @@ describe('DesignsPage (unified Design register grid)', () => {
     });
     (merchApi.updateStyle as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: {},
+    });
+    (setupApi.getTypes as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: setupTypes, count: 2 },
+    });
+    (setupApi.getCategories as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: setupCategories, count: 2 },
     });
   });
 
@@ -296,6 +309,66 @@ describe('DesignsPage (unified Design register grid)', () => {
       });
     });
     expect(merchApi.updateStyle).toHaveBeenCalledWith('sty-42', { name: 'Renamed Jogger' });
+  });
+
+  it('makes Style Type and Category master-data dropdown editors', async () => {
+    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: [{ ...design, style_id: 'sty-42' }], count: 1 },
+    });
+    renderPage();
+    await screen.findByText('REG-1001');
+    const columns = gridCapture.lastProps?.columns as SpreadsheetColumnLike[] | undefined;
+    const byField = Object.fromEntries((columns ?? []).map((c) => [c.field, c] as const));
+    expect(byField['product_type']?.editor).toBe('select');
+    expect(byField['product_category']?.editor).toBe('select');
+    const typeValues = byField['product_type']?.editorParams?.values as
+      | Record<string, string>
+      | undefined;
+    expect(typeValues).toEqual({ Jogger: 'Jogger', Tee: 'Tee' });
+    const categoryValues = byField['product_category']?.editorParams?.values as
+      | Record<string, string>
+      | undefined;
+    expect(categoryValues).toEqual({ Apparel: 'Apparel', Knitwear: 'Knitwear' });
+  });
+
+  it('patches Style product_type when the Style Type cell is edited', async () => {
+    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: [{ ...design, style_id: 'sty-42' }], count: 1 },
+    });
+    (merchApi.updateStyle as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByText('REG-1001');
+    const onCellEdited = gridCapture.lastProps?.onCellEdited as
+      | ((field: string, value: string, row: Record<string, unknown>) => void)
+      | undefined;
+    expect(onCellEdited).toBeDefined();
+    await act(async () => {
+      onCellEdited?.('product_type', 'Tee', {
+        id: 'reg-1',
+        style_id: 'sty-42',
+      });
+    });
+    expect(merchApi.updateStyle).toHaveBeenCalledWith('sty-42', { product_type: 'pt-2' });
+  });
+
+  it('patches Style category when the Category cell is edited', async () => {
+    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: [{ ...design, style_id: 'sty-42' }], count: 1 },
+    });
+    (merchApi.updateStyle as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByText('REG-1001');
+    const onCellEdited = gridCapture.lastProps?.onCellEdited as
+      | ((field: string, value: string, row: Record<string, unknown>) => void)
+      | undefined;
+    expect(onCellEdited).toBeDefined();
+    await act(async () => {
+      onCellEdited?.('product_category', 'Knitwear', {
+        id: 'reg-1',
+        style_id: 'sty-42',
+      });
+    });
+    expect(merchApi.updateStyle).toHaveBeenCalledWith('sty-42', { category: 'cat-2' });
   });
 
   it('maps register values to display labels for the grid', async () => {
@@ -439,6 +512,9 @@ describe('DesignsPage (New Design flow)', () => {
     });
     (setupApi.getTypes as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { results: setupTypes, count: 2 },
+    });
+    (setupApi.getCategories as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: setupCategories, count: 2 },
     });
     (setupApi.getBuyers as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { results: setupBuyers, count: 2 },

@@ -245,6 +245,32 @@ class TestStyleDesignInfoFields:
         assert data["block"] == ""
         assert data["designer"] == ""
 
+    def test_patch_updates_product_type_and_category(self, client, seed):
+        """PATCH a style to set product type and category master FKs."""
+        other_cat = ProductCategory.objects.create(
+            tenant=seed["tenant"], name="Other Category", code="OCAT",
+        )
+        other_type = ProductType.objects.create(
+            tenant=seed["tenant"], name="Other Type", code="OTYPE",
+            category=other_cat,
+        )
+        create_resp = self._create(client, seed)
+        assert create_resp.status_code == 201
+        style_id = create_resp.json()["id"]
+
+        patch_resp = client.patch(
+            f"/api/v1/merchandising/styles/{style_id}/",
+            {
+                "product_type": str(other_type.id),
+                "category": str(other_cat.id),
+            },
+            format="json",
+        )
+        assert patch_resp.status_code == 200, patch_resp.content
+        data = patch_resp.json()
+        assert data["product_type"] == str(other_type.id)
+        assert data["category"] == str(other_cat.id)
+
     def test_patch_preserves_unset_fields(self, client, seed):
         """PATCH only updates supplied fields; others stay untouched."""
         create_resp = self._create(client, seed, block="Keep Me", designer="Keep Designer")

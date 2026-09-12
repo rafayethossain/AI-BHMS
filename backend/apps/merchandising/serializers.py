@@ -1102,6 +1102,16 @@ class DesignSheetSerializer(serializers.ModelSerializer):
                 data["style_code"] = style.style_number
             if style.buyer_id:
                 data["buyer_id"] = str(style.buyer_id)
+            if style.product_type_id:
+                data["product_type_id"] = str(style.product_type_id)
+                data["product_type_name"] = style.product_type.name
+                style_category = (
+                    style.category.name
+                    if style.category_id and style.category
+                    else (style.product_type.category.name
+                          if style.product_type.category_id else "")
+                )
+                data["product_category_name"] = style_category
             # Merged Style + Design scope: the design sheet is the register
             # entry for the linked Style, so its Design Information mirrors
             # the Style (single source of truth). Blank Style values leave the

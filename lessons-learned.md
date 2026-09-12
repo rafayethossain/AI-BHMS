@@ -1687,3 +1687,36 @@ are more visible than on-screen UI.
 **Linked slice/requirement:** TDD_TRACKER #65 (design-sheet print page redesign, A7 continuation).
 **Result:** header + footer tests RED→GREEN (2 failed first); targeted **15/15**; frontend tsc 0 /
 lint 0 / vitest 358 pass + 4 allowlisted GuidedTour jsdom failures (GATE_A, isolated page).
+
+---
+
+# 2026-09-11 (11) - A read path can defeat an edit that "already works" — mirror Style-first precedence in the serializer, not just the write
+
+**What happened:** Making the Design register's Style Type / Category columns editable was presumed a
+frontend-only change: `updateStyle` PATCH already persisted `product_type` and `category` on the linked
+Style (StyleSerializer was already writable for both FKs). But the register grid carried on showing the
+imported tech-pack snapshot values after an edit, so the "updated information was not stored"
+symptom reappeared (same shape as the round-4 stale-Customer bug).
+
+**What went wrong:** `DesignSheetSerializer.to_representation` read `product_type_name` /
+`product_category_name` straight off `tech_pack.product_type` — the immutable snapshot — while the edit
+wrote to the Style. Write-path GREEN and a passing serializer are not enough: the **read path
+(precedence) is part of the contract** and must be tested in the same slice. For a deep merge like
+Style-beats-snapshot, forgetting the read side looks like data loss to users even though nothing was
+lost.
+
+**What to do differently (3 lessons):**
+1. When an edit "already persists" but the list/detail read from a different source field than the
+   write, add a **read-path regression test first** (register must reflect the Style edit), not just a
+   write-endpoint test.
+2. Define a single precedence chain and put it in the one serializer used by every surface (detail +
+   list + export derive from the same `to_representation`), so one fix heals all consumers. Category =
+   Style.category → Style.product_type.category → techpack snapshot is the chain here.
+3. For master-data dropdown edits in a grid, keep the cell value keyed by **display name** (matches the
+   row's existing string) and translate to an id in the handler — no formatter plumbing needed — but
+   load the master lists in the page and guard on a missing match.
+
+**Linked slice/requirement:** TDD_TRACKER #66 (Design register grid editable type/category, A7).
+**Result:** backend 3 new tests RED-first → targeted **28/28**, adjacency **98/98**, owning app
+**51/51**; frontend 3 new DesignsPage tests RED-first → tsc 0 / lint 0 / vitest 361 pass + 4
+allowlisted GuidedTour jsdom failures (GATE_A, merchandising-scoped + full frontend suite).
