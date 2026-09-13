@@ -628,3 +628,40 @@ describe('DesignsPage (New Design flow)', () => {
     expect(submit).toBeDisabled();
   });
 });
+
+describe('DesignsPage page layout standard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gridCapture.reset();
+    cardCapture.reset();
+    (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: [design], count: 1 },
+    });
+    (setupApi.getTypes as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: setupTypes, count: 2 },
+    });
+    (setupApi.getCategories as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { results: setupCategories, count: 2 },
+    });
+  });
+
+  it('wraps the page in the standard padded grid container', async () => {
+    const { container } = renderPage();
+    await screen.findByText('Design Register');
+    const main = container.querySelector('main');
+    expect(main).toBeTruthy();
+    expect(main?.className).toContain('max-w-7xl');
+    expect(main?.className).toContain('mx-auto');
+    expect(main?.className).toContain('px-6');
+    expect(main?.className).toContain('py-8');
+  });
+
+  it('renders the page title block with the standard spacing', async () => {
+    renderPage();
+    await screen.findByText('Design Register');
+    const subtitle = screen.getByText('Design sheets across the buying house');
+    expect(subtitle.className).toContain('text-sm');
+    expect(subtitle.className).toContain('text-muted');
+    expect(subtitle.className).toContain('mt-1');
+  });
+});

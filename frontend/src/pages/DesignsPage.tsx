@@ -169,80 +169,82 @@ export default function DesignsPage() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Design Register</h1>
-            <p className="text-sm text-muted">Design sheets across the buying house</p>
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Design Register</h1>
+              <p className="text-sm text-muted mt-1">Design sheets across the buying house</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowNewDesign(true)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                + New Design
+              </button>
+              <CardListToggle view={view} onChange={setView} />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowNewDesign(true)}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              + New Design
-            </button>
-            <CardListToggle view={view} onChange={setView} />
-          </div>
-        </div>
 
-        {view === 'list' ? (
-          <SpreadsheetGrid
-            data={gridData}
-            columns={columns}
-            height={480}
-            toolbar
-            title="Design Register"
-            exportable
-            onExport={handleExport}
-            printable
-            printTitle="Design Register"
-            columnChooser
-            paginationSize={20}
-            loading={loading}
-            onRowClick={(row) => navigate(`/design-sheets/${row.id}`)}
-            onCellEdited={handleCellEdited}
-          />
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {items.map((o) => (
-              <EntityCard
-                key={o.id}
-                id={o.id}
-                compact
-                code={o.style_code}
-                title={o.style_name || o.style_code || '—'}
-                subtitle={[o.designer, o.department].filter(Boolean).join(' · ')}
-                status={o.status}
-                image={o.sketch_url}
-                date={o.pattern_request_date ?? undefined}
-                metrics={[
-                  { label: 'Live', value: o.live_orders_count ?? 0 },
-                  { label: 'Completed', value: o.completed_orders_count ?? 0 },
-                ]}
-                url={`/design-sheets/${o.id}`}
-                actions={[
-                  { label: 'View', onClick: () => navigate(`/design-sheets/${o.id}`) },
-                ]}
-              />
-            ))}
-            {items.length === 0 && !loading && (
-              <div className="col-span-full bg-surface rounded-xl border border-border p-12 text-center">
-                <p className="text-lg font-medium text-heading mb-1">No designs yet</p>
-                <p className="text-sm text-muted mb-4">
-                  Create a new design or run a tech pack import to start the register.
-                </p>
-                <button
-                  onClick={() => setShowNewDesign(true)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
-                >
-                  + New Design
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          {view === 'list' ? (
+            <SpreadsheetGrid
+              data={gridData}
+              columns={columns}
+              height={480}
+              toolbar
+              title="Design Register"
+              exportable
+              onExport={handleExport}
+              printable
+              printTitle="Design Register"
+              columnChooser
+              paginationSize={20}
+              loading={loading}
+              onRowClick={(row) => navigate(`/design-sheets/${row.id}`)}
+              onCellEdited={handleCellEdited}
+            />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {items.map((o) => (
+                <EntityCard
+                  key={o.id}
+                  id={o.id}
+                  compact
+                  code={o.style_code}
+                  title={o.style_name || o.style_code || '—'}
+                  subtitle={[o.designer, o.department].filter(Boolean).join(' · ')}
+                  status={o.status}
+                  image={o.sketch_url}
+                  date={o.pattern_request_date ?? undefined}
+                  metrics={[
+                    { label: 'Live', value: o.live_orders_count ?? 0 },
+                    { label: 'Completed', value: o.completed_orders_count ?? 0 },
+                  ]}
+                  url={`/design-sheets/${o.id}`}
+                  actions={[
+                    { label: 'View', onClick: () => navigate(`/design-sheets/${o.id}`) },
+                  ]}
+                />
+              ))}
+              {items.length === 0 && !loading && (
+                <div className="col-span-full bg-surface rounded-xl border border-border p-12 text-center">
+                  <p className="text-lg font-medium text-heading mb-1">No designs yet</p>
+                  <p className="text-sm text-muted mb-4">
+                    Create a new design or run a tech pack import to start the register.
+                  </p>
+                  <button
+                    onClick={() => setShowNewDesign(true)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    + New Design
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </main>
 
       {showNewDesign && (
         <NewDesignModal
