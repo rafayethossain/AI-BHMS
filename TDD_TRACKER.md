@@ -1389,4 +1389,69 @@
       (baseline warnings); vitest **361 passed + 4 pre-existing GuidedTour jsdom failures (allowlist)
       / 365 total** (3 new tests, net +3). **VERIFIED.**
 
+67. **Material Breakdown grid: full standard-grid behaviour (filter/add/edit/delete) on the design
+    sheet detail (A7 continuation; US-035 Bill of Materials)** - user request: material rows on
+    `/design-sheets/:id` should behave like the standard data-list grid — Column filters, add, update,
+    delete all working (previously only right-click delete; Add silently no-oped when no BOM existed;
+    supplier edits were dropped).
+    - Read path (GREEN backend): `DesignSheetSerializer.get_material_items` refactored onto a
+      module-level `material_item_grid_row(item, bom)` helper (`backend/apps/merchandising/serializers.py`)
+      shared with the new add action — behaviour identical, no consumer change.
+    - RED (backend): `tests/unit/test_design_sheet_material_grid.py` — added 5 `TestMaterialAddAction`
+      tests (add-to-existing-BOM round-trip proving full grid shape incl. supplier **name** + qty 6.0;
+      category-only defaults to `Others`/`New Item`; creates StyleVersion v1 draft + BOM draft
+      `max(version)+1` when the sheet has no BOM; reuses the same BOM on an empty grid; 400 when the
+      sheet has no linked style). Failed first (404 on the new action).
+    - GREEN (backend): `DesignSheetViewSet.material_add` action at
+      `POST /api/v1/merchandising/design-sheets/{id}/material-add/` (201 → grid-shape row; resolves
+      style → style_version (draft v1 autocreated) → BOM (active preferred, else latest; draft
+      `max+1` autocreated) → `BOMItem` with defaults) + `required_permissions["material_add"] =
+      "merchandising:create"`. Raw-create FK gotcha: pass `uom_id`/`vendor_id`/`supplier_id`
+      (attribute-name `_id` forms), not the UUID strings, or Django raises
+      `Cannot assign ... must be a "Vendor" instance`. Targeted **10/10** (grid-shape lists asserted as
+      sets to dodge random UUID `order_by("id")` ordering).
+    - RED (frontend): `DesignSheetMaterial.test.tsx` rewritten — asserts header filters on every column,
+      supplier select fed from `supplierOptions`, standard chrome (`toolbar`, `title` "Material
+      Breakdown", `exportable` + `onExport` → `downloadXlsx('material-breakdown.xlsx')`, `printable`/
+      `printTitle`, `columnChooser`, `paginationSize: 20`, `actionColumn` delete, `loading`); `DesignSheetPage
+      .test.tsx` extended (`setupApiMock.getVendors` + vendorOptions; supplier-name→vendor-id PATCH;
+      ignore unknown name; Add via `addMaterialItem('ds-1', {})` + refetch; empty-grid add; copy-row
+      payload maps type→category/description_code→item_name/qty→ordered_qty/supplier→id). Failed first
+      (no filters/editor, old Add required `materialItems[0].bom_id`, supplier edit was a no-op).
+    - GREEN (frontend): `DesignSheetMaterial.tsx` — new `supplierOptions`/`loading` props, per-column
+      `headerFilter`/`headerFilterType`, supplier `editor:'select'` keyed by name, undo/redo/"+ Add Item"
+      toolbar, `actionColumn` delete, export/print/column-chooser, inner `paginationSize: 20`, groupBy
+      `type` + clipboard/history preserved. `DesignSheetPage.tsx` — loads vendors via `setupApi
+      .getVendors({ page_size: '10000' })`; `handleMaterialEdit` maps supplier name→vendor id (unknown
+      → no PATCH); `handleMaterialAdd(row?)` now always calls `merchApi.addMaterialItem(sheet.id,
+      payload)` (no `bom_id` client-side dependency) then `loadSheet()`. `client.ts` gained
+      `addMaterialItem`. `createBOMItem` retained (BOMDetailPage consumer).
+    - Gates (GATE_A): backend targeted **10/10** + owning app **51/51** + adjacency **13/13**
+      (test_trim_schedule 12 + core full-lifecycle 1, both hit bom-items); frontend `tsc -b` exit 0;
+      lint 0 errors (baseline warnings); vitest **371 passed / 371 (49 files, net +10)**.
+      **VERIFIED.** Real-browser note: grid chrome is the shared `SpreadsheetGrid`; the 
+      `material-add` dialog/browser path would benefit from a CDP pass when the devtools MCP is up.
+
+68. **Design-sheet demo data: populated Design Information + Material Breakdown rows (demo seed;
+    US-035 BOM + design-sheet detail)** - user request: 4-5 sample records so the design-sheet
+    detail page shows real data in the Design Information block (header) and the Material Breakdown
+    grid.
+    - RED (backend): `tests/unit/test_seed_design_sheet_demo.py` — 4 tests: command creates 4-5
+      design sheets; each sheet's detail response exposes populated design info (block / buyer_name /
+      designer / cloth_code / issue_date) AND a 4-5-row `material_items` grid in full row shape with
+      supplier name + positive qty; re-running is idempotent (same style/techpack/version/BOM/row
+      set). Failed first (`Unknown command: seed_design_sheet_demo`).
+    - GREEN (backend): new `seed_design_sheet_demo` management command
+      (`apps/merchandising/management/commands/seed_design_sheet_demo.py`, `--tenant <slug>` opt-in
+      mirroring `seed_demo_data`). Creates 5 demo designs (DSD-1001..1005, realistic apparel):
+      Style → StyleVersion v1 (active) → StyleTechPack (`block`/`based_on`/`relationship`/
+      `designer`/`pattern_cutter`/`issuer`/`cloth_code`/`size`/`length`/`issue_date`/`risk_date`/
+      `pattern_request_date`/`note` + buyer FK) → DesignSheet (status per sample), plus an active
+      BOM v1 per sheet carrying 5 `BOMItem` rows (type/location/supplier/vendor/colour/width_size/
+      ordered_qty/match/uom), suppliers resolved to Vendor masters (FOURSEASONS / ALICE- / NEW SUP).
+      Idempotent via `get_or_create` keys (style number / techpack number / BOM version / item name).
+      Targeted **4/4** + adjacency **10/10** (material-grid suite). **GATE_A VERIFIED** (new command
+      only — no model/view/migration touched). Also run against the dev DB: 5 sheets, 5 material rows
+      each, live on `/design-sheets/:id`.
+
 ---

@@ -214,3 +214,95 @@ class TestMaterialGridAPI:
         detail = client.get(f"/api/v1/merchandising/design-sheets/{design_sheet.id}/")
         row = next(i for i in detail.data["material_items"] if i["description_code"] == "SANDWASH LINEN XK-529")
         assert row["supplier"] == "FOURSEASONS"
+
+
+@pytest.mark.django_db
+class TestMaterialAddAction:
+    """POST /design-sheets/{id}/material-add/ backs the grid's Add item."""
+
+    def test_add_item_to_existing_bom_returns_grid_shape(self, vendor, client, design_sheet):
+        resp = client.post(
+            f"/api/v1/merchandising/design-sheets/{design_sheet.id}/material-add/",
+            {
+                "category": "Trims", "item_name": "ELASTIC 40MM",
+                "supplier": str(vendor.id), "location": "BACK", "ordered_qty": "6",
+                "colour": "WHITE", "width_size": "40mm", "match": "Center",
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_201_CREATED
+        row = resp.data
+        assert row["type"] == "Trims"
+        assert row["description_code"] == "ELASTIC 40MM"
+        assert row["supplier"] == "FOURSEASONS"
+        assert row["location"] == "BACK"
+        assert row["colour"] == "WHITE"
+        assert row["width_size"] == "40mm"
+        assert row["match"] == "Center"
+        assert row["qty"] == 6.0
+        assert "id" in row
+        detail = client.get(f"/api/v1/merchandising/design-sheets/{design_sheet.id}/")
+        codes = {i["description_code"] for i in detail.data["material_items"]}
+        assert codes == {
+            "SANDWASH LINEN XK-529", "BUTTON 4 HOLES FV9757", "ELASTIC 40MM",
+        }
+
+    def test_add_item_with_defaults_when_only_category_sent(self, client, design_sheet):
+        resp = client.post(
+            f"/api/v1/merchandising/design-sheets/{design_sheet.id}/material-add/",
+            {"category": "Cloth"},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_201_CREATED
+        assert resp.data["type"] == "Cloth"
+        assert resp.data["description_code"] == "New Item"
+
+    def test_add_item_creates_bom_and_style_version_when_missing(self, client, tenant, style):
+        tp = _techpack_with(tenant, style)
+        sheet = DesignSheet.objects.create(tenant=tenant, tech_pack=tp)
+        resp = client.post(
+            f"/api/v1/merchandising/design-sheets/{sheet.id}/material-add/",
+            {"category": "Cloth", "item_name": "FIRST FABRIC"},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_201_CREATED
+        bom_id = resp.data["bom_id"]
+        assert bom_id
+        detail = client.get(f"/api/v1/merchandising/design-sheets/{sheet.id}/")
+        assert [i["description_code"] for i in detail.data["material_items"]] == ["FIRST FABRIC"]
+
+    def test_add_item_reuses_existing_bom_on_empty_grid(self, client, tenant, style):
+        """Add works on an empty grid: it creates/reuses a BOM without needing bom_id."""
+        tp = _techpack_with(tenant, style)
+        sheet = DesignSheet.objects.create(tenant=tenant, tech_pack=tp)
+        first = client.post(
+            f"/api/v1/merchandising/design-sheets/{sheet.id}/material-add/",
+            {"category": "Cloth", "item_name": "FIRST FABRIC"},
+            format="json",
+        )
+        second = client.post(
+            f"/api/v1/merchandising/design-sheets/{sheet.id}/material-add/",
+            {"category": "Trims", "item_name": "SECOND TRIM"},
+            format="json",
+        )
+        assert first.status_code == status.HTTP_201_CREATED
+        assert second.status_code == status.HTTP_201_CREATED
+        assert second.data["bom_id"] == first.data["bom_id"]
+        detail = client.get(f"/api/v1/merchandising/design-sheets/{sheet.id}/")
+        assert {i["description_code"] for i in detail.data["material_items"]} == {
+            "FIRST FABRIC", "SECOND TRIM",
+        }
+
+    def test_add_item_rejects_sheet_without_linked_style(self, client, tenant):
+        tp = StyleTechPack.objects.create(
+            tenant=tenant,
+            techpack_number=StyleTechPack.next_techpack_number(tenant),
+            style=None,
+        )
+        sheet = DesignSheet.objects.create(tenant=tenant, tech_pack=tp)
+        resp = client.post(
+            f"/api/v1/merchandising/design-sheets/{sheet.id}/material-add/",
+            {"category": "Cloth", "item_name": "ORPHAN"},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST

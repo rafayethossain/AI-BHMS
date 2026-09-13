@@ -146,7 +146,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"  Done: {created} created, {updated} existing"))
         self.stdout.write("")
         self.stdout.write(f"  {'Email':<30} {'Role':<25} {'Status'}")
-        self.stdout.write(f"  {'─'*30} {'─'*25} {'─'*15}")
+        self.stdout.write(f"  {'-'*30} {'-'*25} {'-'*15}")
         for email, role, status in rows:
             self.stdout.write(f"  {email:<30} {role:<25} {status}")
         self.stdout.write("")

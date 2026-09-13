@@ -76,6 +76,7 @@ graphify-out/
 graphify-out-*/   # if any suffix variants exist
 
 # ===== Runtime logs =====
+logs-dev/
 backend_be.out.log
 backend_be.err.log
 backend_be.pid.log

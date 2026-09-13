@@ -16,7 +16,7 @@ from apps.setup.models import (
     Season, ProductCategory, ProductType, ProductDepartment,
     ComplianceDocumentType, DeliveryMode, UOM, Currency,
     Department, Designation, PaymentTerms, Country, ColorCode,
-    Buyer, Brand, Factory, Vendor
+    Buyer, Brand, Factory, Vendor, RiskLevel
 )
 
 # Get or create tenant
@@ -467,6 +467,23 @@ for v in vendors_data:
     )
 print("[OK] Vendors")
 
+# ──────────────────────────────────────────────
+# 17. RISK LEVELS
+# ──────────────────────────────────────────────
+risk_levels = [
+    ("none", "None", "#808080", "No risk identified", 0),
+    ("green", "Low Risk", "#00FF00", "On track with no concerns", 1),
+    ("amber", "Medium Risk", "#FFA500", "Requires monitoring", 2),
+    ("red", "High Risk", "#FF0000", "Critical - immediate action needed", 3),
+    ("cyan", "Info", "#00FFFF", "Informational notice", 4),
+]
+for code, name, hex_color, desc, sort_order in risk_levels:
+    RiskLevel.objects.get_or_create(
+        tenant=tenant, code=code,
+        defaults={"name": name, "color": hex_color, "description": desc, "sort_order": sort_order, "status": "active"}
+    )
+print("[OK] Risk Levels")
+
 print("\n" + "="*50)
 print("SEED COMPLETE!")
 print("="*50)
@@ -488,3 +505,4 @@ print(f"  Buyers:         {Buyer.objects.filter(tenant=tenant).count()}")
 print(f"  Brands:         {Brand.objects.filter(tenant=tenant).count()}")
 print(f"  Factories:      {Factory.objects.filter(tenant=tenant).count()}")
 print(f"  Vendors:        {Vendor.objects.filter(tenant=tenant).count()}")
+print(f"  Risk Levels:    {RiskLevel.objects.filter(tenant=tenant).count()}")

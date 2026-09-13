@@ -10,7 +10,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.development")
 django.setup()
 
 from django.contrib.auth import get_user_model
-from apps.tenants.models import Tenant
+from apps.tenants.models import Tenant, Office
 from apps.users.models import Role, UserRole
 
 User = get_user_model()
@@ -26,6 +26,25 @@ tenant, _ = Tenant.objects.get_or_create(
     }
 )
 print(f"[OK] Tenant: {tenant.name}")
+
+# Create offices (head office, branch, warehouse, factory liaison)
+offices_data = [
+    ("HQ-DHK", "Demo Buying House Head Office", "Level 7, Gulshan Avenue", "Dhaka", "hq", "+880-2-87141000", "info@demobh.com"),
+    ("BR-CTG", "Chattogram Branch Office", "Agrabad C/A", "Chattogram", "branch", "+880-31-712345", "chattogram@demobh.com"),
+    ("WH-GZP", "Gazipur Warehouse", "BSCIC Industrial Area, Konabari", "Gazipur", "warehouse", "+880-2-8891020", "warehouse@demobh.com"),
+    ("FT-SAV", "Savar Factory Liaison", "Nabinagar, Savar", "Dhaka", "factory", "+880-2-7744567", "factory@demobh.com"),
+    ("BR-CUM", "Cumilla Branch Office", "Kandirpar", "Cumilla", "branch", "+880-81-778899", "cumilla@demobh.com"),
+]
+for code, name, address, city, otype, phone, email in offices_data:
+    Office.objects.get_or_create(
+        tenant=tenant, code=code,
+        defaults={
+            "name": name, "address": address, "city": city,
+            "country": "BGD", "office_type": otype,
+            "phone": phone, "email": email, "status": "active",
+        }
+    )
+print(f"[OK] Offices: {Office.objects.filter(tenant=tenant).count()}")
 
 # Create roles
 roles_data = [

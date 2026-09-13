@@ -1606,6 +1606,9 @@ export const merchApi = {
   createBOMItem: (data: Record<string, unknown>) =>
     api.post('/merchandising/bom-items/', data),
 
+  addMaterialItem: (designSheetId: string, data: Record<string, unknown>) =>
+    api.post<Record<string, unknown>>(`/merchandising/design-sheets/${designSheetId}/material-add/`, data),
+
   updateBOMItem: (id: string, data: Record<string, unknown>) =>
     api.patch(`/merchandising/bom-items/${id}/`, data),
 

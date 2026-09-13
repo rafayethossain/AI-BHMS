@@ -1,24 +1,37 @@
 # Data Model
 # BHMS - Buying House Management System
 
+> **Status marker (2026-09-13):** this document was reconciled against the actual code
+> (`backend/apps/*/models.py`, introspected from the live dev DB). Detailed sections §2–§10
+> describe **implemented** models only. Entities that exist only in the target ER diagram
+> (§1) but have **no model yet** are collected in §11 (Planned / target-only). The diagram in
+> §1 remains the target view.
+
 ---
 
 ## Table of Contents
 
 1. [Entity Relationship Overview](#1-entity-relationship-overview)
 2. [Core Entities](#2-core-entities)
-3. [Master Data Entities](#3-master-data-entities)
+3. [Setup / Master Data Entities](#3-setup--master-data-entities)
 4. [Merchandising Entities](#4-merchandising-entities)
-5. [Commercial Entities](#5-commercial-entities)
-6. [Production Entities](#6-production-entities)
-7. [Quality Entities](#7-quality-entities)
-8. [Logistics Entities](#8-logistics-entities)
-9. [Finance Entities](#9-finance-entities)
-10. [Indexing Strategy](#10-indexing-strategy)
+5. [Fabric Entities](#5-fabric-entities)
+6. [Commercial Entities](#6-commercial-entities)
+7. [Production Entities](#7-production-entities)
+8. [Quality Entities](#8-quality-entities)
+9. [Logistics Entities](#9-logistics-entities)
+10. [Monitoring, Reporting & Help Entities](#10-monitoring-reporting--help-entities)
+11. [Planned (Target-Only) Entities](#11-planned-target-only-entities)
+12. [Indexing Strategy](#12-indexing-strategy)
 
 ---
 
 ## 1. Entity Relationship Overview
+
+The diagram below is the **target/aspirational ER view** of the product. Not every node
+exists in code yet — the status legend under the diagram marks each entity as
+**implemented** (model exists in `backend/apps`) or **planned** (target-only, no model
+yet). See §2–§10 for the implemented models and §11 for the planned ones.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -38,18 +51,21 @@
 │      ├─> Vendor ──┬──> VendorCertification                           │    │
 │      │            └──> VendorPerformance                              │    │
 │      │                                                                 │    │
-│      ├─> Style ──┬──> TechPack ──> TechPackRevision                  │    │
-│      │           ├──> BOM ──> BOMItem                                 │    │
-│      │           └──> POM                                             │    │
+│      ├─> Style/Design ──┬──> TechPack ──> TechPackRevision            │    │
+│      │                  ├──> Material Breakdown                       │    │
+│      │                  ├──> Fit Specification                        │    │
+│      │                  ├──> Sketch Annotation                        │    │
+│      │                  ├──> Job Request                              │    │
+│      │                  └──> Style Costing                            │    │
 │      │                                                                 │    │
 │      ├─> Order ──┬──> OrderItem                                      │    │
 │      │           ├──> Costing ──> CostingItem                        │    │
-│      │           ├──> TA (Time & Action) ──> TAMilestone             │    │
+│      │           ├──> TA ──> TAMilestone                             │    │
 │      │           └──> Shipment ──┬──> PackingList                    │    │
 │      │                          ├──> Invoice                         │    │
 │      │                          └──> BillOfLading                    │    │
 │      │                                                                 │    │
-│      ├─> PurchaseOrder ──┬──> POItem                                 │    │
+│      ├─> PurchaseOrder ──┬──> POItem (Fabric/Materials/Access.)      │    │
 │      │                   └──> GoodsReceipt ──> GoodsReceiptItem      │    │
 │      │                                                                 │    │
 │      ├─> LC ──┬──> LCItem                                            │    │
@@ -59,8 +75,8 @@
 │      │               └──> VirtualStock                               │    │
 │      │                                                                 │    │
 │      ├─> Production ──┬──> ProductionPlan                            │    │
-│      │                ├──> DailyProduction                           │    │
-│      │                └──> LinePerformance                           │    │
+│      │                ├──> DailyLineProduction                       │    │
+│      │                └──> Daily Line Quality ──> Batch or AQL Audit │    │
 │      │                                                                 │    │
 │      └─> Finance ──┬──> ChartOfAccounts                              │    │
 │                    ├──> Voucher ──> VoucherItem                      │    │
@@ -69,870 +85,456 @@
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Implemented vs planned legend
+
+| Diagram entity | Status | Implementation (app.model, populated as of 2026-09-13) |
+|----------------|--------|-------------------------------------------------------|
+| Tenant | ✅ implemented | `tenants.tenant` |
+| Office | ✅ implemented | `tenants.office` |
+| User | ✅ implemented | `users.user` (roles via `users.userrole`; MFA via `authentication.mfabackupcode` / `authentication.mfasetuplog`) |
+| Role / Permission | ✅ implemented | `users.role`, `users.permission`, `users.rolepermission` |
+| Audit log | ✅ implemented | `users.auditlog` (auth change-audit) + `monitoring.auditlog` (entity audit) |
+| Buyer / Brand | ✅ implemented | `setup.buyer`, `setup.brand` |
+| BuyerCompliance | 🟡 planned | no model yet; `setup.compliancedocumenttype` is only the document-type list |
+| Factory | ✅ implemented | `setup.factory` |
+| FactoryCapability / FactoryCompliance | 🟡 planned | no models yet |
+| Vendor | ✅ implemented | `setup.vendor` |
+| VendorCertification / VendorPerformance | 🟡 planned | no models yet |
+| Style / Design | ✅ implemented | `merchandising.style`, `merchandising.styleversion`, `merchandising.designimage` |
+| TechPack | ✅ implemented | `merchandising.styletechpack` (PDF/Excel upload + extraction) |
+| TechPackRevision | 🟡 planned | no dedicated revision model; style versioning is `styleversion` |
+| Material Breakdown | ✅ implemented | `merchandising.bom` → `merchandising.bomitem` (+ `merchandising.styleitem`) |
+| Fit Specification | ✅ implemented | `merchandising.fitspecification` + `merchandising.fitimage` (design-level); `merchandising.fitspec` (PO-level) |
+| Sketch Annotation | ✅ implemented | `merchandising.designsheet.sketch_annotations` + `designimage` |
+| Job Request | ✅ implemented | `merchandising.jobrequest` (PO-level), `merchandising.designjobrequest` (design-level) |
+| Style Costing | ✅ implemented | `merchandising.designcosting` → `merchandising.designcostingline` |
+| Order / OrderItem | 🔶 mapped | no `Order` table; the commercial order = `merchandising.purchaseorder` → `purchaseorderitem` |
+| Costing / CostingItem | ✅ implemented | `merchandising.costing` → `costingline` (PO-level) |
+| TA / TAMilestone | ✅ implemented | `merchandising.ta` → `merchandising.tamilestone` |
+| Shipment | ✅ implemented | `logistics.shipment` (+ `bookingscheduleitem`, `docket`) |
+| PackingList / Invoice / BillOfLading | 🟡 partial | no dedicated models; `logistics.shippingdocument` stores typed docs (document_type), invoicing workflow via `commercial.proformainvoice` / `invoiceapproval` / `debitnote` |
+| PurchaseOrder | ✅ implemented | `merchandising.purchaseorder` + `poamendment` |
+| POItem (booking) | ✅ implemented | `merchandising.purchaseorderitem`; fabric booking = `fabric.fabricbooking` / `fabric.fabricorder`; materials/accessories tracked via `bomitem` (ordered/delivered/eta) |
+| GoodsReceipt → GoodsReceiptItem | 🟡 planned | no models yet; delivery quantities land on `bomitem.delivered_qty`, `fabricorder.actual_arrival_date` |
+| LC / LCAmendment | ✅ implemented | `commercial.lc`, `commercial.lcamendment` |
+| LCItem | 🟡 planned | no model yet; LC links to PO and tracks amount / utilized_amount directly |
+| Inventory / StockMovement / VirtualStock | 🟡 planned | no inventory app; stock-fabric handled via `merchandising.fileopening` (`is_stock_fabric`) + `merchandising.stockfabricallocation` |
+| ProductionPlan | ✅ implemented | `production.productionplan` |
+| DailyLineProduction | ✅ implemented | `production.dailyproduction` (per-line via `line_number`) |
+| Daily Line Quality → Batch or AQL Audit | 🔶 partial | AQL = `quality.inspection` + `inspectionitem`; `quality.correctiveaction`, `goldseal`, `complianceaudit` exist; no batch-quality model |
+| Finance (ChartOfAccounts / Voucher / VoucherItem / JournalEntry) | 🟡 planned | no finance app or models yet (see §11) |
+
+**Reading the diagram:** branches that point to planned nodes (BuyerCompliance,
+FactoryCompliance, GoodsReceipt, LCItem, Inventory/VirtualStock, Finance, and the
+PackingList/Invoice/BillOfLading trio) are target-only today — the surrounding
+workflows exist but the leaf models do not.
+
 ---
 
 ## 2. Core Entities
 
-### 2.1 Tenant
+All domain tables derive from `core.TimeStampedModel` (adds `created_at`, `updated_at`,
+`is_active`, `created_by`) and, unless noted, from `core.TenantModel` (adds `tenant` FK).
+Primary keys are UUIDs.
 
-```sql
-CREATE TABLE tenants (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    slug VARCHAR(100) UNIQUE NOT NULL,
-    database_name VARCHAR(100) NOT NULL,
-    status VARCHAR(20) DEFAULT 'active',
-    plan VARCHAR(50) DEFAULT 'starter',
-    settings JSONB DEFAULT '{}',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE
-);
+### 2.1 Tenant — `tenants.tenant`
 
-CREATE INDEX idx_tenants_slug ON tenants(slug);
-CREATE INDEX idx_tenants_status ON tenants(status);
-```
+| Field | Type | Notes |
+|-------|------|-------|
+| name, slug, schema_name, legal_name | string | tenant identity; slug unique |
+| address, phone, email, logo | string / file | corporate contact |
+| timezone, currency, status, plan | string | plan: starter/…; status: active/… |
+| is_active | bool | soft-deactivate a tenant |
 
-### 2.2 User
+Children: `Office`, all `User`s, and every tenant-scoped domain model.
 
-```sql
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    email VARCHAR(255) NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    phone VARCHAR(20),
-    designation VARCHAR(100),
-    department VARCHAR(100),
-    status VARCHAR(20) DEFAULT 'active',
-    last_login TIMESTAMP,
-    mfa_enabled BOOLEAN DEFAULT FALSE,
-    mfa_secret VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, email)
-);
+### 2.2 Office — `tenants.office`
 
-CREATE INDEX idx_users_tenant ON users(tenant_id);
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_status ON users(status);
-```
+FK: `tenant`. Fields: `code`, `name`, `address`, `city`, `country`, `office_type`,
+`phone`, `email`, `status`. HQ/regional/warehouse offices used for reporting splits.
 
-### 2.3 Role
+### 2.3 User — `users.user`
 
-```sql
-CREATE TABLE roles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    is_system BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, name)
-);
+FK: `tenant`, `department` (setup), `created_by`. Standard Django `AbstractUser`
+(`username`, `password`, `email`, `first/last_name`, `is_staff`, `is_superuser`) plus
+`phone`, `designation`, `mfa_enabled`, `mfa_secret`, `status`, `last_login_ip`.
 
-CREATE TABLE user_roles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id),
-    role_id UUID NOT NULL REFERENCES roles(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    UNIQUE(user_id, role_id)
-);
+Roles are many-to-many through `UserRole(user, role, created_by)`. Password history in
+`users.passwordhistory(user, password_hash)` (prevents password reuse). MFA state in
+`authentication.mfabackupcode(user)` + `authentication.mfasetuplog(user)`.
 
-CREATE TABLE permissions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    module VARCHAR(50) NOT NULL,
-    action VARCHAR(50) NOT NULL,
-    description TEXT,
-    UNIQUE(module, action)
-);
+### 2.4 Role & Permission — `users.role`, `users.permission`, `users.rolepermission`
 
-CREATE TABLE role_permissions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    role_id UUID NOT NULL REFERENCES roles(id),
-    permission_id UUID NOT NULL REFERENCES permissions(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(role_id, permission_id)
-);
-```
+| Model | Fields | Purpose |
+|-------|--------|---------|
+| role | `tenant`, `name`, `description`, `is_system` | named role per tenant; unique (tenant, name) |
+| permission | `module`, `action`, `description` | capability catalog (module×action), global |
+| userrole | `user`, `role`, `created_by` | grants a role to a user; unique (user, role) |
+| rolepermission | `role`, `permission` | grants permissions to a role; unique (role, permission) |
 
-### 2.4 Audit Log
+### 2.5 Audit Log — `users.auditlog` + `monitoring.auditlog`
 
-```sql
-CREATE TABLE audit_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    user_id UUID REFERENCES users(id),
-    action VARCHAR(50) NOT NULL,
-    entity_type VARCHAR(100) NOT NULL,
-    entity_id UUID,
-    old_values JSONB,
-    new_values JSONB,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+Two audit tables exist:
 
-CREATE INDEX idx_audit_logs_tenant ON audit_logs(tenant_id);
-CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
-CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
-CREATE INDEX idx_audit_logs_created ON audit_logs(created_at);
-```
+| Table | FK | Distinguishing fields | Purpose |
+|-------|----|-----------------------|---------|
+| `users.auditlog` | `tenant`, `user` | `entity_type`, `entity_id`, `old_values`, `new_values` (JSON) | change-audit of auth/user entities |
+| `monitoring.auditlog` | `tenant`, `user` | `entity_type`, `entity_id`, `entity_name`, `action`, `description`, `old_value`, `new_value`, `ip_address`, `user_agent` | general entity change-audit consumed by monitoring screens |
+
+### 2.6 Note & core bases — `core.note`
+
+Generic tenant-scoped notes base class (`text`, `author`); subsystem-specific notes
+specialise it, e.g. `merchandising.fileopeningnote` (FK `file_opening`, `text`, `author`).
 
 ---
 
-## 3. Master Data Entities
+## 3. Setup / Master Data Entities
 
-### 3.1 Buyer
+Every table below is a `TenantModel` with `code`+`name` and `status`, unique per
+`(tenant, code)`.
 
-```sql
-CREATE TABLE buyers (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    code VARCHAR(50) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    contact_person VARCHAR(255),
-    email VARCHAR(255),
-    phone VARCHAR(20),
-    address TEXT,
-    country_id UUID REFERENCES countries(id),
-    currency_id UUID REFERENCES currencies(id),
-    payment_terms_id UUID REFERENCES payment_terms(id),
-    credit_limit DECIMAL(15,2),
-    status VARCHAR(20) DEFAULT 'active',
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, code)
-);
-
-CREATE INDEX idx_buyers_tenant ON buyers(tenant_id);
-CREATE INDEX idx_buyers_code ON buyers(code);
-CREATE INDEX idx_buyers_status ON buyers(status);
-```
-
-### 3.2 Brand
-
-```sql
-CREATE TABLE brands (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    buyer_id UUID NOT NULL REFERENCES buyers(id),
-    code VARCHAR(50) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, code)
-);
-
-CREATE INDEX idx_brands_tenant ON brands(tenant_id);
-CREATE INDEX idx_brands_buyer ON brands(buyer_id);
-```
-
-### 3.3 Factory
-
-```sql
-CREATE TABLE factories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    code VARCHAR(50) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    contact_person VARCHAR(255),
-    email VARCHAR(255),
-    phone VARCHAR(20),
-    address TEXT,
-    city VARCHAR(100),
-    country_id UUID REFERENCES countries(id),
-    capacity INT,
-    capacity_unit VARCHAR(50),
-    factory_type VARCHAR(50),
-    status VARCHAR(20) DEFAULT 'active',
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, code)
-);
-
-CREATE INDEX idx_factories_tenant ON factories(tenant_id);
-CREATE INDEX idx_factories_code ON factories(code);
-CREATE INDEX idx_factories_status ON factories(status);
-```
-
-### 3.4 Vendor
-
-```sql
-CREATE TABLE vendors (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    code VARCHAR(50) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    contact_person VARCHAR(255),
-    email VARCHAR(255),
-    phone VARCHAR(20),
-    address TEXT,
-    city VARCHAR(100),
-    country_id UUID REFERENCES countries(id),
-    product_categories TEXT[],
-    payment_terms_id UUID REFERENCES payment_terms(id),
-    lead_time_days INT,
-    rating DECIMAL(3,2),
-    status VARCHAR(20) DEFAULT 'active',
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, code)
-);
-
-CREATE INDEX idx_vendors_tenant ON vendors(tenant_id);
-CREATE INDEX idx_vendors_code ON vendors(code);
-CREATE INDEX idx_vendors_status ON vendors(status);
-```
-
-### 3.5 Style
-
-```sql
-CREATE TABLE styles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    buyer_id UUID NOT NULL REFERENCES buyers(id),
-    brand_id UUID REFERENCES brands(id),
-    code VARCHAR(50) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    category_id UUID REFERENCES product_categories(id),
-    type_id UUID REFERENCES product_types(id),
-    season_id UUID REFERENCES seasons(id),
-    status VARCHAR(20) DEFAULT 'draft',
-    version INT DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, code)
-);
-
-CREATE INDEX idx_styles_tenant ON styles(tenant_id);
-CREATE INDEX idx_styles_buyer ON styles(buyer_id);
-CREATE INDEX idx_styles_code ON styles(code);
-CREATE INDEX idx_styles_status ON styles(status);
-```
-
-### 3.6 Product Category
-
-```sql
-CREATE TABLE product_categories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    code VARCHAR(50) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    parent_id UUID REFERENCES product_categories(id),
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, code)
-);
-
-CREATE INDEX idx_product_categories_tenant ON product_categories(tenant_id);
-```
+| Entity (`setup.*`) | FK | Notable fields |
+|--------------------|----|----------------|
+| season | — | code, name, start_date, end_date, status |
+| productcategory | parent ↻ self | code, name, status (tree via parent) |
+| producttype | category → productcategory | code, name, status |
+| productdepartment | — | code, name, status |
+| compliancedocumenttype | — | code, name, description, validity_days, status |
+| deliverymode | — | code, name, description, status (e.g. FOB/CIF/CM) |
+| uom | — | code, name, status (pcs, dz, kg, m …) |
+| currency | — | code, name, symbol, exchange_rate, is_default, status |
+| country | default_currency → currency | code, name, status |
+| colorcode | — | code, name, hex_code, status |
+| department | parent ↻ self | code, name, status, description (org structure) |
+| designation | department → department | code, name, description, status |
+| paymentterms | — | code, name, days, description, status |
+| buyer | country, currency, payment_terms | code, name, contact_person, email, phone, address, credit_limit, status, notes |
+| brand | buyer → buyer | code, name, status |
+| factory | country | code, name, contact_person, email, phone, address, city, capacity, capacity_unit, factory_type, status, notes |
+| vendor | country, payment_terms, approved_by(user) | code, name, contact_person, email, phone, address, city, product_categories, lead_time_days, rating, status, notes, is_approved, approved_at |
+| risklevel | — | code, name, color, description, sort_order, status (risk bands for FN/PO/shipments) |
 
 ---
 
 ## 4. Merchandising Entities
 
-### 4.1 Style
+### 4.1 Style — `merchandising.style`
 
-```sql
-CREATE TABLE styles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    style_number VARCHAR(50) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    buyer_id UUID NOT NULL REFERENCES buyers(id),
-    brand_id UUID REFERENCES brands(id),
-    category_id UUID REFERENCES product_categories(id),
-    type_id UUID REFERENCES product_types(id),
-    department_id UUID REFERENCES product_departments(id),
-    season_id UUID REFERENCES seasons(id),
-    tech_pack VARCHAR(500),
-    sketch_front VARCHAR(500),
-    sketch_back VARCHAR(500),
-    sketch_side VARCHAR(500),
-    sketch_detail VARCHAR(500),
-    status VARCHAR(20) DEFAULT 'draft',
-    current_version INT DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, style_number)
-);
+FK: `buyer`, `brand`, `category`(productcategory), `product_type`, `department`
+(productdepartment), `season`.
 
-CREATE INDEX idx_styles_tenant ON styles(tenant_id);
-CREATE INDEX idx_styles_buyer ON styles(buyer_id);
-CREATE INDEX idx_styles_style_number ON styles(style_number);
-CREATE INDEX idx_styles_status ON styles(status);
-```
+Design-detail fields: `style_number` (unique/tenant), `name`, `description`, `tech_pack`
+(upload), `sketch_front/back/side/detail`, `current_version`, `status`, plus TechPack-sheet
+fields: `block`, `based_on`, `relationship`, `designer`, `pattern_cutter`, `issuer`,
+`cloth_code`, `size`, `length`, `issue_date`, `risk_date`, `pattern_request_date`,
+`design_note`.
 
-### 4.2 Style Version
+Children: `styleversion`, `fileopening`, `styleitem`, `designimage`, `designcosting`,
+`jobrequest`, `styletechpack`.
 
-```sql
-CREATE TABLE style_versions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    style_id UUID NOT NULL REFERENCES styles(id),
-    version_number INT NOT NULL,
-    status VARCHAR(20) DEFAULT 'draft',
-    revision_notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    UNIQUE(style_id, version_number)
-);
+### 4.2 Style Version — `merchandising.styleversion`
 
-CREATE INDEX idx_style_versions_tenant ON style_versions(tenant_id);
-CREATE INDEX idx_style_versions_style ON style_versions(style_id);
-```
+FK: `style`. Fields: `version_number`, `revision_notes`, `status`. Unique `(style,
+version_number)`. Children: `fileopening`, `bom`.
 
-### 4.3 File Opening
+### 4.3 File Opening (`FN`) — `merchandising.fileopening`
 
-```sql
-CREATE TABLE file_openings (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    file_number VARCHAR(50) NOT NULL,
-    style_id UUID NOT NULL REFERENCES styles(id),
-    style_version_id UUID NOT NULL REFERENCES style_versions(id),
-    buyer_id UUID NOT NULL REFERENCES buyers(id),
-    brand_id UUID REFERENCES brands(id),
-    factory_id UUID NOT NULL REFERENCES factories(id),
-    file_date DATE NOT NULL,
-    status VARCHAR(20) DEFAULT 'open',
-    remarks TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, file_number)
-);
+FK: `style`, `style_version`, `buyer`, `brand`, `factory`, `risk_level`, `original_fn`
+(self, for repeats). Fields: `file_number` (unique/tenant), `file_date`, `status`, `remarks`,
+`is_quick_lead` (+ `quick_lead_agreed_by`), `is_repeat` (+ `repeat_approved_by`),
+`is_stock_fabric`, `stock_fabric_description`, `total_meters`, `allocated_meters`,
+`stock_photo`. Children: `repeats`, `stock_allocations`, `notes`, `purchase_orders`.
 
-CREATE INDEX idx_file_openings_tenant ON file_openings(tenant_id);
-CREATE INDEX idx_file_openings_style ON file_openings(style_id);
-CREATE INDEX idx_file_openings_buyer ON file_openings(buyer_id);
-CREATE INDEX idx_file_openings_factory ON file_openings(factory_id);
-CREATE INDEX idx_file_openings_status ON file_openings(status);
-```
+### 4.4 Stock Fabric Allocation — `merchandising.stockfabricallocation`
 
-### 4.4 Purchase Order (PO)
+FK: `stock`(fileopening), `allocated_to`(fileopening). Fields: `meters`, `allocated_date`,
+`notes`. Tracks metres of stock fabric moved between FNs.
 
-```sql
-CREATE TABLE purchase_orders (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    po_number VARCHAR(50) NOT NULL,
-    file_opening_id UUID NOT NULL REFERENCES file_openings(id),
-    buyer_id UUID NOT NULL REFERENCES buyers(id),
-    brand_id UUID REFERENCES brands(id),
-    factory_id UUID NOT NULL REFERENCES factories(id),
-    po_date DATE NOT NULL,
-    delivery_date DATE NOT NULL,
-    destination_country_id UUID REFERENCES countries(id),
-    destination_port VARCHAR(255),
-    quantity INT NOT NULL,
-    unit_price DECIMAL(10,2) NOT NULL,
-    total_value DECIMAL(15,2) NOT NULL,
-    currency_id UUID REFERENCES currencies(id),
-    payment_terms_id UUID REFERENCES payment_terms(id),
-    delivery_mode VARCHAR(50),
-    status VARCHAR(20) DEFAULT 'open',
-    remarks TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, po_number)
-);
+### 4.5 File Opening Note — `merchandising.fileopeningnote`
 
-CREATE INDEX idx_purchase_orders_tenant ON purchase_orders(tenant_id);
-CREATE INDEX idx_purchase_orders_file_opening ON purchase_orders(file_opening_id);
-CREATE INDEX idx_purchase_orders_buyer ON purchase_orders(buyer_id);
-CREATE INDEX idx_purchase_orders_factory ON purchase_orders(factory_id);
-CREATE INDEX idx_purchase_orders_status ON purchase_orders(status);
-CREATE INDEX idx_purchase_orders_delivery_date ON purchase_orders(delivery_date);
-```
+Specialises `core.Note`. FK: `file_opening`, `author`. Fields: `text`.
 
-### 4.5 Purchase Order Item
+### 4.6 Purchase Order — `merchandising.purchaseorder`
 
-```sql
-CREATE TABLE purchase_order_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id),
-    color_id UUID NOT NULL REFERENCES colors(id),
-    size VARCHAR(50),
-    quantity INT NOT NULL,
-    unit_price DECIMAL(10,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+FK: `file_opening`, `buyer`, `brand`, `factory`, `destination_country`, `currency`,
+`payment_terms`, `delivery_mode`, `risk_level`. One-to-one reverse: `ta`. Fields:
+`po_number` (unique/tenant), `po_date`, `delivery_date`, `destination_port`, `quantity`,
+`unit_price`, `total_value`, `status`, `remarks`.
 
-CREATE INDEX idx_purchase_order_items_po ON purchase_order_items(purchase_order_id);
-```
+Children: `poamendment`, `purchaseorderitem`, `hit`, `fitspec`, `costing`,
+`jobrequest`, and (cross-app) all `commercial.*`, `production.*`, `quality.*`,
+`logistics.*` rows that reference the PO.
 
-### 4.6 T&A
+### 4.7 PO Amendment — `merchandising.poamendment`
 
-```sql
-CREATE TABLE tas (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id),
-    status VARCHAR(20) DEFAULT 'active',
-    delivery_date DATE NOT NULL,
-    critical_path JSONB,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    UNIQUE(purchase_order_id)
-);
+FK: `purchase_order`, `approved_by`. Fields: `amendment_number`, `field_name`, `old_value`,
+`new_value`, `reason`, `status`, `approved_at`.
 
-CREATE INDEX idx_tas_tenant ON tas(tenant_id);
-CREATE INDEX idx_tas_po ON tas(purchase_order_id);
-CREATE INDEX idx_tas_status ON tas(status);
-```
+### 4.8 Purchase Order Item — `merchandising.purchaseorderitem`
 
-### 4.7 T&A Milestone
+FK: `purchase_order`, `color`. Fields: `size`, `quantity`, `unit_price`. Colour×size
+contract line of the PO.
 
-```sql
-CREATE TABLE ta_milestones (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ta_id UUID NOT NULL REFERENCES tas(id),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    planned_date DATE NOT NULL,
-    actual_date DATE,
-    status VARCHAR(20) DEFAULT 'pending',
-    assigned_to UUID REFERENCES users(id),
-    is_critical BOOLEAN DEFAULT FALSE,
-    sort_order INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id)
-);
+### 4.9 Hit — `merchandising.hit`
 
-CREATE INDEX idx_ta_milestones_ta ON ta_milestones(ta_id);
-CREATE INDEX idx_ta_milestones_status ON ta_milestones(status);
-```
+FK: `purchase_order`, `colour`(colorcode), `factory_override`(optional factory). Fields:
+`hit_number`, `delivery_mode` (boxed/hanging), `delivery_type` (sea/air/air-paid),
+`original_delivery_date`, `actual_delivery_date`. Colour-level production commitment used
+by booking schedule.
 
-### 4.8 Costing
+### 4.10 Fit Spec (PO-level) — `merchandising.fitspec`
 
-```sql
-CREATE TABLE costings (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id),
-    version INT DEFAULT 1,
-    status VARCHAR(20) DEFAULT 'draft',
-    target_price DECIMAL(10,2),
-    fabric_cost DECIMAL(10,2),
-    trim_cost DECIMAL(10,2),
-    cm_cost DECIMAL(10,2),
-    overhead_cost DECIMAL(10,2),
-    total_cost DECIMAL(10,2),
-    margin DECIMAL(5,2),
-    approved_by UUID REFERENCES users(id),
-    approved_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id)
-);
+FK: `purchase_order`. Fields: `fit_stage`, `version`, `measurements` (JSON), `notes`,
+`is_current`. Children: `fitimage`.
 
-CREATE INDEX idx_costings_tenant ON costings(tenant_id);
-CREATE INDEX idx_costings_po ON costings(purchase_order_id);
-CREATE INDEX idx_costings_version ON costings(version);
-```
+### 4.11 BOM / BOM Item — `merchandising.bom`, `merchandising.bomitem`
 
-### 4.9 BOM
+`bom`: FK `style_version`. Fields: `name`, `version`, `status`.
 
-```sql
-CREATE TABLE boms (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    style_version_id UUID NOT NULL REFERENCES style_versions(id),
-    name VARCHAR(255) NOT NULL,
-    version INT DEFAULT 1,
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    UNIQUE(style_version_id, version)
-);
+`bomitem`: FK `bom`, `uom`, `vendor`, `supplier`(vendor). Fields: `category`,
+`item_name`, `description`, `consumption`, `waste_percent`, `unit_price`, `ordered_qty`,
+`delivered_qty`, `eta_date`, `confirmed_date`, `actual_date`, `status`, `location`,
+`colour`, `width_size`, `match`. The `ordered/delivered/eta` fields double as the
+materials/accessories **booking & goods-receipt tracking** (target `GoodsReceipt`).
 
-CREATE TABLE bom_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    bom_id UUID NOT NULL REFERENCES boms(id),
-    category VARCHAR(50) NOT NULL,
-    item_name VARCHAR(255) NOT NULL,
-    description TEXT,
-    uom_id UUID REFERENCES uoms(id),
-    consumption DECIMAL(10,4),
-    waste_percent DECIMAL(5,2),
-    unit_price DECIMAL(10,2),
-    vendor_id UUID REFERENCES vendors(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+### 4.12 Style Item — `merchandising.styleitem`
 
-CREATE INDEX idx_boms_tenant ON boms(tenant_id);
-CREATE INDEX idx_boms_style_version ON boms(style_version_id);
-CREATE INDEX idx_bom_items_bom ON bom_items(bom_id);
-```
+FK: `style`, `uom`, `vendor`. Fields: `category`, `item_name`, `description`,
+`consumption`, `waste_percent`, `unit_price`, `sort_order`. Style-level material list;
+seeds BOM items.
+
+### 4.13 Design Image — `merchandising.designimage`
+
+FK: `style`. Fields: `image`, `role` (sketch/layout/…) , `caption`, `colourway`,
+`sort_order`, `is_main`.
+
+### 4.14 Costing (PO-level) — `merchandising.costing` + `costingline`
+
+`costing` FK: `purchase_order`, `bom`, `approved_by`, `confirmed_by`. Fields: `version`,
+`status`, `sheet_type`, `is_live`, `exchange_rate`, `target_price`, `fabric_cost`,
+`trim_cost`, `cm_cost`, `overhead_cost`, `total_cost`, `margin`, `approved_at`, `notes`,
+`is_single_size`, `size_ratio`, `confirmed`, `confirmed_at`, `is_patterned`,
+`patterned_fabric_options`.
+
+`costingline` FK: `costing`, `approved_by`. Fields: `category`, `description`,
+`unit_price`, `consumption`, `is_additional`, `original_description`, `approved_at`,
+`size_width`, `sort_order`.
+
+### 4.15 Design Costing (Style-level) — `merchandising.designcosting` + `designcostingline`
+
+Like Costing but FK `style` (not PO) and with no `exchange_rate`/`confirmed` fields;
+`designcostingline` has no approval fields. Fields mirror `costing`/`costingline`.
+
+### 4.16 T&A / T&Milestone — `merchandising.ta` + `merchandising.tamilestone`
+
+`ta` FK: `purchase_order`. Fields: `status`, `delivery_date`, `critical_path` (JSON).
+`tamilestone` FK: `ta`, `assigned_to`. Fields: `name`, `description`, `planned_date`,
+`actual_date`, `status`, `is_critical`, `sort_order`.
+
+### 4.17 Job Request — `merchandising.jobrequest`
+
+FK: `style`, `purchase_order`, `assigned_to`. Fields: `job_number`, `job_type`,
+`description`, `work_location`, `required_by_date`, `priority`, `status`, `notes`.
+
+### 4.18 TechPack — `merchandising.styletechpack`
+
+FK: `style`, `product_type`, `buyer`, `design_sheet`. Fields: `techpack_number`,
+`source_pdf`, `excel_file`, `status`, `extracted_data` (JSON), `errors`, `warnings`,
+plus the full TechPack-sheet block: `issue_date`, `block`, `based_on`, `relationship`,
+`style_number`, `size`, `designer`, `pattern_cutter`, `issuer`, `cloth_code`, `length`,
+`sketch`, `description`, `note`, `style_code`, `contains`, `risk_date`,
+`pattern_request_date`, `sketch_image`, `sketch_thumbnail`, `other_images`,
+`notes_initials`, `notes_date`.
+
+### 4.19 Design Sheet — `merchandising.designsheet`
+
+FK: `tech_pack`(styletechpack). Fields: `status`, `sketch_annotations`, `layout_order`.
+Children: `fitspecification`, `designjobrequest`. This is the "Sketch Annotation" node.
+
+### 4.20 Fit Specification (design-level) — `merchandising.fitspecification` + `fitimage`
+
+`fitspecification` FK: `design_sheet`. Fields: `fit_number`, `fit_date`, `description`,
+`notes`, `is_selected`. `fitimage` FK: `fit_spec`, fields: `image`, `caption`, `order`.
+
+### 4.21 Design Job Request — `merchandising.designjobrequest`
+
+FK: `design_sheet`, `allocated_to`. Fields: `job_type`, `required_by`, `work_location`,
+`no_of_garments`, `notes`, `status`.
 
 ---
 
-## 5. Commercial Entities
+## 5. Fabric Entities
 
-### 5.1 LC (Letter of Credit)
+| Entity (`fabric.*`) | FK | Notable fields |
+|---------------------|----|----------------|
+| fabriccategory | parent ↻ self | code, name, description (tree) |
+| htscode | fabric_category | code, description, duty_rate |
+| fabricsupplier | vendor(setup), country | code, name, contact_person, email, phone, lead_time_days, moq_meters, is_mill, notes |
+| fabricmill | country | code, name, city, capacity_meters_month, rating, certification, notes |
+| rfq | supplier(fabricsupplier) | rfq_number, status, notes, closed_at |
+| rfqlineitem | rfq, fabric_category | quantity_meters, target_price, notes |
+| rfqresponse | rfq, supplier | response_date, valid_until, notes |
+| rfqresponseitem | response, line_item | quoted_price, available_qty_meters, lead_days, notes |
+| fabricbooking | supplier, fabric_category, origin_country | booking_number, quantity_meters, status, expected_delivery, actual_delivery, notes |
+| fabricorder | supplier, fabric_category, bulk_approved_by, risk_level | order_number, quantity_meters, unit_price, total_price, status, lab_dip_required/actual/approval_date, lab_dip_notes, bulk_approved_date/notes, strike_off_*.date, onboard_date, eta_date, actual_arrival_date, paperwork_date, clearance_date, notes, risk_notes, date_owners |
+| fabrictolerance | — | customer_type, qty_from, qty_to, tolerance_pct |
+| fabricschedulehandoff | order(fabricorder), handed_off_by | date_key, from_role, to_role, trigger, handed_off_at, notes |
+| fabricutilization | order(fabricorder), recorded_by | period, received_meters, used_meters, wasted_meters, damaged_meters, notes, recorded_at |
 
-```sql
-CREATE TABLE lcs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    lc_number VARCHAR(50) NOT NULL,
-    lc_type VARCHAR(20) NOT NULL,
-    buyer_id UUID REFERENCES buyers(id),
-    order_id UUID REFERENCES orders(id),
-    parent_lc_id UUID REFERENCES lcs(id),
-    bank_id UUID REFERENCES banks(id),
-    amount DECIMAL(15,2) NOT NULL,
-    currency_id UUID REFERENCES currencies(id),
-    issued_date DATE,
-    expiry_date DATE NOT NULL,
-    status VARCHAR(20) DEFAULT 'draft',
-    utilized_amount DECIMAL(15,2) DEFAULT 0,
-    balance_amount DECIMAL(15,2) GENERATED ALWAYS AS (amount - utilized_amount) STORED,
-    remarks TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, lc_number)
-);
-
-CREATE INDEX idx_lcs_tenant ON lcs(tenant_id);
-CREATE INDEX idx_lcs_buyer ON lcs(buyer_id);
-CREATE INDEX idx_lcs_order ON lcs(order_id);
-CREATE INDEX idx_lcs_status ON lcs(status);
-CREATE INDEX idx_lcs_expiry ON lcs(expiry_date);
-```
-
-### 5.2 LC Amendment
-
-```sql
-CREATE TABLE lc_amendments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    lc_id UUID NOT NULL REFERENCES lcs(id),
-    amendment_number INT NOT NULL,
-    amount_change DECIMAL(15,2),
-    expiry_date_change DATE,
-    quantity_change INT,
-    reason TEXT,
-    status VARCHAR(20) DEFAULT 'pending',
-    approved_by UUID REFERENCES users(id),
-    approved_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id)
-);
-
-CREATE INDEX idx_lc_amendments_lc ON lc_amendments(lc_id);
-```
-
-### 5.3 Bank
-
-```sql
-CREATE TABLE banks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    code VARCHAR(50) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    swift_code VARCHAR(20),
-    address TEXT,
-    contact_person VARCHAR(255),
-    phone VARCHAR(20),
-    email VARCHAR(255),
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, code)
-);
-
-CREATE INDEX idx_banks_tenant ON banks(tenant_id);
-```
+The fabric module implements the "POItem → Fabric Booking" branch: booking/order lifecycle
+from RFQ through lab-dip/strike-off approval, bulk approval, shipment and utilization.
 
 ---
 
-## 6. Production Entities
+## 6. Commercial Entities
 
-### 6.1 Production Plan
+| Entity (`commercial.*`) | FK | Notable fields |
+|-------------------------|----|----------------|
+| forwardorder | buyer, factory, purchase_order | month, quantity, unit_cost, total_cost, service_pct, service_charge, in_hand_units, status, remarks |
+| lc | buyer, purchase_order, parent_lc(self), bank, currency | lc_number (unique/tenant), lc_type, amount, issued_date, expiry_date, status, utilized_amount, remarks |
+| lcamendment | lc, approved_by | amendment_number, amount_change, expiry_date_change, quantity_change, reason, status, approved_at |
+| bank | — | code, name, swift_code, address, contact_person, phone, email, status |
+| proformainvoice | purchase_order, buyer, lc | pi_number, amount, currency, issued_date, validity_date, status, remarks |
+| salescontract | purchase_order, buyer, payment_terms | contract_number, contract_date, total_amount, currency, delivery_terms, status, remarks |
+| salesconfirmation | purchase_order, buyer | confirmation_number, sent_at, disputed_at, accepted_at, status, dispute_reason, auto_accepted, remarks |
+| debitnote | purchase_order, invoice_approval, reconciliation(finalhitreconciliation), currency, raised_by | debit_number (unique/tenant), debit_type, party_type, debited_party, amount, shortage_units, tolerance_pct, reason, status, compliance_email, compliance_email_sent, email_sent_at, raised_at, issued_at, paid_at, notes |
+| invoiceapproval | purchase_order, currency, debit_note, approved_by, rejected_by | invoice_number, invoice_type, invoice_date, quantity, unit_price, amount, status, rejection_reason, approved_at, rejected_at, notes |
 
-```sql
-CREATE TABLE production_plans (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    order_id UUID NOT NULL REFERENCES orders(id),
-    factory_id UUID NOT NULL REFERENCES factories(id),
-    plan_date DATE NOT NULL,
-    start_date DATE,
-    end_date DATE,
-    quantity INT NOT NULL,
-    status VARCHAR(20) DEFAULT 'draft',
-    remarks TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id)
-);
-
-CREATE INDEX idx_production_plans_tenant ON production_plans(tenant_id);
-CREATE INDEX idx_production_plans_order ON production_plans(order_id);
-CREATE INDEX idx_production_plans_factory ON production_plans(factory_id);
-```
-
-### 6.2 Daily Production
-
-```sql
-CREATE TABLE daily_productions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    factory_id UUID NOT NULL REFERENCES factories(id),
-    order_id UUID NOT NULL REFERENCES orders(id),
-    production_date DATE NOT NULL,
-    line_number INT,
-    target_quantity INT,
-    actual_quantity INT,
-    passed_quantity INT,
-    rejected_quantity INT,
-    efficiency DECIMAL(5,2),
-    dhu DECIMAL(5,2),
-    manpower INT,
-    working_hours DECIMAL(5,2),
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id)
-);
-
-CREATE INDEX idx_daily_productions_tenant ON daily_productions(tenant_id);
-CREATE INDEX idx_daily_productions_factory ON daily_productions(factory_id);
-CREATE INDEX idx_daily_productions_order ON daily_productions(order_id);
-CREATE INDEX idx_daily_productions_date ON daily_productions(production_date);
-```
+Note: `lc` has no `lcitem` — it links the PO directly and tracks `amount` +
+`utilized_amount` (target `LCItem` is planned, §11).
 
 ---
 
-## 7. Quality Entities
+## 7. Production Entities
 
-### 7.1 Inspection
+### 7.1 Production Plan — `production.productionplan`
 
-```sql
-CREATE TABLE inspections (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    order_id UUID NOT NULL REFERENCES orders(id),
-    factory_id UUID NOT NULL REFERENCES factories(id),
-    inspection_type VARCHAR(50) NOT NULL,
-    inspection_date DATE NOT NULL,
-    inspector_id UUID REFERENCES users(id),
-    aql_level DECIMAL(3,1),
-    sample_size INT,
-    passed_quantity INT,
-    rejected_quantity INT,
-    status VARCHAR(20) DEFAULT 'pending',
-    remarks TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id)
-);
+FK: `purchase_order`, `factory`. Fields: `plan_date`, `start_date`, `end_date`,
+`quantity`, `status`, `remarks`.
 
-CREATE INDEX idx_inspections_tenant ON inspections(tenant_id);
-CREATE INDEX idx_inspections_order ON inspections(order_id);
-CREATE INDEX idx_inspections_factory ON inspections(factory_id);
-CREATE INDEX idx_inspections_status ON inspections(status);
-```
+### 7.2 Daily Production — `production.dailyproduction` (aligns to DailyLineProduction)
 
-### 7.2 Inspection Item
-
-```sql
-CREATE TABLE inspection_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    inspection_id UUID NOT NULL REFERENCES inspections(id),
-    defect_type VARCHAR(100) NOT NULL,
-    defect_count INT NOT NULL,
-    severity VARCHAR(20),
-    description TEXT,
-    image_url TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_inspection_items_inspection ON inspection_items(inspection_id);
-```
+FK: `purchase_order`, `factory`. Fields: `production_date`, `line_number`,
+`target_quantity`, `actual_quantity`, `passed_quantity`, `rejected_quantity`,
+`efficiency`, `dhu`, `manpower`, `working_hours`, `status`.
 
 ---
 
-## 8. Logistics Entities
+## 8. Quality Entities
 
-### 8.1 Shipment
+| Entity (`quality.*`) | FK | Notable fields |
+|----------------------|----|----------------|
+| inspection | purchase_order, factory, inspector | inspection_type, inspection_date, aql_level, sample_size, passed_quantity, rejected_quantity, status, remarks |
+| inspectionitem | inspection | defect_type, defect_count, severity, description, image_url |
+| correctiveaction | inspection, assigned_to, verified_by | title, description, root_cause, corrective_measure, preventive_measure, due_date, completed_date, priority, status, verified_at |
+| goldseal | shipment(logistics) | status, sent_date, approval_date, notes |
+| complianceaudit | purchase_order | week_start, efficiency_rate, fabric_paperwork_status, dockets_status, fabric_utilisation_status, factory_invoice_status, fabric_rating_status, recon_costed_vs_actual_status, final_hits_status, notes |
 
-```sql
-CREATE TABLE shipments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    shipment_number VARCHAR(50) NOT NULL,
-    order_id UUID NOT NULL REFERENCES orders(id),
-    lc_id UUID REFERENCES lcs(id),
-    freight_forwarder_id UUID REFERENCES freight_forwarders(id),
-    shipping_line VARCHAR(255),
-    vessel_name VARCHAR(255),
-    voyage_number VARCHAR(50),
-    container_number VARCHAR(50),
-    container_size VARCHAR(20),
-    port_of_loading VARCHAR(255),
-    port_of_discharge VARCHAR(255),
-    etd DATE,
-    eta DATE,
-    atd DATE,
-    ata DATE,
-    status VARCHAR(20) DEFAULT 'booked',
-    remarks TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, shipment_number)
-);
-
-CREATE INDEX idx_shipments_tenant ON shipments(tenant_id);
-CREATE INDEX idx_shipments_order ON shipments(order_id);
-CREATE INDEX idx_shipments_lc ON shipments(lc_id);
-CREATE INDEX idx_shipments_status ON shipments(status);
-```
-
-### 8.2 Freight Forwarder
-
-```sql
-CREATE TABLE freight_forwarders (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    code VARCHAR(50) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    contact_person VARCHAR(255),
-    email VARCHAR(255),
-    phone VARCHAR(20),
-    address TEXT,
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, code)
-);
-
-CREATE INDEX idx_freight_forwarders_tenant ON freight_forwarders(tenant_id);
-```
+`inspection`/`inspectionitem` implement the "Batch or AQL Audit" node of the target
+diagram; weekly factory-gate compliance is `complianceaudit` + `goldseal`.
 
 ---
 
-## 9. Finance Entities
+## 9. Logistics Entities
 
-### 9.1 Chart of Accounts
+| Entity (`logistics.*`) | FK | Notable fields |
+|------------------------|----|----------------|
+| freightforwarder | — | code, name, contact_person, email, phone, address, country, notes |
+| shipment | purchase_order, factory, freight_forwarder, risk_level | shipment_number (unique/tenant), mode, status, booking_date, booking_reference, booking_ref_required_date, etd, eta, atd, ata, port_of_loading, port_of_discharge, vessel_name, voyage_number, container_number, seal_number, container_size, quantity, weight_kg, cbm, marks, remarks |
+| bookingscheduleitem | shipment, hit, risk_level | status, cut_qty, garments_ready_qty, ex_factory_date, ex_factory_notes, week_ending, notes, snapshot_date, snapshot_data |
+| shippingdocument | shipment | document_type, document_number, document_date, file, notes (typed: packing list / invoice / B/L / …) |
+| docket | shipment | docket_number, contract_price, date_raised, delivery_date, total_fabric_meters, unused_fabric_meters, is_final, sales_notified, sales_notified_at, notes |
+| importrecap | supplier(vendor), factory | s_c_number, invoice_value, item_category, quantity, rolls_bales, container, bl_hawb, mode, lc_foc, vessel, pcd_date, etd_date, eta_date, atb_date, unstuffed_date, in_house_date, agent, docs_received, status, remarks |
+| exportrecap | purchase_order, factory, forwarder | fob_no, s_c_number, factory_invoice(+date), customer_invoice(+date), quantity, fob_value, cmpt_value, cost_value, service_pct, ex_factory_date, mode, hbl, on_board_date, eta_date, container, bl_number, courier, factory_pay_terms, factory_amount, factory_due_date, factory_paid_date, customer_pay_terms, customer_received_amount, customer_due_date, customer_payment_date, remarks |
+| finalhitreconciliation | shipment, schedule_item, reconciled_by | docket_quantity, shipped_quantity, shortage_units, reasons_evident, notes, status, reconciled_at; child `debitnote` |
+| supplierpayment | supplier(vendor), purchase_order, lc, released_by | payment_ref, invoice_no, fn_ref, allocated_amount, amount, currency, payment_date, due_date, payment_method, released, released_at, remarks |
+| costreconciliation | purchase_order, export_recap, costing, reconciled_by | factory_inv_amount/qty, planning_cm_amount/qty, factory_inv_per_unit, planning_cm_per_unit, saving_loss_per_unit, saving_loss_total, is_mismatch, status, notes, reconciled_at |
 
-```sql
-CREATE TABLE chart_of_accounts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    code VARCHAR(50) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    account_type VARCHAR(50) NOT NULL,
-    parent_id UUID REFERENCES chart_of_accounts(id),
-    is_group BOOLEAN DEFAULT FALSE,
-    currency_id UUID REFERENCES currencies(id),
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(tenant_id, code)
-);
-
-CREATE INDEX idx_chart_of_accounts_tenant ON chart_of_accounts(tenant_id);
-CREATE INDEX idx_chart_of_accounts_type ON chart_of_accounts(account_type);
-```
-
-### 9.2 Voucher
-
-```sql
-CREATE TABLE vouchers (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    voucher_number VARCHAR(50) NOT NULL,
-    voucher_type VARCHAR(50) NOT NULL,
-    voucher_date DATE NOT NULL,
-    reference_type VARCHAR(100),
-    reference_id UUID,
-    total_debit DECIMAL(15,2) NOT NULL,
-    total_credit DECIMAL(15,2) NOT NULL,
-    status VARCHAR(20) DEFAULT 'draft',
-    remarks TEXT,
-    approved_by UUID REFERENCES users(id),
-    approved_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES users(id),
-    UNIQUE(tenant_id, voucher_number)
-);
-
-CREATE TABLE voucher_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    voucher_id UUID NOT NULL REFERENCES vouchers(id),
-    account_id UUID NOT NULL REFERENCES chart_of_accounts(id),
-    debit DECIMAL(15,2) DEFAULT 0,
-    credit DECIMAL(15,2) DEFAULT 0,
-    description TEXT,
-    cost_center_id UUID REFERENCES cost_centers(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_vouchers_tenant ON vouchers(tenant_id);
-CREATE INDEX idx_vouchers_type ON vouchers(voucher_type);
-CREATE INDEX idx_vouchers_date ON vouchers(voucher_date);
-CREATE INDEX idx_voucher_items_voucher ON voucher_items(voucher_id);
-CREATE INDEX idx_voucher_items_account ON voucher_items(account_id);
-```
+`shippingdocument.document_type` currently carries the packing-list / invoice /
+bill-of-lading artifacts; dedicated models are planned (§11).
 
 ---
 
-## 10. Indexing Strategy
+## 10. Monitoring, Reporting & Help Entities
 
-### 10.1 Indexing Principles
+| Entity | FK | Notable fields |
+|--------|----|----------------|
+| `monitoring.auditlog` | tenant, user | entity_type, entity_id, entity_name, action, description, ip_address, user_agent, old_value, new_value |
+| `monitoring.systemhealth` | tenant | service, status, response_time_ms, message, checked_at |
+| `monitoring.alert` | tenant, resolved_by | alert_type, service, title, message, entity_type, entity_id, is_read, is_resolved, resolved_at |
+| `reporting.savedreport` | tenant | name, report_type, description, config (JSON), is_scheduled |
+| `help.tourcompletion` | user, tenant | tour_id, completed_at |
+| `help.onboardingchecklistitem` | user, tenant | item_key, completed, completed_at |
+| `help.releasenote` | (no tenant) | version, title, body, released_at, is_published |
+
+---
+
+## 11. Planned (Target-Only) Entities
+
+These entities appear in the §1 target ER diagram but have **no model or app yet** as of
+2026-09-13. They are intentionally listed here (tagged **planned**) so the documentation
+shows both current and target state. When any of these ships, move it to the matching
+implemented section and update the §1 legend.
+
+### 11.1 Finance (new app, target-only)
+| Entity | Relation | Notes |
+|--------|----------|-------|
+| ChartOfAccounts | tenant | coded account tree; `code`, `name`, `account_type`, `parent`, `is_group` |
+| Voucher → VoucherItem | tenant | `voucher_number`, `voucher_type`, `total_debit`, `total_credit`; items = account × debit/credit |
+| JournalEntry | tenant | posting trail derived from vouchers |
+Today monetary tracking lives in the commercial module (`lc`, `proformainvoice`,
+`salescontract`, `debitnote`, `invoiceapproval`, `supplierpayment`,
+`costreconciliation`) and per-entity amount fields (`purchaseorder`, `costing`,
+`designcosting`).
+
+### 11.2 Inventory
+| Entity | Relation | Notes |
+|--------|----------|-------|
+| Inventory / StockMovement / VirtualStock | tenant | stock ledger with movements; virtual stock for pre-allocated stock-fabric |
+Today stock-fabric is modelled by `merchandising.fileopening` (`is_stock_fabric`,
+`total_meters`, `allocated_meters`) + `merchandising.stockfabricallocation`. A
+standalone inventory app is not present.
+
+### 11.3 Procurement receipts
+| Entity | Relation | Notes |
+|--------|----------|-------|
+| GoodsReceipt → GoodsReceiptItem | purchase_order | PO receiving with item lines |
+Receipt quantities are currently tracked on `bomitem.delivered_qty` / `fabricorder` lifecycle fields rather than a dedicated receipt model.
+
+### 11.4 LC composition
+| Entity | Notes |
+|--------|-------|
+| LCItem | itemized line items under an LC; today `commercial.lc` links the PO directly |
+
+### 11.5 Shipment documents
+| Entity | Notes |
+|--------|-------|
+| PackingList / Invoice / BillOfLading | would replace/augment `logistics.shippingdocument` typed-doc rows |
+
+### 11.6 Compliance registries
+| Entity | Notes |
+|--------|-------|
+| BuyerCompliance | per-buyer compliance doc registry |
+| FactoryCapability / FactoryCompliance | per-factory capability + compliance registry |
+| VendorCertification / VendorPerformance | per-vendor certification + performance ledger |
+`setup.compliancedocumenttype` exists as the type list only.
+
+### 11.7 Design revision
+| Entity | Notes |
+|--------|-------|
+| TechPackRevision | explicit techpack revision history; today versioning is `styleversion` |
+
+### 11.8 Production / quality lineage
+| Entity | Notes |
+|--------|-------|
+| Batch or AQL Audit (line-quality batch) | AQL is implemented as `quality.inspection`; a batch/line-quality ledger is not |
+| LinePerformance (as separate from DailyProduction) | per-line KPI roll-ups are computed, not stored |
+
+---
+
+## 12. Indexing Strategy
+
+### 12.1 Indexing Principles
 
 | Principle | Description |
 |-----------|-------------|
@@ -943,7 +545,7 @@ CREATE INDEX idx_voucher_items_account ON voucher_items(account_id);
 | Composite Indexes | Create composite indexes for common query patterns |
 | Partial Indexes | Use partial indexes for filtered queries |
 
-### 10.2 Performance Considerations
+### 12.2 Performance Considerations
 
 | Consideration | Recommendation |
 |---------------|----------------|
@@ -955,4 +557,5 @@ CREATE INDEX idx_voucher_items_account ON voucher_items(account_id);
 
 ---
 
-*This data model should be reviewed by Database Architect before implementation.*
+*This data model is continuously reconciled against `backend/apps/*/models.py`. The §1
+ER diagram is the target view; §2–§10 are implemented; §11 is planned/target-only.*

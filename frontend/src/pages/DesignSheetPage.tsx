@@ -7,7 +7,7 @@ import DesignSheetMaterial from '../components/DesignSheetMaterial';
 import DesignSheetFitSpecs from '../components/DesignSheetFitSpecs';
 import DesignSheetImages, { type DesignImagesUploadData } from '../components/DesignSheetImages';
 import DesignSheetJobRequests from '../components/DesignSheetJobRequests';
-import { merchApi, usersApi } from '../api/client';
+import { merchApi, setupApi, usersApi } from '../api/client';
 import { toBomItemPatch, toMaterialRows } from '../api/materialGrid';
 import type { MaterialItem } from '../components/DesignSheetMaterial';
 import type { UserOption } from '../components/DesignSheetJobRequests';
@@ -19,6 +19,8 @@ const DEFAULT_BLOCK_ORDER = [
   'images', 'job_requests',
 ];
 
+type SupplierOption = { id: string; name: string; code: string };
+
 export default function DesignSheetPage() {
   const { id } = useParams<{ id: string }>();
   const [sheet, setSheet] = useState<DesignSheet | null>(null);
@@ -26,6 +28,7 @@ export default function DesignSheetPage() {
   const [error, setError] = useState<string | null>(null);
   const [userOptions, setUserOptions] = useState<UserOption[]>([]);
   const [designImages, setDesignImages] = useState<DesignImage[]>([]);
+  const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   const [fitCopySources, setFitCopySources] = useState<import('../components/DesignSheetFitSpecs').FitCopySourceOption[]>([]);
 
   useEffect(() => {
@@ -44,6 +47,14 @@ export default function DesignSheetPage() {
       .getDesignSheets()
       .then((res) => setFitCopySources(res.data.results.map((s) => ({ id: s.id, file_number: s.file_number, style_code: s.style_code }))))
       .catch(() => setFitCopySources([]));
+    setupApi
+      .getVendors({ page_size: '10000' })
+      .then((res) =>
+        setSupplierOptions(
+          res.data.results.map((v) => ({ id: v.id, name: v.name, code: v.code })),
+        ),
+      )
+      .catch(() => setSupplierOptions([]));
   }, []);
 
   const loadSheet = useCallback(() => {
@@ -79,7 +90,13 @@ export default function DesignSheetPage() {
 
   const handleMaterialEdit = (field: string, value: unknown, row: MaterialItem) => {
     const rowId = typeof row.id === 'string' ? row.id : null;
-    const patch = toBomItemPatch(field, value);
+    let patch: Record<string, unknown> | null = null;
+    if (field === 'supplier') {
+      const vendor = supplierOptions.find((v) => v.name === value);
+      if (vendor) patch = { supplier: vendor.id };
+    } else {
+      patch = toBomItemPatch(field, value);
+    }
     if (!patch || !rowId) return;
     setError(null);
     merchApi
@@ -99,12 +116,25 @@ export default function DesignSheetPage() {
       .catch(() => setError('Failed to save material edit'));
   };
 
-  const handleMaterialAdd = () => {
-    const bomId = materialItems[0]?.bom_id;
-    if (!bomId) return;
+  const handleMaterialAdd = (row?: MaterialItem) => {
+    if (!sheet) return;
     setError(null);
+    const payload: Record<string, unknown> = {};
+    if (row) {
+      if (row.type) payload.category = row.type;
+      if (row.description_code) payload.item_name = row.description_code;
+      if (row.location) payload.location = row.location;
+      if (row.colour) payload.colour = row.colour;
+      if (row.width_size) payload.width_size = row.width_size;
+      if (typeof row.qty === 'number') payload.ordered_qty = row.qty;
+      if (row.match) payload.match = row.match;
+      if (typeof row.supplier === 'string') {
+        const vendor = supplierOptions.find((v) => v.name === row.supplier);
+        if (vendor) payload.supplier = vendor.id;
+      }
+    }
     merchApi
-      .createBOMItem({ bom: bomId, item_name: 'New Item', category: 'Others' })
+      .addMaterialItem(sheet.id, payload)
       .then(() => loadSheet())
       .catch(() => setError('Failed to add material item'));
   };
@@ -352,6 +382,8 @@ export default function DesignSheetPage() {
                   <DesignSheetMaterial
                     key="material"
                     bomItems={materialItems}
+                    supplierOptions={supplierOptions}
+                    loading={loading}
                     onItemEdit={handleMaterialEdit}
                     onItemAdd={handleMaterialAdd}
                     onItemDelete={handleMaterialDelete}

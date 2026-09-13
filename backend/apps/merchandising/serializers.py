@@ -1190,25 +1190,27 @@ class DesignSheetSerializer(serializers.ModelSerializer):
         if not bom:
             return []
         items = BOMItem.objects.filter(tenant=obj.tenant, bom=bom).order_by("id")
-        return [
-            {
-                "id": str(item.id),
-                "bom_id": str(bom.id),
-                "type": item.category,
-                "description_code": item.item_name,
-                "location": item.location or "",
-                "supplier": (
-                    item.supplier.name
-                    if item.supplier
-                    else (item.vendor.name if item.vendor else "")
-                ),
-                "colour": item.colour or "",
-                "width_size": item.width_size or "",
-                "qty": float(item.ordered_qty) if item.ordered_qty is not None else None,
-                "match": item.match or "",
-            }
-            for item in items
-        ]
+        return [material_item_grid_row(item, bom) for item in items]
+
+
+def material_item_grid_row(item, bom):
+    """Map a BOMItem to the Material Breakdown grid's field names."""
+    return {
+        "id": str(item.id),
+        "bom_id": str(bom.id),
+        "type": item.category,
+        "description_code": item.item_name,
+        "location": item.location or "",
+        "supplier": (
+            item.supplier.name
+            if item.supplier
+            else (item.vendor.name if item.vendor else "")
+        ),
+        "colour": item.colour or "",
+        "width_size": item.width_size or "",
+        "qty": float(item.ordered_qty) if item.ordered_qty is not None else None,
+        "match": item.match or "",
+    }
 
 
 class DesignInitSerializer(serializers.Serializer):

@@ -1720,3 +1720,120 @@ lost.
 **Result:** backend 3 new tests RED-first → targeted **28/28**, adjacency **98/98**, owning app
 **51/51**; frontend 3 new DesignsPage tests RED-first → tsc 0 / lint 0 / vitest 361 pass + 4
 allowlisted GuidedTour jsdom failures (GATE_A, merchandising-scoped + full frontend suite).
+
+---
+
+## 2026-09-13 ??? Domain docs reconciled to code (data-model.md + api-design.md)
+
+**What happened:** The product changed significantly (design/techpack entities, fabric module,
+commercial workflow, planned Finance/Inventory/Compliance targets), but `data-model.md` and
+`api-design.md` still described the older, partially-fictional model set — e.g. §4 listed
+`/orders`, `/inventory/*`, `/finance/*` endpoints that don't exist, and auth endpoints were
+stale. Re-inventoried the real app (`backend/apps/*/models.py`), regenerated the API surface from
+live routers (`config/urls.py` + `apps/*/urls.py`), and rewrote both docs with an
+**implemented vs planned** split.
+
+**What went well:**
+- Grounded everything in live introspection (Django model dump from the dev DB + a read of every
+  app `urls.py`) instead of trusting memory — caught that `users.auditlog` and `monitoring.auditlog`
+  are two separate tables, that `lc` has no `lcitem`, and that stock-fabric is `fileopening` +
+  `stockfabricallocation`, not an inventory module.
+- Preserved the §1 ER diagram as the **target view** and added a legend table mapping each node to
+  its implemented model (or marking it planned), so docs now show current + target state honestly
+  instead of implying Finance/Inventory exist.
+
+**What to do differently:**
+1. Docs drift quickly; tie them to code generation. Regenerate the model inventory + route tables
+   from the live source when anything module-level changes (cheap: one introspect script + reading
+   `urls.py`), and flag "planned" sections each time rather than letting them silently become fiction.
+2. When product changes span document scope, use the implemented-vs-planned legend pattern everywhere
+   (data-model.md §1) — it both tracks the roadmap and tells readers what is actually callable today.
+3. `config/settings/__init__.py` is **empty** — `DJANGO_SETTINGS_MODULE` must point at
+   `config.settings.development` (or `test`/`production`), not `config.settings`. Any future
+   introspection/management script must set the module or it will silently load an empty app registry
+   (returned `{}` models).
+
+**Linked slice/requirement:** roadmap A1/B-layer docs hygiene; traced via RQ rows in
+TDD_TRACKER backlog.
+**Result:** docs-only task — no TDD gate; `data-model.md` (reconciled §2–§10, new §11 planned) and
+`api-design.md` (real routes + planned §4.14/§4.15/§6) updated, git working tree uncommitted for
+review.
+
+---
+
+## 2026-09-13 - Material Breakdown grid: standard add/filter/edit on the design-sheet detail (slice #67)
+
+**What happened:** User reported the material grid on `/design-sheets/:id` didn't behave like the
+standard data-list grids — no column filters, Add did nothing on an empty grid, supplier edits were
+silently dropped. Fixed across backend + frontend: new `POST …/design-sheets/{id}/material-add/`
+action, shared `material_item_grid_row` helper, vendor-fed supplier dropdown, header filters.
+
+**What went well:**
+- Minimal backend surface: a single new DRF action + one module-level helper, zero model/migration
+  change. The action reuses the reference manual's auto-create pattern already proven in
+  `POViewSet.create_bom` (draft style-version + BOM when missing).
+- Frontend mirrored the established A3 standard-grid recipe exactly (DesignsPage/BOMsListPage), so
+  the test expectations came almost free from the existing pattern, and BLAST_RADIUS stayed isolated.
+
+**What went wrong / gotcha:**
+- **Raw DRF create with FKs:** `BOMItem.objects.create(supplier=<uuid>)` raises `Cannot assign
+  … must be a "Vendor" instance` even when the UUID is valid. The working form is the attribute-name
+  `_id` variants (`supplier_id=<uuid>`). Caught via the round-trip test's 500 → fixed in GREEN.
+- **Grid rows ordered by UUID:** `order_by("id")` is effectively random, so list-order assertions are
+  flaky. New tests assert description_code **sets**, not sequences, when order isn't the point.
+- **Client-side BOM coupling:** the old Add handler required `materialItems[0]?.bom_id`, which is why
+  an empty grid no-oped. The server resolves style → version → BOM, so the client must not pre-require
+  a BOM id.
+- **Grid stores names, API wants ids:** supplier is a master-data dropdown; the grid row carries the
+  vendor **name** and `handleMaterialEdit` resolves name → vendor id via the loaded vendor master
+  before PATCHing. Unknown names must no-op, not 500.
+
+**What to do differently:**
+1. When a grid column has an `editor:'select'` backed by master data, load the master once on mount
+   (`setupApi.getVendors({ page_size: '10000' })`) and resolve name→id at the page handler, not in the
+   grid.
+2. Keep raw model creates inside actions to the attribute-name FK forms; write the reminder into any
+   future helper that takes FK values.
+3. Vitest default threads pool fails to start workers on this machine occasionally —
+   `npx vitest run --pool=forks` is the reliable invocation for the full suite.
+
+**Linked slice/requirement:** slice #67 / US-035 Bill of Materials (TDD_TRACKER entry 67;
+master-backlog Addendum 9).
+**Result:** GATE_A VERIFIED — backend targeted 10/10 + owning app 51/51 + adjacency 13/13; frontend
+`tsc -b` 0, lint 0 errors, vitest 371/371.
+
+---
+
+## 2026-09-13 - Design-sheet demo seed: design information + materials (slice #68)
+
+**What happened:** User asked for 4-5 sample records of design information + materials for the
+design-sheet detail page. Delivered as a new idempotent management command
+(`seed_design_sheet_demo`) — 5 demo design sheets, each with the full `StyleTechPack` design-info
+field set and an active BOM carrying 5 material rows — proven by a failing-first test and then run
+against the dev DB.
+
+**What went well:**
+- TDD still held for a data task: the RED test asserted the *observable* outcome (the design-sheet
+  detail response contains populated design info + a 4-5-row material grid), which is exactly what the
+  user asked to see, not just row counts.
+- Keying the seed on stable business keys (`style_number`, `techpack_number`, BOM `version`, item
+  `item_name`) via `get_or_create` made re-runs safe and the idempotency test trivial.
+- Reused the reference manual's auto-create convention (Style → active StyleVersion → active BOM) so
+  the seeded grid rows resolve exactly the way `material_items` and the `material-add` action pick them.
+- Design info and materials verify in one call: `GET /design-sheets/{id}/` returns both the header
+  fields and `material_items`, so one API test covers both blocks the user named.
+
+**What to do differently:**
+1. `get_or_create` only guards creation — subsequent runs still need the **explicit re-write + save** 
+   of every mutable field (or stale demo values survive re-runs). Always re-assign and
+   `save(update_fields=...)` after `get_or_create` in idempotent seeds.
+2. Supply both `supplier` and `vendor` FKs when seeding BOM items; the grid prefers `supplier`, but
+   other views use `vendor` — setting both keeps the row consistent everywhere.
+3. Mechanics of running seeds in this repo: `.\venv\Scripts\python.exe manage.py seed_design_sheet_demo`
+   from `backend/` targets the first active tenant by default (the dev DB is "Demo Buying House");
+   `--tenant <slug>` is available for other tenants.
+
+**Linked slice/requirement:** slice #68 / design-sheet detail (US-035 BOM + RQ-036-042 tech-pack
+area; TDD_TRACKER entry 68; master-backlog Addendum 10).
+**Result:** GATE_A VERIFIED — targeted 4/4 + adjacency 10/10; seeded live (5 sheets, 5 material rows
+each) on the dev DB.

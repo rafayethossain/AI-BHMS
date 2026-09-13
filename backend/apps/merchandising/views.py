@@ -77,6 +77,7 @@ from .serializers import (
     POAmendmentSerializer,
     PurchaseOrderItemSerializer,
     PurchaseOrderSerializer,
+    material_item_grid_row,
     StockFabricAllocationSerializer,
     StyleItemSerializer,
     StyleSerializer,
@@ -3328,6 +3329,7 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
         "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
         "init": "merchandising:create", "export": "merchandising:view",
         "design_info": "merchandising:edit",
+        "material_add": "merchandising:create",
     }
 
     # Key → model field, shared by Style and StyleTechPack (design_note maps
@@ -3553,6 +3555,71 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
         target.save(update_fields=list(field_updates))
         target.refresh_from_db()
         return Response(self.get_serializer(sheet).data)
+
+    @action(detail=True, methods=["post"], url_path="material-add")
+    def material_add(self, request, pk=None):
+        """Add a Material Breakdown grid row (BOMItem) for the design sheet.
+
+        Resolves the sheet's style → latest style version (auto-created when
+        missing) → BOM (active preferred, otherwise latest; auto-created when
+        missing) and appends a new item, so Add works even when the grid is
+        empty and no BOM exists yet. Returns the created row in the grid
+        shape used by ``material_items``.
+        """
+        sheet = self.get_object()
+        style = sheet.tech_pack.style if sheet.tech_pack and sheet.tech_pack.style_id else None
+        if not style:
+            return Response(
+                {"detail": "Design sheet has no linked style."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        style_version = StyleVersion.objects.filter(
+            tenant=request.tenant, style=style
+        ).order_by("-version_number").first()
+        if not style_version:
+            style_version = StyleVersion.objects.create(
+                tenant=request.tenant, style=style,
+                version_number=1, revision_notes="Auto-created for material breakdown",
+                status="draft", created_by=request.user,
+            )
+        with transaction.atomic():
+            bom = (
+                BOM.objects.filter(
+                    tenant=request.tenant, style_version=style_version, status="active",
+                ).order_by("-version").first()
+                or BOM.objects.filter(
+                    tenant=request.tenant, style_version=style_version,
+                ).order_by("-version").first()
+            )
+            if not bom:
+                last_version = BOM.objects.filter(
+                    tenant=request.tenant, style_version=style_version
+                ).aggregate(m=Max("version"))["m"] or 0
+                bom = BOM.objects.create(
+                    tenant=request.tenant, style_version=style_version,
+                    name=f"BOM - {style.style_number or style.name or 'Style'}",
+                    version=last_version + 1, status="draft",
+                    created_by=request.user,
+                )
+            writable = {
+                "category", "item_name", "description", "uom", "vendor",
+                "supplier", "ordered_qty", "location", "colour", "width_size",
+                "match",
+            }
+            item_data = {
+                k: v for k, v in request.data.items()
+                if k in writable and v not in (None, "")
+            }
+            for fk_field in ("uom", "vendor", "supplier"):
+                if fk_field in item_data:
+                    item_data[f"{fk_field}_id"] = item_data.pop(fk_field)
+            item_data.setdefault("category", "Others")
+            item_data.setdefault("item_name", "New Item")
+            item = BOMItem.objects.create(
+                tenant=request.tenant, bom=bom, created_by=request.user,
+                **item_data,
+            )
+        return Response(material_item_grid_row(item, bom), status=status.HTTP_201_CREATED)
 
     @staticmethod
     def _coerce_design_date(value):

@@ -4836,6 +4836,64 @@ stored. "Design" (style name) was already inline-editable + persisted via
 - **GATE_A: VERIFIED.** No schema change (Style already owns both FKs; `StyleSerializer` already
   writable) — no migration.
 
+## Part 15 Addendum 9 - Material Breakdown grid: full standard-grid behaviour on the design-sheet detail (2026-09-13)
+
+User request: material rows on `/design-sheets/:id` must behave like the standard data-list grid —
+Column filters, add, update, delete all working (previously only right-click delete; Add silently
+no-oped on an empty grid / missing BOM; supplier edits were dropped).
+
+Backward: continues the DS-01 design-sheet detail work + the shared `SpreadsheetGrid` pattern (A3):
+centralized grid chrome (`toolbar`/`exportable`/`printable`/`columnChooser`/`paginationSize`,
+per-column header filters, `actionColumn`), client-side vendor master list (setup `Buyer`/Vendor, the
+A7 buyer-merge source of truth), and the existing `PATCH /bom-items/{id}/` write path. Forward:
+closes the last design-sheet detail gap against the "Excel-familiar desktop workflow"; the new
+`material-add` action mirrors the auto-create BOM/version pattern of the reference manual and unblocks
+any future template-driven row inserts.
+
+- Backend: `POST /api/v1/merchandising/design-sheets/{id}/material-add/` (new `material_add` action on
+  `DesignSheetViewSet`, `required_permissions["material_add"] = "merchandising:create"`). Resolves
+  style → style_version (draft v1 autocreated when missing) → BOM (active preferred else latest; draft
+  `version = max+1` autocreated and named when missing) → creates `BOMItem` (defaults `category=
+  "Others"`, `item_name="New Item"`) and returns the grid-shape row (201); 400 when the sheet has no
+  linked style. `get_material_items` refactored onto shared `material_item_grid_row(item, bom)`
+  helper (serializers.py) — behaviour identical, no consumer change. Raw-create FK gotcha: pass
+  `uom_id`/`vendor_id`/`supplier_id` attribute-name forms, not UUID strings. No schema change — no
+  migration.
+- Frontend: `DesignSheetMaterial.tsx` — new `supplierOptions`/`loading` props, per-column
+  `headerFilter`/`headerFilterType`, supplier `editor:'select'` keyed by vendor name, `toolbar` +
+  Undo/Redo/"+ Add Item", `actionColumn` delete, export/print/column-chooser, `paginationSize: 20`,
+  `loading`, group-by type + clipboard/history preserved. `DesignSheetPage.tsx` — loads vendors via
+  `setupApi.getVendors({ page_size: '10000' })`; `handleMaterialEdit` maps supplier name → vendor id
+  (unknown names no-op); `handleMaterialAdd(row?)` always calls `merchApi.addMaterialItem(sheet.id,
+  payload)` (no `bom_id` client-side dependency) then refetches; client.ts gained `addMaterialItem`
+  (`createBOMItem` retained — BOMDetailPage consumer).
+- Tests: backend RED-first 5 new (`TestMaterialAddAction`) → targeted **10/10**, owning app **51/51**,
+  adjacency **13/13** (trim-schedule + core lifecycle — both hit bom-items); frontend RED-first
+  rewrites/extensions (DesignSheetMaterial 5, DesignSheetPage 4-ish) → `tsc -b` 0, oxlint 0 errors
+  (baseline), vitest **371 passed / 371**.
+- **GATE_A: VERIFIED.** New DB writes only via runtime auto-create (version/BOM); no migration.
+
+## Part 15 Addendum 10 - Design-sheet demo data: Design Information + Material Breakdown rows (2026-09-13)
+
+User request: 4-5 sample records so the design-sheet detail page (`/design-sheets/:id`) shows real
+data in the **Design Information** block and the **Material Breakdown** grid.
+
+- Backend: new idempotent `seed_design_sheet_demo` management command
+  (`backend/apps/merchandising/management/commands/seed_design_sheet_demo.py`, optional
+  `--tenant <slug>`). Creates 5 demo designs (DSD-1001..1005, realistic apparel): Style →
+  StyleVersion v1 (active) → StyleTechPack with the full design-info field set (block / based-on /
+  relationship / designer / pattern-cutter / issuer / cloth-code / size / length / issue-date /
+  risk-date / pattern-request-date / note + buyer FK) → DesignSheet (per-sample status), plus an
+  active BOM v1 per sheet carrying 5 `BOMItem` rows mapped to grid fields (type / location /
+  supplier / colour / width_size / qty / match) and resolved against Vendor masters
+  (FOURSEASONS / ALICE- / NEW SUP). Idempotent via `get_or_create` keys — safe to re-run.
+- Tests: RED-first 4 in `tests/unit/test_seed_design_sheet_demo.py` — 4-5 sheets created; each sheet
+  detail returns populated design info + a 4-5-row `material_items` grid in full row shape with
+  supplier name and positive qty; re-run is idempotent. Targeted **4/4** + adjacency **10/10**
+  (material grid). **GATE_A: VERIFIED.** No schema change — no migration.
+- Run live against the dev DB: 5 sheets, 5 material rows each; data visible on the design-sheet
+  detail pages.
+
 ---
 
 *This is the single source of truth for the BHMS backlog and requirement status (workflow-ordered). Reframed: 2026-08-03*

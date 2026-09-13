@@ -5,6 +5,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const materialCapture = vi.hoisted(() => ({
   current: null as null | {
     bomItems: Record<string, unknown>[];
+    supplierOptions: { id: string; name: string; code: string }[];
+    loading?: boolean;
     onItemEdit?: (field: string, value: unknown, row: Record<string, unknown>) => void;
     onItemAdd?: (row?: Record<string, unknown>) => void;
     onItemDelete?: (row: Record<string, unknown>) => void;
@@ -29,6 +31,8 @@ vi.mock('../../components/DesignSheetSketch', () => ({
 vi.mock('../../components/DesignSheetMaterial', () => ({
   default: (props: {
     bomItems: Record<string, unknown>[];
+    supplierOptions: { id: string; name: string; code: string }[];
+    loading?: boolean;
     onItemEdit?: (field: string, value: unknown, row: Record<string, unknown>) => void;
     onItemAdd?: (row?: Record<string, unknown>) => void;
     onItemDelete?: (row: Record<string, unknown>) => void;
@@ -95,6 +99,7 @@ const merchApiMock = vi.hoisted(() => ({
   getDesignSheet: vi.fn(),
   updateBOMItem: vi.fn(),
   createBOMItem: vi.fn(),
+  addMaterialItem: vi.fn(),
   deleteBOMItem: vi.fn(),
   createFitSpecification: vi.fn(),
   updateFitSpecification: vi.fn(),
@@ -112,7 +117,21 @@ const usersApiMock = vi.hoisted(() => ({
   getUsers: vi.fn(),
 }));
 
-vi.mock('../../api/client', () => ({ merchApi: merchApiMock, usersApi: usersApiMock }));
+const setupApiMock = vi.hoisted(() => ({
+  getVendors: vi.fn(),
+}));
+
+const vendorOptions = [
+  { id: 'v1', name: 'FOURSEASONS', code: 'FS1' },
+  { id: 'v2', name: 'ALICE-', code: 'AL2' },
+  { id: 'v3', name: 'NEW SUP', code: 'NS3' },
+];
+
+vi.mock('../../api/client', () => ({
+  merchApi: merchApiMock,
+  usersApi: usersApiMock,
+  setupApi: setupApiMock,
+}));
 
 import DesignSheetPage from '../DesignSheetPage';
 import type { DesignSheet } from '../../api/client';
@@ -162,6 +181,9 @@ describe('DesignSheetPage material grid wiring', () => {
     materialCapture.current = null;
     fitSpecCapture.current = null;
     jobCapture.current = null;
+    setupApiMock.getVendors.mockResolvedValue({
+      data: { count: vendorOptions.length, results: vendorOptions },
+    });
     usersApiMock.getUsers.mockResolvedValue({
       data: {
         count: 2,
@@ -272,7 +294,7 @@ describe('DesignSheetPage material grid wiring', () => {
     });
   });
 
-  it('does not send a patch for supplier edits', async () => {
+  it('maps a supplier name to its vendor id and patches the item', async () => {
     merchApiMock.getDesignSheet.mockResolvedValue({
       data: {
         ...baseSheet,
@@ -297,10 +319,12 @@ describe('DesignSheetPage material grid wiring', () => {
     await act(async () => {
       materialCapture.current?.onItemEdit?.('supplier', 'NEW SUP', { id: 'bi-1' });
     });
-    expect(merchApiMock.updateBOMItem).not.toHaveBeenCalled();
+    expect(merchApiMock.updateBOMItem).toHaveBeenCalledWith('bi-1', {
+      supplier: 'v3',
+    });
   });
 
-  it('creates a BOM item and refetches when Add Item is used', async () => {
+  it('ignores supplier edits that do not match a known vendor', async () => {
     merchApiMock.getDesignSheet.mockResolvedValue({
       data: {
         ...baseSheet,
@@ -320,19 +344,108 @@ describe('DesignSheetPage material grid wiring', () => {
         ],
       },
     });
-    merchApiMock.createBOMItem.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('material-mock');
+    await act(async () => {
+      materialCapture.current?.onItemEdit?.('supplier', 'NO SUCH VENDOR', { id: 'bi-1' });
+    });
+    expect(merchApiMock.updateBOMItem).not.toHaveBeenCalled();
+  });
+
+  it('adds a material item through material-add and refetches when Add Item is used', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({
+      data: {
+        ...baseSheet,
+        material_items: [
+          {
+            id: 'bi-1',
+            bom_id: 'bom-1',
+            type: 'Cloth',
+            description_code: 'SANDWASH LINEN XK-529',
+            location: '',
+            supplier: '',
+            colour: '',
+            width_size: '',
+            qty: 2.25,
+            match: '',
+          },
+        ],
+      },
+    });
+    merchApiMock.addMaterialItem.mockResolvedValue({ data: {} });
     renderPage();
     await screen.findByTestId('material-mock');
     await act(async () => {
       materialCapture.current?.onItemAdd?.();
     });
-    expect(merchApiMock.createBOMItem).toHaveBeenCalledWith({
-      bom: 'bom-1',
-      item_name: 'New Item',
-      category: 'Others',
-    });
+    expect(merchApiMock.addMaterialItem).toHaveBeenCalledWith('ds-1', {});
     await waitFor(() => {
       expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('adds a material item even when the grid is empty and no BOM is known', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({
+      data: { ...baseSheet, material_items: [] },
+    });
+    merchApiMock.addMaterialItem.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('material-mock');
+    await act(async () => {
+      materialCapture.current?.onItemAdd?.();
+    });
+    expect(merchApiMock.addMaterialItem).toHaveBeenCalledWith('ds-1', {});
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('maps an existing row into the material-add payload when Add is used to copy', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({
+      data: {
+        ...baseSheet,
+        material_items: [
+          {
+            id: 'bi-1',
+            bom_id: 'bom-1',
+            type: 'Cloth',
+            description_code: 'SANDWASH LINEN XK-529',
+            location: 'BACK',
+            supplier: 'FOURSEASONS',
+            colour: 'WHITE',
+            width_size: '60in',
+            qty: 3,
+            match: 'Left',
+          },
+        ],
+      },
+    });
+    merchApiMock.addMaterialItem.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('material-mock');
+    await act(async () => {
+      materialCapture.current?.onItemAdd?.({
+        id: 'bi-1',
+        bom_id: 'bom-1',
+        type: 'Cloth',
+        description_code: 'SANDWASH LINEN XK-529',
+        location: 'BACK',
+        supplier: 'FOURSEASONS',
+        colour: 'WHITE',
+        width_size: '60in',
+        qty: 3,
+        match: 'Left',
+      });
+    });
+    expect(merchApiMock.addMaterialItem).toHaveBeenCalledWith('ds-1', {
+      category: 'Cloth',
+      item_name: 'SANDWASH LINEN XK-529',
+      location: 'BACK',
+      colour: 'WHITE',
+      width_size: '60in',
+      ordered_qty: 3,
+      match: 'Left',
+      supplier: 'v1',
     });
   });
 });
@@ -375,6 +488,9 @@ describe('DesignSheetPage fit spec + job request wiring', () => {
     vi.clearAllMocks();
     fitSpecCapture.current = null;
     jobCapture.current = null;
+    setupApiMock.getVendors.mockResolvedValue({
+      data: { count: vendorOptions.length, results: vendorOptions },
+    });
     usersApiMock.getUsers.mockResolvedValue({
       data: {
         count: 1,
@@ -602,6 +718,9 @@ describe('DesignSheetPage block layout order (design builder Phase 1)', () => {
     vi.clearAllMocks();
     fitSpecCapture.current = null;
     jobCapture.current = null;
+    setupApiMock.getVendors.mockResolvedValue({
+      data: { count: vendorOptions.length, results: vendorOptions },
+    });
     usersApiMock.getUsers.mockResolvedValue({
       data: {
         count: 2,
