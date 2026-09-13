@@ -4896,4 +4896,28 @@ data in the **Design Information** block and the **Material Breakdown** grid.
 
 ---
 
+## Part 15 Addendum 11 - Fit Specs + Job Requests grids on the design sheet detail (2026-09-13)
+
+User request: the Fit Specs and Job Requests sections on `/design-sheets/:id` should behave like the
+Material Breakdown grid - full add/update/delete + standard grid chrome, keeping the domain activity.
+
+- Frontend only (no backend change): both sections now render through the shared `SpreadsheetGrid`.
+- **Fit Specs**: columns Fit Spec / Selected (check mark) / Fit Date / Description / Notes / Photos;
+  inline cell edits PATCH the spec (`updateFitSpecification`), action-column + context-menu delete
+  (`deleteFitSpecification`), selection now uses the safe `selectFitSpecification` action (clears the
+  previous selected spec first - the old raw `is_selected` PATCH could trip the unique-selected
+  constraint). Saved images gallery for the selected spec, Copy from Base / Copy from Another Style
+  pickers, and the auto-numbered add form are preserved.
+- **Job Requests**: columns Job Type / Required By / Work Location / No. of Garments (sum) /
+  Allocated To / Status / Notes with friendly label editors; cell edits map back to domain keys (user
+  name -> `allocated_to` id, status/job-type label -> key) and PATCH `updateDesignJobRequest`;
+  action-column + context-menu delete (`deleteDesignJobRequest`); create form preserved.
+- Tests: RED-first rewrites of `DesignSheetFitSpecs.test.tsx` (23) + `DesignSheetJobRequests.test.tsx`
+  (13) + `DesignSheetPage.test.tsx` (27) against the mocked grid - RED 22-fail verified via
+  stash/run/pop, then GREEN **63/63**. Full suite **387/387** (`tsc -b` 0, lint 0 errors).
+  **GATE_A: VERIFIED** (frontend only - backend endpoints already covered by
+  `test_design_sheet_api.py` / `test_design_sheet_e2e_flows.py`).
+
+---
+
 *This is the single source of truth for the BHMS backlog and requirement status (workflow-ordered). Reframed: 2026-08-03*

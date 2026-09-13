@@ -1624,6 +1624,12 @@ export const merchApi = {
   updateFitSpecification: (id: string, data: Record<string, unknown>) =>
     api.patch<FitSpecification>(`/merchandising/fit-specifications/${id}/`, data),
 
+  deleteFitSpecification: (id: string) =>
+    api.delete(`/merchandising/fit-specifications/${id}/`),
+
+  selectFitSpecification: (id: string) =>
+    api.post(`/merchandising/fit-specifications/${id}/select/`),
+
   createFitImage: (data: FormData) =>
     api.post<FitImage>('/merchandising/fit-images/', data),
 
@@ -1644,6 +1650,9 @@ export const merchApi = {
 
   updateDesignJobRequest: (id: string, data: Record<string, unknown>) =>
     api.patch<DesignJobRequest>(`/merchandising/design-job-requests/${id}/`, data),
+
+  deleteDesignJobRequest: (id: string) =>
+    api.delete(`/merchandising/design-job-requests/${id}/`),
 
   getCostings: (params?: Record<string, string>) =>
     api.get<{ results: Costing[]; count: number }>('/merchandising/costings/', { params }),

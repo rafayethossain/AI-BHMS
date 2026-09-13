@@ -1837,3 +1837,38 @@ against the dev DB.
 area; TDD_TRACKER entry 68; master-backlog Addendum 10).
 **Result:** GATE_A VERIFIED — targeted 4/4 + adjacency 10/10; seeded live (5 sheets, 5 material rows
 each) on the dev DB.
+
+---
+
+## 2026-09-13 - Fit Specs + Job Requests upgraded to the standard grid (slice #69)
+
+**What happened:** User asked for the Fit Specs and Job Requests sections on the design-sheet detail
+page to match the Material Breakdown grid: full add/update/delete + standard grid chrome. Replaced
+both bespoke card sections with the shared `SpreadsheetGrid` while preserving their unique activity
+(fit-spec selection + photos + copy-from-base/copy-other; job allocate + status transitions).
+
+**What went well:**
+- The backend already had full CRUD and the safe `select` action for both models, so this slice was
+  frontend-only - no migration, no backend tests, no blast radius beyond the detail page.
+- The grid+form hybrid: entities whose create requires fields (fit-date/description, job required-by)
+  keep the auto-numbered/toolbar add form, while inline cell-editing covers updates - best of both.
+- Verified RED honestly: stashed the new components, ran the rewritten tests against the old card
+  components (22 failures), popped the stash, and went green. Real RED, not a formality.
+- Mapped friendly labels inside the components (name->id, status label->key) so the grid shows
+  Excel-like display values but PATCHes domain keys - same pattern as the material supplier select.
+
+**What to do differently:**
+1. Selection (is_selected) must go through the `select` action, never a raw `is_selected: true`
+   PATCH - the latter can violate the unique-selected fit spec constraint when another spec is already
+   selected.
+2. `SpreadsheetGrid` has no cell formatter/button slots; pass a computed display field (e.g. the
+   `selected` check column, `job_type_label`) as row data instead of fighting the grid.
+3. When a grid row type differs from the API type, cast at the `rowContextMenu`/`onCellEdited`
+   boundary (`row as JobRequestRow`) - the grid callbacks are typed `Record<string, unknown>`.
+4. Keep a plain `input` editor for date cells (Tabulator's date editor needs picker deps); the
+   serializer accepts the ISO text.
+
+**Linked slice/requirement:** slice #69 / US-033 Fit Spec + US-034 Job Request (TDD_TRACKER entry
+69; master-backlog Addendum 11).
+**Result:** GATE_A VERIFIED - frontend only: targeted 63/63, full suite 387/387, tsc -b 0, lint 0
+errors.

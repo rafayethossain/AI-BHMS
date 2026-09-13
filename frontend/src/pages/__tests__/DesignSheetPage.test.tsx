@@ -48,6 +48,8 @@ const fitSpecCapture = vi.hoisted(() => ({
     fitSpecs: Record<string, unknown>[];
     onCreateFitSpec?: (data: Record<string, unknown>) => void;
     onSelectFitSpec?: (id: string) => void;
+    onUpdateFitSpec?: (id: string, data: Record<string, unknown>) => void;
+    onDeleteFitSpec?: (id: string) => void;
     onAddFitImage?: (fitSpecId: string, file: File) => void;
     onDeleteFitImage?: (imageId: string) => void;
     onReorderFitImage?: (imageId: string, newOrder: number) => void;
@@ -62,7 +64,8 @@ const jobCapture = vi.hoisted(() => ({
     jobRequests: Record<string, unknown>[];
     users: { id: string; name: string }[];
     onCreateJobRequest?: (data: Record<string, unknown>) => void;
-    onAllocateUser?: (jobId: string, userId: string) => void;
+    onUpdateJobRequest?: (id: string, data: Record<string, unknown>) => void;
+    onDeleteJobRequest?: (id: string) => void;
   },
 }));
 
@@ -71,6 +74,8 @@ vi.mock('../../components/DesignSheetFitSpecs', () => ({
     fitSpecs: Record<string, unknown>[];
     onCreateFitSpec?: (data: Record<string, unknown>) => void;
     onSelectFitSpec?: (id: string) => void;
+    onUpdateFitSpec?: (id: string, data: Record<string, unknown>) => void;
+    onDeleteFitSpec?: (id: string) => void;
     onAddFitImage?: (fitSpecId: string, file: File) => void;
     onDeleteFitImage?: (imageId: string) => void;
     onReorderFitImage?: (imageId: string, newOrder: number) => void;
@@ -88,7 +93,8 @@ vi.mock('../../components/DesignSheetJobRequests', () => ({
     jobRequests: Record<string, unknown>[];
     users: { id: string; name: string }[];
     onCreateJobRequest?: (data: Record<string, unknown>) => void;
-    onAllocateUser?: (jobId: string, userId: string) => void;
+    onUpdateJobRequest?: (id: string, data: Record<string, unknown>) => void;
+    onDeleteJobRequest?: (id: string) => void;
   }) => {
     jobCapture.current = props;
     return <div data-testid="job-mock" />;
@@ -103,6 +109,8 @@ const merchApiMock = vi.hoisted(() => ({
   deleteBOMItem: vi.fn(),
   createFitSpecification: vi.fn(),
   updateFitSpecification: vi.fn(),
+  deleteFitSpecification: vi.fn(),
+  selectFitSpecification: vi.fn(),
   createFitImage: vi.fn(),
   deleteFitImage: vi.fn(),
   updateFitImage: vi.fn(),
@@ -110,6 +118,7 @@ const merchApiMock = vi.hoisted(() => ({
   getDesignSheets: vi.fn(),
   createDesignSheetJob: vi.fn(),
   updateDesignJobRequest: vi.fn(),
+  deleteDesignJobRequest: vi.fn(),
   updateDesignSheet: vi.fn(),
 }));
 
@@ -556,17 +565,48 @@ describe('DesignSheetPage fit spec + job request wiring', () => {
     });
   });
 
-  it('selects a fit spec through a PATCH and refetches the sheet', async () => {
+  it('selects a fit spec through the select action and refetches the sheet', async () => {
     merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
-    merchApiMock.updateFitSpecification.mockResolvedValue({ data: {} });
+    merchApiMock.selectFitSpecification.mockResolvedValue({ data: {} });
     renderPage();
     await screen.findByTestId('fitspec-mock');
     await act(async () => {
       fitSpecCapture.current?.onSelectFitSpec?.('fs-2');
     });
-    expect(merchApiMock.updateFitSpecification).toHaveBeenCalledWith('fs-2', { is_selected: true });
+    expect(merchApiMock.selectFitSpecification).toHaveBeenCalledWith('fs-2');
+    expect(merchApiMock.updateFitSpecification).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('updates a fit spec through PATCH with a single-field patch and refetches the sheet', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: sheetWithFitAndJob });
+    merchApiMock.updateFitSpecification.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await act(async () => {
+      fitSpecCapture.current?.onUpdateFitSpec?.('fs-1', { description: 'Updated fit' });
+    });
+    expect(merchApiMock.updateFitSpecification).toHaveBeenCalledWith('fs-1', {
+      description: 'Updated fit',
+    });
+    await waitFor(() => {
+      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('deletes a fit spec through the API and removes it from the sheet', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: sheetWithFitAndJob });
+    merchApiMock.deleteFitSpecification.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    await act(async () => {
+      fitSpecCapture.current?.onDeleteFitSpec?.('fs-1');
+    });
+    expect(merchApiMock.deleteFitSpecification).toHaveBeenCalledWith('fs-1');
+    await waitFor(() => {
+      expect(fitSpecCapture.current?.fitSpecs).toEqual([]);
     });
   });
 
@@ -598,19 +638,35 @@ describe('DesignSheetPage fit spec + job request wiring', () => {
     });
   });
 
-  it('allocates a user through PATCH and refetches the sheet', async () => {
-    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+  it('updates a job request through PATCH with the mapped payload and mirrors it locally', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: sheetWithFitAndJob });
     merchApiMock.updateDesignJobRequest.mockResolvedValue({ data: {} });
     renderPage();
     await screen.findByTestId('job-mock');
     await act(async () => {
-      jobCapture.current?.onAllocateUser?.('jr-1', 'u1');
+      jobCapture.current?.onUpdateJobRequest?.('jr-1', { allocated_to: 'u1' });
     });
     expect(merchApiMock.updateDesignJobRequest).toHaveBeenCalledWith('jr-1', {
       allocated_to: 'u1',
     });
     await waitFor(() => {
-      expect(merchApiMock.getDesignSheet).toHaveBeenCalledTimes(2);
+      expect(jobCapture.current?.jobRequests).toEqual([
+        expect.objectContaining({ id: 'jr-1', allocated_to: 'u1', allocated_to_name: 'Alice Rahman' }),
+      ]);
+    });
+  });
+
+  it('deletes a job request through the API and removes it from the sheet', async () => {
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: sheetWithFitAndJob });
+    merchApiMock.deleteDesignJobRequest.mockResolvedValue({ data: {} });
+    renderPage();
+    await screen.findByTestId('job-mock');
+    await act(async () => {
+      jobCapture.current?.onDeleteJobRequest?.('jr-1');
+    });
+    expect(merchApiMock.deleteDesignJobRequest).toHaveBeenCalledWith('jr-1');
+    await waitFor(() => {
+      expect(jobCapture.current?.jobRequests).toEqual([]);
     });
   });
 

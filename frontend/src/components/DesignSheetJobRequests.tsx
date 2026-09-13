@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import SpreadsheetGrid from './SpreadsheetGrid';
+import type { SpreadsheetColumn, SpreadsheetGridHandle, SpreadsheetMenuItem } from './SpreadsheetGrid';
 import type { DesignJobRequest } from '../api/client';
 
 export type JobRequestFormData = {
@@ -29,19 +31,122 @@ const STATUS_LABELS: Record<string, string> = {
   completed: 'Completed',
 };
 
+type JobRequestRow = {
+  id: string;
+  job_type_label: string;
+  required_by: string;
+  work_location: string;
+  no_of_garments: number | null;
+  allocated_to_name: string;
+  status_label: string;
+  notes: string;
+};
+
+function buildJobRequestColumns(users: UserOption[]): SpreadsheetColumn[] {
+  const allocateValues = Object.fromEntries([
+    ['', 'Unassigned'],
+    ...users.map((u) => [u.name, u.name]),
+  ]);
+  const jobTypeValues = Object.fromEntries(Object.entries(JOB_TYPE_LABELS).map(([, label]) => [label, label]));
+  const statusValues = Object.fromEntries(Object.entries(STATUS_LABELS).map(([, label]) => [label, label]));
+  return [
+    {
+      title: 'Job Type', field: 'job_type_label', width: 170, editor: 'select',
+      editorParams: { values: jobTypeValues },
+      headerFilter: true, headerFilterType: 'list',
+    },
+    {
+      title: 'Required By', field: 'required_by', width: 130, editor: 'input',
+      headerFilter: true, headerFilterType: 'input',
+    },
+    {
+      title: 'Work Location', field: 'work_location', width: 170, editor: 'input',
+      headerFilter: true, headerFilterType: 'input',
+    },
+    {
+      title: 'No. of Garments', field: 'no_of_garments', width: 110, hozAlign: 'right',
+      editor: 'number', bottomCalc: 'sum', headerFilter: true, headerFilterType: 'input',
+    },
+    {
+      title: 'Allocated To', field: 'allocated_to_name', width: 170, editor: 'select',
+      editorParams: { values: allocateValues },
+      headerFilter: true, headerFilterType: 'list',
+    },
+    {
+      title: 'Status', field: 'status_label', width: 130, editor: 'select',
+      editorParams: { values: statusValues },
+      headerFilter: true, headerFilterType: 'list',
+    },
+    {
+      title: 'Notes', field: 'notes', width: 220, editor: 'input',
+      headerFilter: true, headerFilterType: 'input',
+    },
+  ];
+}
+
+function toJobRequestRow(jr: DesignJobRequest): JobRequestRow {
+  return {
+    id: jr.id,
+    job_type_label: JOB_TYPE_LABELS[jr.job_type] ?? jr.job_type,
+    required_by: jr.required_by ?? '',
+    work_location: jr.work_location,
+    no_of_garments: jr.no_of_garments,
+    allocated_to_name: jr.allocated_to_name ?? '',
+    status_label: STATUS_LABELS[jr.status] ?? jr.status,
+    notes: jr.notes,
+  };
+}
+
 interface DesignSheetJobRequestsProps {
   jobRequests: DesignJobRequest[];
   users: UserOption[];
   onCreateJobRequest?: (data: JobRequestFormData) => void;
-  onAllocateUser?: (jobId: string, userId: string) => void;
+  onUpdateJobRequest?: (id: string, data: Record<string, unknown>) => void;
+  onDeleteJobRequest?: (id: string) => void;
+  loading?: boolean;
+}
+
+function buildJobRequestRowContextMenu(row: JobRequestRow, onDelete: (id: string) => void): SpreadsheetMenuItem[] {
+  return [
+    { label: 'Add New Job Request', action: undefined },
+    { label: 'Delete Job Request', action: () => onDelete(row.id) },
+  ];
+}
+
+function buildJobRequestHeaderMenu(column: unknown): SpreadsheetMenuItem[] {
+  const col = column as
+    | {
+        hide?: () => void;
+        getTable?: () => {
+          getColumns?: () => { getTitle?: () => string; toggle?: () => void; show?: () => void }[];
+        };
+      }
+    | undefined;
+  const columns = col?.getTable?.().getColumns?.() ?? [];
+  return [
+    { label: 'Hide Column', action: () => col?.hide?.() },
+    ...columns.map(
+      (c): SpreadsheetMenuItem => ({
+        label: `Toggle ${c.getTitle?.() ?? 'Column'}`,
+        action: () => c.toggle?.(),
+      }),
+    ),
+    {
+      label: 'Show All Columns',
+      action: () => columns.forEach((c) => c.show?.()),
+    },
+  ];
 }
 
 export default function DesignSheetJobRequests({
   jobRequests,
   users,
   onCreateJobRequest,
-  onAllocateUser,
+  onUpdateJobRequest,
+  onDeleteJobRequest,
+  loading = false,
 }: DesignSheetJobRequestsProps) {
+  const gridRef = useRef<SpreadsheetGridHandle>(null);
   const [showForm, setShowForm] = useState(false);
   const [jobType, setJobType] = useState('new_pattern');
   const [requiredBy, setRequiredBy] = useState('');
@@ -49,6 +154,8 @@ export default function DesignSheetJobRequests({
   const [garments, setGarments] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [notes, setNotes] = useState('');
+
+  const rows = jobRequests.map(toJobRequestRow);
 
   const submit = () => {
     onCreateJobRequest?.({
@@ -68,59 +175,84 @@ export default function DesignSheetJobRequests({
     setShowForm(false);
   };
 
+  const handleCellEdited = (field: string, value: unknown, row: Record<string, unknown>) => {
+    const id = typeof row.id === 'string' ? row.id : null;
+    if (!id) return;
+    if (field === 'allocated_to_name') {
+      const userId = users.find((u) => u.name === value)?.id ?? null;
+      onUpdateJobRequest?.(id, { allocated_to: userId });
+      return;
+    }
+    if (field === 'job_type_label') {
+      const jobKey =
+        Object.keys(JOB_TYPE_LABELS).find((k) => JOB_TYPE_LABELS[k] === value) ?? String(value ?? '');
+      onUpdateJobRequest?.(id, { job_type: jobKey });
+      return;
+    }
+    if (field === 'status_label') {
+      const statusKey =
+        Object.keys(STATUS_LABELS).find((k) => STATUS_LABELS[k] === value) ?? String(value ?? '');
+      onUpdateJobRequest?.(id, { status: statusKey });
+      return;
+    }
+    onUpdateJobRequest?.(id, { [field]: value });
+  };
+
   return (
-    <section className="bg-surface rounded-xl border border-border p-6">
+    <section data-testid="job-requests-section" className="bg-surface rounded-xl border border-border p-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-bold">Job Requests</h2>
-        <button
-          type="button"
-          onClick={() => setShowForm((v) => !v)}
-          className="px-3 py-1.5 rounded-lg bg-heading text-background text-sm font-medium hover:opacity-90"
-        >
-          {showForm ? 'Cancel' : '+ New Job Request'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => gridRef.current?.undo()}
+            className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            onClick={() => gridRef.current?.redo()}
+            className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+          >
+            Redo
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            className="px-3 py-1.5 rounded-lg bg-heading text-background text-sm font-medium hover:opacity-90"
+          >
+            {showForm ? 'Cancel' : '+ New Job Request'}
+          </button>
+        </div>
       </div>
 
-      {jobRequests.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="text-muted text-sm">No job requests yet.</p>
       ) : (
-        <div className="space-y-2">
-          {jobRequests.map((jr) => (
-            <div key={jr.id} className="flex flex-wrap items-center gap-3 text-sm border border-border rounded-lg p-3">
-              <span className="text-heading font-medium">{JOB_TYPE_LABELS[jr.job_type] ?? jr.job_type}</span>
-              <span className="text-muted">{jr.required_by}</span>
-              <span className="text-muted">{jr.work_location}</span>
-              <span className="text-muted">{jr.no_of_garments}</span>
-              {jr.allocated_to_name && <span className="text-badge-emerald">{jr.allocated_to_name}</span>}
-              <span
-                className={`px-2 py-0.5 rounded-full text-xs badge badge--${jr.status} ${
-                  jr.status === 'in_progress'
-                    ? 'bg-blue-500/20 text-blue-400'
-                    : jr.status === 'completed'
-                      ? 'bg-emerald-500/20 text-badge-emerald'
-                      : 'bg-surface-alt text-muted'
-                }`}
-              >
-                {STATUS_LABELS[jr.status] ?? jr.status}
-              </span>
-              <select
-                aria-label={`Allocate user for ${JOB_TYPE_LABELS[jr.job_type] ?? jr.job_type}`}
-                value={jr.allocated_to ?? ''}
-                onChange={(e) => {
-                  if (e.target.value !== '') onAllocateUser?.(jr.id, e.target.value);
-                }}
-                className="ml-auto rounded-md border border-border bg-input px-2 py-1 text-xs text-heading focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              >
-                <option value="">Allocate to...</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ))}
-        </div>
+        <SpreadsheetGrid
+          data={rows}
+          columns={buildJobRequestColumns(users)}
+          gridRef={gridRef}
+          toolbar
+          title="Job Requests"
+          exportable
+          onExport={() => gridRef.current?.downloadXlsx('job-requests.xlsx')}
+          printable
+          printTitle="Job Requests"
+          columnChooser
+          paginationSize={20}
+          history
+          loading={loading}
+          actionColumn
+          onDelete={(row) => {
+            const id = typeof row.id === 'string' ? row.id : null;
+            if (id) onDeleteJobRequest?.(id);
+          }}
+          onCellEdited={handleCellEdited}
+          rowContextMenu={(row) => buildJobRequestRowContextMenu(row as JobRequestRow, (id) => onDeleteJobRequest?.(id))}
+          headerMenu={(column) => buildJobRequestHeaderMenu(column)}
+        />
       )}
 
       {showForm && (

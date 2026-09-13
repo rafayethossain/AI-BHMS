@@ -1454,4 +1454,35 @@
       only — no model/view/migration touched). Also run against the dev DB: 5 sheets, 5 material rows
       each, live on `/design-sheets/:id`.
 
+69. **Fit Specs + Job Requests grids: full standard-grid behaviour (filter/add/edit/delete) on the
+    design sheet detail (A7 continuation; US-033 Fit Spec / US-034 Job Request)** - user request: the
+    remaining bespoke card sections on `/design-sheets/:id` should behave like the Material Breakdown
+    grid — full add/update/delete + standard grid chrome, while keeping the domain-specific activity
+    (fit-spec selection + photos + copy-from-base/copy-other; job allocate + status transitions).
+    No backend changes: `FitSpecificationViewSet` (`destroy` + `select` action) and
+    `DesignJobRequestViewSet` (full CRUD) were already shipped and covered by
+    `test_design_sheet_api.py` / `test_design_sheet_e2e_flows.py`.
+    - RED (frontend): `DesignSheetFitSpecs.test.tsx` + `DesignSheetJobRequests.test.tsx` rewritten to
+      assert the grid contract (columns + editors + header filters, row mapping with friendly labels,
+      cell-edit → PATCH, action-column delete, context-menu select/delete, standard chrome,
+      `gridRef` undo/redo/export) against the mocked `SpreadsheetGrid`. Failed first against the old
+      card components (**22 failed / 36 total**, verified via a corrective git-stash/run/pop).
+      `DesignSheetPage.test.tsx` extended: selection now hits the `select` action (clearing others —
+      previously a bare PATCH that could trip the unique-selected constraint); new update/delete
+      wiring for both fit specs and job requests. Failed first (props/callbacks absent).
+    - GREEN (frontend): `client.ts` gained `deleteFitSpecification`, `selectFitSpecification`,
+      `deleteDesignJobRequest`. `DesignSheetFitSpecs.tsx` → `SpreadsheetGrid` (Fit Spec / Selected ✓ /
+      Fit Date / Description / Notes / Photos) + saved gallery for the selected spec + copy pickers +
+      auto-numbered add form + undo/redo/export/print; `onSelectFitSpec` → `selectFitSpecification`.
+      `DesignSheetJobRequests.tsx` → `SpreadsheetGrid` (Job Type / Required By / Work Location / No. of
+      Garments=sum / Allocated To / Status / Notes) with name→id and label→key mapping inside the
+      component; `.DesignSheetPage.tsx` gains `handleFitSpecDelete`, `handleJobEdit` (maps
+      `allocated_to` name→id then optimistic local mirror of `allocated_to_name`) and `handleJobDelete`;
+      `handleFitSpecSelect` switched to the `select` action.
+    - Gates (GATE_A, frontend only — no backend file touched): targeted **3 files 63/63** (FitSpecs 23,
+      JobRequests 13, Page 27; net suite **371 → 387**); `tsc -b` exit 0; lint 0 errors (baseline
+      warnings); vitest full **387 passed / 387 (49 files)**. **VERIFIED.** Real-browser note: the
+      two new grids are the shared `SpreadsheetGrid`; a CDP pass is recommended when the devtools MCP
+      is up (Tabulator module binding cannot run under jsdom).
+
 ---

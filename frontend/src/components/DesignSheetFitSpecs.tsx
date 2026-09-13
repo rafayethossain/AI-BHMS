@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import SpreadsheetGrid from './SpreadsheetGrid';
+import type { SpreadsheetColumn, SpreadsheetGridHandle, SpreadsheetMenuItem } from './SpreadsheetGrid';
 import type { FitSpecification } from '../api/client';
 
 export type FitSpecFormData = {
@@ -17,31 +19,126 @@ export interface FitCopySourceOption {
   style_code: string;
 }
 
+type FitSpecRow = {
+  id: string;
+  fit_number: string;
+  selected: string;
+  fit_date: string;
+  description: string;
+  notes: string;
+  image_count: number;
+};
+
+function buildFitSpecColumns(): SpreadsheetColumn[] {
+  return [
+    {
+      title: 'Fit Spec', field: 'fit_number', width: 120, frozen: true,
+    },
+    {
+      title: 'Selected', field: 'selected', width: 90, headerFilter: true, headerFilterType: 'list',
+    },
+    {
+      title: 'Fit Date', field: 'fit_date', width: 130, editor: 'input',
+      headerFilter: true, headerFilterType: 'input',
+    },
+    {
+      title: 'Description', field: 'description', width: 320, editor: 'input',
+      headerFilter: true, headerFilterType: 'input',
+    },
+    {
+      title: 'Notes', field: 'notes', width: 260, editor: 'input',
+      headerFilter: true, headerFilterType: 'input',
+    },
+    {
+      title: 'Photos', field: 'image_count', width: 90, hozAlign: 'right',
+    },
+  ];
+}
+
+function toFitSpecRow(fs: FitSpecification): FitSpecRow {
+  return {
+    id: fs.id,
+    fit_number: fs.fit_number,
+    selected: fs.is_selected ? CHECK : '',
+    fit_date: fs.fit_date ?? '',
+    description: fs.description,
+    notes: fs.notes,
+    image_count: fs.images.length,
+  };
+}
+
 interface DesignSheetFitSpecsProps {
   fitSpecs: FitSpecification[];
   onCreateFitSpec?: (data: FitSpecFormData) => void;
   onSelectFitSpec?: (id: string) => void;
+  onUpdateFitSpec?: (id: string, data: Record<string, unknown>) => void;
+  onDeleteFitSpec?: (id: string) => void;
   onAddFitImage?: (fitSpecId: string, file: File) => void;
   onDeleteFitImage?: (imageId: string) => void;
   onReorderFitImage?: (imageId: string, newOrder: number) => void;
   onCopyFromBase?: (opts?: { include_annotations: boolean }) => void;
   onCopyFromOtherStyle?: (sourceSheetId: string) => void;
-  onUpdateFitSpec?: (id: string, data: Record<string, unknown>) => void;
   otherSheets?: FitCopySourceOption[];
+  loading?: boolean;
+}
+
+function buildFitSpecRowContextMenu(
+  row: FitSpecRow,
+  selected: boolean,
+  onSelect: (id: string) => void,
+  onDelete: (id: string) => void,
+): SpreadsheetMenuItem[] {
+  return [
+    { label: 'Add New Fit Spec', action: undefined },
+    {
+      label: selected ? 'Selected (marked in grid)' : 'Set as Selected',
+      disabled: selected,
+      action: () => onSelect(row.id),
+    },
+    { label: 'Delete Fit Spec', action: () => onDelete(row.id) },
+  ];
+}
+
+function buildFitSpecHeaderMenu(column: unknown): SpreadsheetMenuItem[] {
+  const col = column as
+    | {
+        hide?: () => void;
+        getTable?: () => {
+          getColumns?: () => { getTitle?: () => string; toggle?: () => void; show?: () => void }[];
+        };
+      }
+    | undefined;
+  const columns = col?.getTable?.().getColumns?.() ?? [];
+  return [
+    { label: 'Hide Column', action: () => col?.hide?.() },
+    ...columns.map(
+      (c): SpreadsheetMenuItem => ({
+        label: `Toggle ${c.getTitle?.() ?? 'Column'}`,
+        action: () => c.toggle?.(),
+      }),
+    ),
+    {
+      label: 'Show All Columns',
+      action: () => columns.forEach((c) => c.show?.()),
+    },
+  ];
 }
 
 export default function DesignSheetFitSpecs({
   fitSpecs,
   onCreateFitSpec,
   onSelectFitSpec,
+  onUpdateFitSpec,
+  onDeleteFitSpec,
   onAddFitImage,
   onDeleteFitImage,
   onReorderFitImage,
   onCopyFromBase,
   onCopyFromOtherStyle,
-  onUpdateFitSpec,
   otherSheets = [],
+  loading = false,
 }: DesignSheetFitSpecsProps) {
+  const gridRef = useRef<SpreadsheetGridHandle>(null);
   const [showForm, setShowForm] = useState(false);
   const [showCopyPicker, setShowCopyPicker] = useState(false);
   const [showBaseCopyConfirm, setShowBaseCopyConfirm] = useState(false);
@@ -53,6 +150,7 @@ export default function DesignSheetFitSpecs({
 
   const nextLabel = FIT_LABELS[fitSpecs.length] ?? `FIT ${fitSpecs.length + 1}`;
   const selectedSpec = fitSpecs.find((fs) => fs.is_selected);
+  const rows = fitSpecs.map(toFitSpecRow);
   const selectedImages = selectedSpec
     ? [...selectedSpec.images].sort((a, b) => a.order - b.order)
     : [];
@@ -78,10 +176,24 @@ export default function DesignSheetFitSpecs({
   };
 
   return (
-    <section className="bg-surface rounded-xl border border-border p-6">
+    <section data-testid="fit-spec-section" className="bg-surface rounded-xl border border-border p-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-bold">Fit Specs</h2>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => gridRef.current?.undo()}
+            className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            onClick={() => gridRef.current?.redo()}
+            className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+          >
+            Redo
+          </button>
           <button
             type="button"
             onClick={() => setShowCopyPicker((v) => !v)}
@@ -159,38 +271,43 @@ export default function DesignSheetFitSpecs({
         </div>
       )}
 
-      {fitSpecs.length === 0 ? (
-        <p className="text-muted text-sm">No fit specs yet.</p>
+      {rows.length === 0 ? (
+        <p className="text-muted text-sm mb-4">No fit specs yet.</p>
       ) : (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {fitSpecs.map((fs) => {
-            const selected = Boolean(fs.is_selected);
-            return (
-              <button
-                key={fs.id}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => onSelectFitSpec?.(fs.id)}
-                className={
-                  selected
-                    ? 'px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-500/20 text-badge-emerald border border-emerald-500/40'
-                    : 'px-4 py-2 rounded-lg text-sm font-medium bg-surface-alt text-muted border border-border hover:border-emerald-500/40'
-                }
-              >
-                {fs.fit_number}
-                {selected && (
-                  <span className="ml-1.5" aria-label="selected">
-                    {CHECK}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <SpreadsheetGrid
+          data={rows}
+          columns={buildFitSpecColumns()}
+          gridRef={gridRef}
+          toolbar
+          title="Fit Specs"
+          exportable
+          onExport={() => gridRef.current?.downloadXlsx('fit-specs.xlsx')}
+          printable
+          printTitle="Fit Specs"
+          columnChooser
+          paginationSize={20}
+          history
+          selectableRows={1}
+          loading={loading}
+          actionColumn
+          onDelete={(row) => {
+            const id = typeof row.id === 'string' ? row.id : null;
+            if (id) onDeleteFitSpec?.(id);
+          }}
+          onCellEdited={(field, value, row) => {
+            const id = typeof row.id === 'string' ? row.id : null;
+            if (id) onUpdateFitSpec?.(id, { [field]: value });
+          }}
+          rowContextMenu={(row) => {
+            const specRow = row as FitSpecRow;
+            return buildFitSpecRowContextMenu(specRow, specRow.selected === CHECK, (id) => onSelectFitSpec?.(id), (id) => onDeleteFitSpec?.(id));
+          }}
+          headerMenu={(column) => buildFitSpecHeaderMenu(column)}
+        />
       )}
 
       {selectedSpec && (
-        <div className="mb-4 rounded-lg border border-border p-4">
+        <div className="mt-4 rounded-lg border border-border p-4">
           <div className="mb-3 flex items-end gap-2">
             <label className="block flex-1 text-sm">
               Fit Description
@@ -279,7 +396,7 @@ export default function DesignSheetFitSpecs({
       )}
 
       {showForm && (
-        <div className="space-y-3 rounded-lg border border-border p-4">
+        <div className="mt-4 space-y-3 rounded-lg border border-border p-4">
           <div className="flex items-center gap-2 text-sm">
             <span className="px-2 py-0.5 rounded bg-surface-alt font-mono text-heading">{nextLabel}</span>
             <span className="text-muted">auto-numbered</span>

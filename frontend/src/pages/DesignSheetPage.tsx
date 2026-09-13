@@ -175,9 +175,23 @@ export default function DesignSheetPage() {
   const handleFitSpecSelect = (fitSpecId: string) => {
     setError(null);
     merchApi
-      .updateFitSpecification(fitSpecId, { is_selected: true })
+      .selectFitSpecification(fitSpecId)
       .then(() => refreshSheet())
       .catch(() => setError('Failed to select fit spec'));
+  };
+
+  const handleFitSpecDelete = (fitSpecId: string) => {
+    setError(null);
+    merchApi
+      .deleteFitSpecification(fitSpecId)
+      .then(() =>
+        setSheet((prev) =>
+          prev
+            ? { ...prev, fit_specs: prev.fit_specs.filter((s) => s.id !== fitSpecId) }
+            : prev,
+        ),
+      )
+      .catch(() => setError('Failed to delete fit spec'));
   };
 
   const handleFitSpecUpdate = (fitSpecId: string, data: Record<string, unknown>) => {
@@ -242,12 +256,48 @@ export default function DesignSheetPage() {
       .catch(() => setError('Failed to create job request'));
   };
 
-  const handleJobAllocate = (jobId: string, userId: string) => {
+  const handleJobEdit = (jobId: string, patch: Record<string, unknown>) => {
+    setError(null);
+    const value = patch.allocated_to;
+    const allocated_to_name =
+      typeof value === 'string'
+        ? (userOptions.find((u) => u.id === value)?.name ?? null)
+        : null;
+    merchApi
+      .updateDesignJobRequest(jobId, patch)
+      .then(() =>
+        setSheet((prev) =>
+          prev
+            ? {
+                ...prev,
+                job_requests: prev.job_requests.map((j) =>
+                  j.id === jobId
+                    ? {
+                        ...j,
+                        ...patch,
+                        ...(patch.allocated_to !== undefined ? { allocated_to_name } : {}),
+                      }
+                    : j,
+                ),
+              }
+            : prev,
+        ),
+      )
+      .catch(() => setError('Failed to update job request'));
+  };
+
+  const handleJobDelete = (jobId: string) => {
     setError(null);
     merchApi
-      .updateDesignJobRequest(jobId, { allocated_to: userId })
-      .then(() => refreshSheet())
-      .catch(() => setError('Failed to allocate user'));
+      .deleteDesignJobRequest(jobId)
+      .then(() =>
+        setSheet((prev) =>
+          prev
+            ? { ...prev, job_requests: prev.job_requests.filter((j) => j.id !== jobId) }
+            : prev,
+        ),
+      )
+      .catch(() => setError('Failed to delete job request'));
   };
 
   const handleDesignImageUpload = (data: DesignImagesUploadData) => {
@@ -394,12 +444,13 @@ export default function DesignSheetPage() {
                     fitSpecs={sheet.fit_specs}
                     onCreateFitSpec={handleFitSpecCreate}
                     onSelectFitSpec={handleFitSpecSelect}
+                    onUpdateFitSpec={handleFitSpecUpdate}
+                    onDeleteFitSpec={handleFitSpecDelete}
                     onAddFitImage={handleFitImageAdd}
                     onDeleteFitImage={handleFitImageDelete}
                     onReorderFitImage={handleFitImageReorder}
                     onCopyFromBase={handleFitSpecCopyFromBase}
                     onCopyFromOtherStyle={handleFitSpecCopyFromOtherStyle}
-                    onUpdateFitSpec={handleFitSpecUpdate}
                     otherSheets={fitCopySources.filter((s) => s.id !== sheet.id)}
                   />],
                 ['images',
@@ -418,7 +469,8 @@ export default function DesignSheetPage() {
                     jobRequests={sheet.job_requests}
                     users={userOptions}
                     onCreateJobRequest={handleJobCreate}
-                    onAllocateUser={handleJobAllocate}
+                    onUpdateJobRequest={handleJobEdit}
+                    onDeleteJobRequest={handleJobDelete}
                   />],
               ]);
               return blockKeys.map((key, index) => {
