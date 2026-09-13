@@ -285,3 +285,32 @@ describe('DesignSheetJobRequests create form', () => {
     });
   });
 });
+
+describe('DesignSheetJobRequests button contrast tokens', () => {
+  beforeEach(() => {
+    gridCapture.current = null;
+    vi.clearAllMocks();
+  });
+
+  it('uses the site primary button token with white text on action buttons', () => {
+    render(<DesignSheetJobRequests jobRequests={jobs} users={users} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /New Job Request/i }));
+    const cancel = screen.getByRole('button', { name: /Cancel/i });
+    expect(cancel.className).toMatch(/bg-btn-primary text-white/);
+    expect(cancel.className).not.toContain('bg-heading');
+    expect(cancel.className).not.toContain('text-background');
+
+    const create = screen.getByRole('button', { name: /Create Job/i });
+    expect(create.className).toMatch(/bg-btn-primary text-white/);
+  });
+
+  it('uses the readable heading text token on secondary buttons', () => {
+    render(<DesignSheetJobRequests jobRequests={jobs} users={users} />);
+    for (const name of ['Undo', 'Redo']) {
+      const btn = screen.getByRole('button', { name });
+      expect(btn.className).toContain('text-heading');
+      expect(btn.className).not.toContain('text-muted');
+    }
+  });
+});

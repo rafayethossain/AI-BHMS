@@ -406,7 +406,7 @@ export default function DesignSheetPage() {
             <div className="flex justify-end">
               <Link
                 to={`/design-sheets/${sheet.id}/print`}
-                className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+                className="px-3 py-1.5 rounded-lg bg-surface-alt text-heading text-sm font-medium border border-border hover:border-emerald-500/40"
               >
                 Print Design Sheet
               </Link>
@@ -485,7 +485,7 @@ export default function DesignSheetPage() {
                         disabled={index === 0}
                         aria-label={`Move ${key} section up`}
                         onClick={() => handleMoveBlock(key, 'up')}
-                        className="px-2 py-1 rounded-md text-xs text-muted border border-border hover:border-emerald-500/40 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="px-2 py-1 rounded-md text-xs text-heading border border-border hover:border-emerald-500/40 disabled:opacity-30 disabled:cursor-not-allowed"
                       >
                         Move up
                       </button>
@@ -495,7 +495,7 @@ export default function DesignSheetPage() {
                         disabled={index === blockKeys.length - 1}
                         aria-label={`Move ${key} section down`}
                         onClick={() => handleMoveBlock(key, 'down')}
-                        className="px-2 py-1 rounded-md text-xs text-muted border border-border hover:border-emerald-500/40 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="px-2 py-1 rounded-md text-xs text-heading border border-border hover:border-emerald-500/40 disabled:opacity-30 disabled:cursor-not-allowed"
                       >
                         Move down
                       </button>

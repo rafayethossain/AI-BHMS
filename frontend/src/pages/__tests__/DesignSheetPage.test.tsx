@@ -912,4 +912,44 @@ describe('DesignSheetPage block layout order (design builder Phase 1)', () => {
   });
 });
 
+describe('DesignSheetPage button contrast tokens', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fitSpecCapture.current = null;
+    jobCapture.current = null;
+    setupApiMock.getVendors.mockResolvedValue({
+      data: { count: vendorOptions.length, results: vendorOptions },
+    });
+    usersApiMock.getUsers.mockResolvedValue({
+      data: {
+        count: 2,
+        results: [
+          { id: 'u1', full_name: 'Alice Rahman', username: 'alice', first_name: 'Alice', last_name: 'Rahman' },
+          { id: 'u2', full_name: 'Bob Chowdhury', username: 'bob', first_name: 'Bob', last_name: 'Chowdhury' },
+        ],
+      },
+    });
+    merchApiMock.getDesignSheet.mockResolvedValue({ data: baseSheet });
+  });
+
+  it('uses readable heading text on the Print Design Sheet link', async () => {
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    const link = screen.getByRole('link', { name: 'Print Design Sheet' });
+    expect(link.className).toContain('text-heading');
+    expect(link.className).not.toContain('text-muted');
+  });
+
+  it('uses readable heading text on the block move buttons', async () => {
+    renderPage();
+    await screen.findByTestId('fitspec-mock');
+    const moveUp = screen.getByTestId('move-up-header');
+    const moveDown = screen.getByTestId('move-down-header');
+    expect(moveUp.className).toContain('text-heading');
+    expect(moveDown.className).toContain('text-heading');
+    expect(moveUp.className).not.toContain('text-muted');
+    expect(moveDown.className).not.toContain('text-muted');
+  });
+});
+
 

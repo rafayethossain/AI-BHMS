@@ -183,35 +183,35 @@ export default function DesignSheetFitSpecs({
           <button
             type="button"
             onClick={() => gridRef.current?.undo()}
-            className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+            className="px-3 py-1.5 rounded-lg bg-surface-alt text-heading text-sm font-medium border border-border hover:border-emerald-500/40"
           >
             Undo
           </button>
           <button
             type="button"
             onClick={() => gridRef.current?.redo()}
-            className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+            className="px-3 py-1.5 rounded-lg bg-surface-alt text-heading text-sm font-medium border border-border hover:border-emerald-500/40"
           >
             Redo
           </button>
           <button
             type="button"
             onClick={() => setShowCopyPicker((v) => !v)}
-            className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+            className="px-3 py-1.5 rounded-lg bg-surface-alt text-heading text-sm font-medium border border-border hover:border-emerald-500/40"
           >
             Copy from Another Style
           </button>
           <button
             type="button"
             onClick={() => setShowBaseCopyConfirm((v) => !v)}
-            className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+            className="px-3 py-1.5 rounded-lg bg-surface-alt text-heading text-sm font-medium border border-border hover:border-emerald-500/40"
           >
             Copy from Base
           </button>
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
-            className="px-3 py-1.5 rounded-lg bg-heading text-background text-sm font-medium hover:opacity-90"
+            className="px-3 py-1.5 rounded-lg bg-btn-primary text-white text-sm font-medium hover:opacity-90"
           >
             {showForm ? 'Cancel' : '+ New Fit Spec'}
           </button>
@@ -263,7 +263,7 @@ export default function DesignSheetFitSpecs({
                 setShowBaseCopyConfirm(false);
                 setIncludeAnnotations(false);
               }}
-              className="px-3 py-1.5 rounded-lg bg-heading text-background text-sm font-medium hover:opacity-90"
+              className="px-3 py-1.5 rounded-lg bg-btn-primary text-white text-sm font-medium hover:opacity-90"
             >
               Confirm Base Copy
             </button>
@@ -327,14 +327,14 @@ export default function DesignSheetFitSpecs({
                 onUpdateFitSpec?.(selectedSpec.id, { description: descriptionDraft });
                 setDescriptionDraft(null);
               }}
-              className="px-3 py-1.5 rounded-lg bg-heading text-background text-sm font-medium hover:opacity-90"
+              className="px-3 py-1.5 rounded-lg bg-btn-primary text-white text-sm font-medium hover:opacity-90"
             >
               Save Description
             </button>
           </div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-heading">Photos</h3>
-            <label className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40 cursor-pointer">
+            <label className="px-3 py-1.5 rounded-lg bg-surface-alt text-heading text-sm font-medium border border-border hover:border-emerald-500/40 cursor-pointer">
               + Add Photo
               <input
                 type="file"
@@ -432,7 +432,7 @@ export default function DesignSheetFitSpecs({
             <button
               type="button"
               onClick={submit}
-              className="px-3 py-1.5 rounded-lg bg-heading text-background text-sm font-medium hover:opacity-90"
+              className="px-3 py-1.5 rounded-lg bg-btn-primary text-white text-sm font-medium hover:opacity-90"
             >
               Add Fit Spec
             </button>

@@ -126,3 +126,25 @@ describe('DesignSheetImages', () => {
     expect(onDelete).toHaveBeenCalledWith('img-3');
   });
 });
+
+describe('DesignSheetImages button contrast tokens', () => {
+  it('uses the site primary button token with white text on the add/cancel toggle', () => {
+    render(<DesignSheetImages images={images} styleId="st-1" />);
+    const add = screen.getByTestId('design-images-add');
+    expect(add.className).toMatch(/bg-btn-primary text-white/);
+    expect(add.className).not.toContain('bg-heading');
+    expect(add.className).not.toContain('text-background');
+    fireEvent.click(add);
+    expect(screen.getByTestId('design-images-add').textContent).toContain('Cancel');
+    expect(screen.getByTestId('design-images-add').className).toMatch(/bg-btn-primary text-white/);
+  });
+
+  it('uses the readable heading text token on the view toggle buttons', () => {
+    render(<DesignSheetImages images={images} />);
+    for (const id of ['design-images-view-image', 'design-images-view-list']) {
+      const btn = screen.getByTestId(id);
+      expect(btn.className).toContain('text-heading');
+      expect(btn.className).not.toContain('text-muted');
+    }
+  });
+});

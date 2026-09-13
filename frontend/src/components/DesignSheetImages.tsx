@@ -75,7 +75,7 @@ export default function DesignSheetImages({
             data-testid="design-images-view-image"
             aria-pressed={view === 'image'}
             onClick={() => setView('image')}
-            className="px-2 py-1 rounded text-sm font-medium bg-surface-alt text-muted border border-border hover:border-emerald-500/40"
+            className="px-2 py-1 rounded text-sm font-medium bg-surface-alt text-heading border border-border hover:border-emerald-500/40"
           >
             Image
           </button>
@@ -84,7 +84,7 @@ export default function DesignSheetImages({
             data-testid="design-images-view-list"
             aria-pressed={view === 'list'}
             onClick={() => setView('list')}
-            className="px-2 py-1 rounded text-sm font-medium bg-surface-alt text-muted border border-border hover:border-emerald-500/40"
+            className="px-2 py-1 rounded text-sm font-medium bg-surface-alt text-heading border border-border hover:border-emerald-500/40"
           >
             List
           </button>
@@ -92,7 +92,7 @@ export default function DesignSheetImages({
             type="button"
             data-testid="design-images-add"
             onClick={() => setShowUpload((v) => !v)}
-            className="px-3 py-1.5 rounded-lg bg-heading text-background text-sm font-medium hover:opacity-90"
+            className="px-3 py-1.5 rounded-lg bg-btn-primary text-white text-sm font-medium hover:opacity-90"
           >
             {showUpload ? 'Cancel' : '+ Add Image'}
           </button>

@@ -361,3 +361,42 @@ describe('DesignSheetFitSpecs description editing', () => {
     expect(onUpdateFitSpec).not.toHaveBeenCalled();
   });
 });
+
+describe('DesignSheetFitSpecs button contrast tokens', () => {
+  beforeEach(() => {
+    gridCapture.current = null;
+    vi.clearAllMocks();
+  });
+
+  it('uses the site primary button token with white text on action buttons', () => {
+    render(<DesignSheetFitSpecs fitSpecs={specs} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /New Fit Spec/i }));
+    const cancel = screen.getByRole('button', { name: /Cancel/i });
+    expect(cancel.className).toMatch(/bg-btn-primary text-white/);
+    expect(cancel.className).not.toContain('bg-heading');
+    expect(cancel.className).not.toContain('text-background');
+
+    expect(screen.getByRole('button', { name: /Save Description/i }).className).toMatch(/bg-btn-primary text-white/);
+    expect(screen.getByRole('button', { name: /Add Fit Spec/i }).className).toMatch(/bg-btn-primary text-white/);
+
+    fireEvent.click(screen.getByRole('button', { name: /Copy from Base/i }));
+    expect(screen.getByRole('button', { name: /Confirm Base Copy/i }).className).toMatch(/bg-btn-primary text-white/);
+  });
+
+  it('uses the readable heading text token on secondary buttons', () => {
+    render(<DesignSheetFitSpecs fitSpecs={specs} />);
+    const secondaryButtons = [
+      screen.getByRole('button', { name: 'Undo' }),
+      screen.getByRole('button', { name: 'Redo' }),
+      screen.getByRole('button', { name: /Copy from Another Style/i }),
+      screen.getByRole('button', { name: /Copy from Base/i }),
+    ];
+    for (const btn of secondaryButtons) {
+      expect(btn.className).toContain('text-heading');
+      expect(btn.className).not.toContain('text-muted');
+    }
+    expect(screen.getByText('+ Add Photo').className).toContain('text-heading');
+    expect(screen.getByText('+ Add Photo').className).not.toContain('text-muted');
+  });
+});

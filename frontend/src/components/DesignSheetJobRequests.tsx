@@ -206,21 +206,21 @@ export default function DesignSheetJobRequests({
           <button
             type="button"
             onClick={() => gridRef.current?.undo()}
-            className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+            className="px-3 py-1.5 rounded-lg bg-surface-alt text-heading text-sm font-medium border border-border hover:border-emerald-500/40"
           >
             Undo
           </button>
           <button
             type="button"
             onClick={() => gridRef.current?.redo()}
-            className="px-3 py-1.5 rounded-lg bg-surface-alt text-muted text-sm font-medium border border-border hover:border-emerald-500/40"
+            className="px-3 py-1.5 rounded-lg bg-surface-alt text-heading text-sm font-medium border border-border hover:border-emerald-500/40"
           >
             Redo
           </button>
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
-            className="px-3 py-1.5 rounded-lg bg-heading text-background text-sm font-medium hover:opacity-90"
+            className="px-3 py-1.5 rounded-lg bg-btn-primary text-white text-sm font-medium hover:opacity-90"
           >
             {showForm ? 'Cancel' : '+ New Job Request'}
           </button>
@@ -329,7 +329,7 @@ export default function DesignSheetJobRequests({
             <button
               type="button"
               onClick={submit}
-              className="px-3 py-1.5 rounded-lg bg-heading text-background text-sm font-medium hover:opacity-90"
+              className="px-3 py-1.5 rounded-lg bg-btn-primary text-white text-sm font-medium hover:opacity-90"
             >
               Create Job
             </button>
