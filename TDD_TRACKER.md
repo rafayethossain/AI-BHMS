@@ -1485,4 +1485,27 @@
       two new grids are the shared `SpreadsheetGrid`; a CDP pass is recommended when the devtools MCP
       is up (Tabulator module binding cannot run under jsdom).
 
+70. **Design-sheet demo seed: Fit Specs + Job Requests rows (slice #68 continuation; US-033 Fit
+    Spec / US-034 Job Request)** - user request: seed demo fit specs and job requests so the two
+    grids shipped in #69 render real rows on `/design-sheets/:id`.
+    - RED (backend): `tests/unit/test_seed_design_sheet_demo.py` +5 tests - every sheet's detail
+      response exposes >= 2 fit specs (fit_number/fit_date/description set, exactly ONE
+      `is_selected`, unique reference labels incl. DEV SPEC + 1ST FIT); each sheet has >= 1 job
+      request with a valid job_type/status and non-null required_by; job rows serialize
+      `job_type`/`required_by`/`work_location`/`no_of_garments`/`allocated_to`/`allocated_to_name`/
+      `status`; re-running stays idempotent for fit+job state. Failed first (**5/9 red** - command
+      created no fit specs and no job requests).
+    - GREEN (backend): `seed_design_sheet_demo` extended - `DEMO_FIT_SPECS` (DEV SPEC -> 1ST/2ND/3RD
+      FIT stages per sheet, one `selected` flag each) + `DEMO_JOB_REQUESTS` (new_pattern/tech_sample/
+      fit_sample/mini_marker/3d with due date, work location, garment count, status, notes;
+      allocation rotates over active tenant users). Fit specs are `get_or_create`-keyed on
+      `(tenant, sheet, fit_number)` then a bulk `is_selected=False` clear + a single set preserves
+      the unique-selected constraint on re-run (never set `is_selected` in `get_or_create` defaults);
+      job requests keyed on `(tenant, sheet, job_type, required_by)` so re-run updates in place.
+      Targeted **9/9**.
+    - Gates (GATE_A, backend only - no model/view/migration touched): targeted **9/9** + adjacency
+      **45/45** (`test_design_sheet_api.py` + `test_design_sheet_e2e_flows.py`; fits/jobs are nested
+      through the same detail serializer). Re-ran against the dev DB: 5 sheets now carry 2-4 fit
+      specs + 2-3 job requests each. **VERIFIED.**
+
 ---

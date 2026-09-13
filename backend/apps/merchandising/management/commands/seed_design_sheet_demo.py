@@ -1,5 +1,6 @@
 """
-Seed 5 demo design sheets with populated design information and materials.
+Seed 5 demo design sheets with populated design information, materials,
+fit specs and job requests.
 
 Each design sheet is backed by Style -> StyleVersion (active) -> StyleTechPack
 -> DesignSheet, plus an active BOM carrying the Material Breakdown rows so the
@@ -11,9 +12,16 @@ design-sheet detail page renders:
    issue-date / risk-date / pattern-request-date / note).
 2. **Material Breakdown** (material block) - ``BOMItem`` rows surfaced as
    ``material_items`` in grid field names.
+3. **Fit Specs** - ``FitSpecification`` stages along the reference fit label
+   sequence (DEV SPEC / 1ST FIT / 2ND FIT / 3RD FIT), rotating exactly one
+   selected per sheet so the unique-selected constraint holds.
+4. **Job Requests** - ``DesignJobRequest`` rows (patterns / samples / 3D) with
+   a due date, work location, status, notes and a rotating allocation to
+   active tenant users.
 
 Idempotent: rows are keyed by style number / tech-pack number / BOM version /
-item name, so re-running updates in place instead of duplicating.
+item name / fit stage / job type+due date, so re-running updates in place
+instead of duplicating.
 
 Usage: ``python manage.py seed_design_sheet_demo [--tenant <slug>]``
 """
@@ -24,13 +32,16 @@ from django.core.management.base import BaseCommand
 from apps.merchandising.models import (
     BOM,
     BOMItem,
+    DesignJobRequest,
     DesignSheet,
+    FitSpecification,
     Style,
     StyleTechPack,
     StyleVersion,
 )
 from apps.setup.models import Buyer, UOM, Vendor
 from apps.tenants.models import Tenant
+from apps.users.models import User
 
 
 DEMO_DESIGNS = [
@@ -226,9 +237,101 @@ DEMO_DESIGNS = [
     },
 ]
 
+DEMO_FIT_SPECS = {
+    "DSD-1001": [
+        {"fit_number": "DEV SPEC", "fit_date": "2022-03-25",
+         "description": "Initial dev sample from block 59073T, zip front pocket.",
+         "notes": "Check hem allowance and pocket zip length.", "selected": True},
+        {"fit_number": "1ST FIT", "fit_date": "2022-04-18",
+         "description": "1st fit after front pocket pattern changes.",
+         "notes": "Re-check seat rise and thigh ease.", "selected": False},
+    ],
+    "DSD-1002": [
+        {"fit_number": "DEV SPEC", "fit_date": "2024-01-22",
+         "description": "Dev spec for classic crew neck tee.",
+         "notes": "Rib collar spec updated per buyer comment.", "selected": False},
+        {"fit_number": "1ST FIT", "fit_date": "2024-02-15",
+         "description": "1st fit sample reviewed.", "notes": "Shoulder drop OK.", "selected": False},
+        {"fit_number": "2ND FIT", "fit_date": "2024-03-10",
+         "description": "2nd fit with updated rib collar.", "notes": "Approved for bulk.", "selected": False},
+        {"fit_number": "3RD FIT", "fit_date": "2024-03-28",
+         "description": "3rd fit in production colours.", "notes": "PP fit - final sign off.", "selected": True},
+    ],
+    "DSD-1003": [
+        {"fit_number": "DEV SPEC", "fit_date": "2025-06-10",
+         "description": "Dev spec for performance polo, flat knit collar.",
+         "notes": "Placket button spacing to verify.", "selected": False},
+        {"fit_number": "1ST FIT", "fit_date": "2025-07-01",
+         "description": "1st fit review.", "notes": "Reduce hem side slits by 1cm.", "selected": True},
+        {"fit_number": "2ND FIT", "fit_date": "2025-07-22",
+         "description": "2nd fit after side slit adjustment.",
+         "notes": "Awaiting collar colourway.", "selected": False},
+    ],
+    "DSD-1004": [
+        {"fit_number": "DEV SPEC", "fit_date": "2025-03-15",
+         "description": "Dev spec for windbreaker shell.", "notes": "DWR finish check.", "selected": False},
+        {"fit_number": "1ST FIT", "fit_date": "2025-04-02",
+         "description": "1st fit rejected by buying team.",
+         "notes": "Re-issue after re-submit.", "selected": True},
+    ],
+    "DSD-1005": [
+        {"fit_number": "DEV SPEC", "fit_date": "2025-08-25",
+         "description": "Dev spec awaiting stripe colourways.",
+         "notes": "Stripe alignment to match body.", "selected": True},
+        {"fit_number": "1ST FIT", "fit_date": "2025-09-20",
+         "description": "1st fit planned after colourway confirmation.", "notes": "", "selected": False},
+    ],
+}
+
+DEMO_JOB_REQUESTS = {
+    "DSD-1001": [
+        {"job_type": "new_pattern", "required_by": "2026-09-25", "work_location": "Pattern Room 2",
+         "no_of_garments": 1, "status": "in_progress",
+         "notes": "Full pattern set from 59073T block."},
+        {"job_type": "tech_sample", "required_by": "2026-10-09", "work_location": "Sewing Bay A",
+         "no_of_garments": 2, "status": "pending",
+         "notes": "Submit dev sample in Black."},
+    ],
+    "DSD-1002": [
+        {"job_type": "fit_sample", "required_by": "2026-09-05", "work_location": "Fitting Room",
+         "no_of_garments": 1, "status": "completed",
+         "notes": "Bulk fit sample reviewed and signed off."},
+        {"job_type": "3d", "required_by": "2026-09-10", "work_location": "",
+         "no_of_garments": 1, "status": "completed",
+         "notes": "3D render approved for buyer."},
+        {"job_type": "mini_marker", "required_by": "2026-10-01", "work_location": "Marker Office",
+         "no_of_garments": 1, "status": "in_progress",
+         "notes": "Mini marker for 3% fabric saving."},
+    ],
+    "DSD-1003": [
+        {"job_type": "new_pattern", "required_by": "2026-09-20", "work_location": "Pattern Room 1",
+         "no_of_garments": 1, "status": "in_progress",
+         "notes": "Recut pattern from 59074T."},
+        {"job_type": "3d", "required_by": "2026-10-08", "work_location": "",
+         "no_of_garments": 1, "status": "pending",
+         "notes": "3D for buyer review."},
+    ],
+    "DSD-1004": [
+        {"job_type": "tech_sample", "required_by": "2026-08-28", "work_location": "Sewing Bay A",
+         "no_of_garments": 2, "status": "completed",
+         "notes": "Rejected - revise DWR finish."},
+        {"job_type": "fit_sample", "required_by": "2026-09-22", "work_location": "Fitting Room",
+         "no_of_garments": 1, "status": "in_progress",
+         "notes": "Refit on revised shell."},
+    ],
+    "DSD-1005": [
+        {"job_type": "new_pattern", "required_by": "2026-09-28", "work_location": "Pattern Room 2",
+         "no_of_garments": 1, "status": "pending",
+         "notes": "Waiting stripe colourways confirmation."},
+        {"job_type": "mini_marker", "required_by": "2026-10-15", "work_location": "Marker Office",
+         "no_of_garments": 1, "status": "pending",
+         "notes": "Marker once stripe confirmed."},
+    ],
+}
+
 
 class Command(BaseCommand):
-    help = "Seed demo design sheets with populated design information + material breakdown"
+    help = "Seed demo design sheets with design info, materials, fit specs and job requests"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -344,13 +447,86 @@ class Command(BaseCommand):
             sheet.status = design["sheet_status"]
             sheet.save(update_fields=["status"])
 
+            active_users = list(
+                User.objects.filter(tenant=tenant, status="active").order_by("id")
+            )
+
+            selected_fit_number = next(
+                (
+                    spec["fit_number"]
+                    for spec in DEMO_FIT_SPECS.get(design["number"], [])
+                    if spec["selected"]
+                ),
+                None,
+            )
+            fit_spec_count = 0
+            for spec in DEMO_FIT_SPECS.get(design["number"], []):
+                fit, _ = FitSpecification.objects.get_or_create(
+                    tenant=tenant, design_sheet=sheet,
+                    fit_number=spec["fit_number"],
+                    defaults={
+                        "fit_date": spec["fit_date"],
+                        "description": spec["description"],
+                        "notes": spec.get("notes", ""),
+                    },
+                )
+                fit.fit_date = spec["fit_date"]
+                fit.description = spec["description"]
+                fit.notes = spec.get("notes", "")
+                fit.save(update_fields=["fit_date", "description", "notes"])
+                fit_spec_count += 1
+
+            FitSpecification.objects.filter(
+                tenant=tenant, design_sheet=sheet
+            ).update(is_selected=False)
+            if selected_fit_number:
+                FitSpecification.objects.filter(
+                    tenant=tenant, design_sheet=sheet,
+                    fit_number=selected_fit_number,
+                ).update(is_selected=True)
+
+            job_request_count = 0
+            for index, job in enumerate(
+                DEMO_JOB_REQUESTS.get(design["number"], [])
+            ):
+                allocated = (
+                    active_users[index % len(active_users)]
+                    if active_users
+                    else None
+                )
+                request, _ = DesignJobRequest.objects.get_or_create(
+                    tenant=tenant, design_sheet=sheet,
+                    job_type=job["job_type"], required_by=job["required_by"],
+                    defaults={
+                        "work_location": job.get("work_location", ""),
+                        "no_of_garments": job.get("no_of_garments", 1),
+                        "allocated_to": allocated,
+                        "notes": job.get("notes", ""),
+                        "status": job.get(
+                            "status", DesignJobRequest.Status.PENDING
+                        ),
+                    },
+                )
+                request.work_location = job.get("work_location", "")
+                request.no_of_garments = job.get("no_of_garments", 1)
+                request.allocated_to = allocated
+                request.notes = job.get("notes", "")
+                request.status = job.get("status", DesignJobRequest.Status.PENDING)
+                request.save(update_fields=[
+                    "work_location", "no_of_garments", "allocated_to",
+                    "notes", "status", "created_at",
+                ])
+                job_request_count += 1
+
             self.stdout.write(
                 f"  - {design['number']} {design['name']} "
-                f"({len(design['materials'])} material rows)"
+                f"({len(design['materials'])} material rows, "
+                f"{fit_spec_count} fit specs, {job_request_count} job requests)"
             )
 
         self.stdout.write(self.style.SUCCESS(
             "Design-sheet demo data seeded: "
-            f"{len(DEMO_DESIGNS)} sheets, one active BOM each with material rows. "
-            "Open a design sheet to see Design Information + Material Breakdown."
+            f"{len(DEMO_DESIGNS)} sheets with material breakdown, fit specs and "
+            "job requests. Open a design sheet to see Design Information, "
+            "Material Breakdown, Fit Specs and Job Requests."
         ))

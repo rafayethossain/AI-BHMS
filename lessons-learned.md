@@ -1872,3 +1872,29 @@ both bespoke card sections with the shared `SpreadsheetGrid` while preserving th
 69; master-backlog Addendum 11).
 **Result:** GATE_A VERIFIED - frontend only: targeted 63/63, full suite 387/387, tsc -b 0, lint 0
 errors.
+
+---
+
+## 2026-09-13 - Design-sheet demo seed: fit specs + job requests rows (slice #70)
+
+**What happened:** The Fit Specs / Job Requests grids shipped in #69 were empty on the demo sheets,
+so they were folded into `seed_design_sheet_demo` with realistic fit stages (DEV SPEC / 1ST FIT /
+2ND FIT / 3RD FIT) and job requests covering all five reference job types.
+
+**What went well:**
+- The unique-selected DB constraint (one `is_selected=True` per sheet) is easiest to satisfy in an
+  idempotent seed by a bulk `is_selected=False` clear followed by a single set - and by **never**
+  setting `is_selected` inside `get_or_create` defaults (a re-run could otherwise trip the
+  constraint while the selection rotates between stages).
+- Job requests have no natural key; keying `get_or_create` on `(tenant, sheet, job_type,
+  required_by)` gives a deterministic idempotency anchor the recipe fully controls.
+- Allocating jobs to active tenant users by rotating index is deterministic across re-runs, so the
+  idempotency test stays meaningful.
+
+**What to do differently:** reuse the #68 discipline - `get_or_create` only guards creation, so every
+mutable field is re-assigned and saved after the lookup so recipe edits propagate on re-run.
+
+**Linked slice/requirement:** slice #70 / US-033 Fit Spec + US-034 Job Request (TDD_TRACKER entry
+70; master-backlog Addendum 12).
+**Result:** GATE_A VERIFIED - backend only: targeted 9/9, adjacency 45/45; dev DB re-seeded live
+(5 sheets x 2-4 fit specs + 2-3 job requests).

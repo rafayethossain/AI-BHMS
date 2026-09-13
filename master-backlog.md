@@ -4920,4 +4920,26 @@ Material Breakdown grid - full add/update/delete + standard grid chrome, keeping
 
 ---
 
+## Part 15 Addendum 12 - Design-sheet demo seed: Fit Specs + Job Requests rows (2026-09-13)
+
+User request: after the Fit Specs / Job Requests grids went standard (Addendum 11), seed demo rows so
+the two grids render real data per design sheet on `/design-sheets/:id`.
+
+- `seed_design_sheet_demo` now also creates Fit Specs (`DEMO_FIT_SPECS`) and Job Requests
+  (`DEMO_JOB_REQUESTS`) for each of the 5 demo sheets.
+- **Fit Specs** follow the reference fit-label sequence (DEV SPEC / 1ST FIT / 2ND FIT / 3RD FIT) -
+  each sheet gets 2-4 stages with fit date, description and notes, and exactly ONE selected (bulk
+  `is_selected=False` clear then a single set, so the unique-selected constraint holds on re-run).
+- **Job Requests** cover the reference job types (new pattern / tech sample / fit sample / mini
+  marker / 3D) with a due date, work location, garment count, status (pending / in_progress /
+  completed) and rotating allocation to active tenant users.
+- Idempotent: fit specs keyed on `(tenant, sheet, fit_number)`, job requests on
+  `(tenant, sheet, job_type, required_by)` - re-running updates in place.
+- Tests: RED-first +5 in `test_seed_design_sheet_demo.py` (fit/job grid shape via the detail API,
+  one-selected, job field validation, idempotency) - targeted **9/9**, adjacency **45/45**
+  (`test_design_sheet_api.py` + `test_design_sheet_e2e_flows.py`). GATE_A VERIFIED (backend only).
+- Live dev DB re-seeded: 5 sheets now carry 2-4 fit specs + 2-3 job requests each.
+
+---
+
 *This is the single source of truth for the BHMS backlog and requirement status (workflow-ordered). Reframed: 2026-08-03*
