@@ -4942,4 +4942,32 @@ the two grids render real data per design sheet on `/design-sheets/:id`.
 
 ---
 
+## Part 15 Addendum 13 - Design Images: per-image annotations (2026-09-13)
+
+User request: mark points directly on a design image and attach notes, with **multiple annotations per
+image**. Scope agreed with BA: the **Design Images** section only (Fit Spec photos deferred), using the
+same click-to-place-note interaction as the sketch.
+
+- New US-036 (Image Annotations) under the RQ-036-042 DesignSheet/tech-pack infrastructure umbrella;
+  reuses the `sketch_annotations` `[id, x, y, text]` JSON precedent, applied per image instead of per
+  sheet.
+- Backend: `DesignImage.annotations` `JSONField(default=list, blank=True)` + migration
+  `0042_designimage_annotations`; `DesignImageSerializer` exposes `annotations`; new
+  `PATCH /api/v1/merchandising/design-images/{id}/annotations/` action on `DesignImageViewSet`
+  (`merchandising:edit`, tenant-isolated, validation identical to the design-sheet sketch action).
+- Frontend: new shared `ImageAnnotationOverlay` component (annotate toggle, click places a marker at
+  percentage coords, inline note edit, per-marker delete, Save button - no API, host persists);
+  `DesignSheetImages` gained a per-tile **Annotate** button + modal dialog with a local draft that
+  closes on successful save and stays open on failure; `merchApi.saveDesignImageAnnotations` +
+  `DesignImage.annotations` type; `DesignSheetPage.handleDesignImageSaveAnnotations` PATCHes and
+  refreshes the gallery.
+- Tests: RED-first `test_design_image_annotations.py` (**10/10**, was 9 red) - save/echo/expose,
+  empty-list clear, 400s (non-list, missing id/text, non-numeric coordinates), 404 foreign tenant,
+  403 no permission; `ImageAnnotationOverlay.test.tsx` (7) + `DesignSheetImages.test.tsx` (**16**,
+  4 new: dialog open, close-without-persist, existing notes shown, save plumbing). GATE_A VERIFIED:
+  backend targeted 10/10 + owning app 51/51; frontend tsc `-b` 0, lint 0 errors, vitest **408/408**
+  (50 files; session baseline 397 → +11).
+
+---
+
 *This is the single source of truth for the BHMS backlog and requirement status (workflow-ordered). Reframed: 2026-08-03*

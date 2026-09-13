@@ -116,7 +116,7 @@ class DesignImageSerializer(serializers.ModelSerializer):
         model = DesignImage
         fields = [
             "id", "style", "style_number", "image", "role", "caption",
-            "colourway", "sort_order", "is_main", "created_at",
+            "colourway", "sort_order", "is_main", "annotations", "created_at",
         ]
         read_only_fields = ["id", "created_at"]
 

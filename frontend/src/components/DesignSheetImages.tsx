@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { DesignImage } from '../api/client';
+import type { DesignImage, SketchAnnotation } from '../api/client';
+import ImageAnnotationOverlay from './ImageAnnotationOverlay';
 
 export const DESIGN_IMAGE_ROLES = ['main', 'range', 'colourway', 'detail'] as const;
 
@@ -24,6 +25,7 @@ interface DesignSheetImagesProps {
   onSetMain?: (id: string) => void;
   onSetRole?: (id: string, role: string) => void;
   onDelete?: (id: string) => void;
+  onSaveAnnotations?: (id: string, annotations: SketchAnnotation[]) => void | Promise<unknown>;
 }
 
 export default function DesignSheetImages({
@@ -33,6 +35,7 @@ export default function DesignSheetImages({
   onSetMain,
   onSetRole,
   onDelete,
+  onSaveAnnotations,
 }: DesignSheetImagesProps) {
   const [view, setView] = useState<'image' | 'list'>('image');
   const [rangeOnly, setRangeOnly] = useState(false);
@@ -40,6 +43,15 @@ export default function DesignSheetImages({
   const [showUpload, setShowUpload] = useState(false);
   const [role, setRole] = useState<string>('main');
   const [caption, setCaption] = useState('');
+  const [annotationDraft, setAnnotationDraft] = useState<{
+    id: string;
+    annotations: SketchAnnotation[];
+  } | null>(null);
+  const [savingAnnotations, setSavingAnnotations] = useState(false);
+
+  const annotationImage = annotationDraft
+    ? images.find((i) => i.id === annotationDraft.id)
+    : undefined;
 
   const visible = rangeOnly
     ? images.filter((i) => i.role === 'range')
@@ -54,6 +66,19 @@ export default function DesignSheetImages({
       setShowUpload(false);
     }
     e.target.value = '';
+  };
+
+  const saveDraftAnnotations = async () => {
+    if (!annotationDraft) return;
+    setSavingAnnotations(true);
+    try {
+      await onSaveAnnotations?.(annotationDraft.id, annotationDraft.annotations);
+      setAnnotationDraft(null);
+    } catch {
+      // keep the dialog open so the user can retry
+    } finally {
+      setSavingAnnotations(false);
+    }
   };
 
   return (
@@ -165,6 +190,16 @@ export default function DesignSheetImages({
                   MAIN
                 </span>
               )}
+              <button
+                type="button"
+                data-testid={`design-images-annotate-${img.id}`}
+                onClick={() =>
+                  setAnnotationDraft({ id: img.id, annotations: img.annotations ?? [] })
+                }
+                className="absolute bottom-1 right-1 rounded bg-black/60 hover:bg-black/80 px-1.5 py-0.5 text-[10px] text-white"
+              >
+                Annotate
+              </button>
             </figure>
           ))}
         </div>
@@ -219,6 +254,45 @@ export default function DesignSheetImages({
           >
             Delete image
           </button>
+        </div>
+      )}
+
+      {annotationDraft && annotationImage && (
+        <div
+          role="dialog"
+          aria-label="Annotate image"
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6"
+          onClick={() => {
+            if (!savingAnnotations) setAnnotationDraft(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-3xl rounded-xl border border-border bg-surface p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-heading">Annotate image</h3>
+              <button
+                type="button"
+                data-testid="design-images-annotate-close"
+                aria-label="Close annotation dialog"
+                onClick={() => setAnnotationDraft(null)}
+                className="w-8 h-8 rounded-full bg-surface-alt text-heading text-lg flex items-center justify-center hover:bg-surface-alt/70"
+              >
+                ✕
+              </button>
+            </div>
+            <ImageAnnotationOverlay
+              src={annotationImage.image}
+              alt={annotationImage.caption || undefined}
+              annotations={annotationDraft.annotations}
+              onAnnotationsChange={(next) =>
+                setAnnotationDraft((prev) => (prev ? { ...prev, annotations: next } : prev))
+              }
+              onSaveAnnotations={saveDraftAnnotations}
+              saving={savingAnnotations}
+            />
+          </div>
         </div>
       )}
     </section>

@@ -540,6 +540,7 @@ class DesignImageViewSet(viewsets.ModelViewSet):
         "create": "merchandising:create", "update": "merchandising:edit",
         "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
         "set_main": "merchandising:edit",
+        "annotations": "merchandising:edit",
     }
 
     def get_queryset(self):
@@ -585,6 +586,32 @@ class DesignImageViewSet(viewsets.ModelViewSet):
         image.is_main = True
         image.save(update_fields=["is_main"])
         return Response({"id": str(image.id), "is_main": True})
+
+    @action(detail=True, methods=["patch"], url_path="annotations")
+    def annotations(self, request, pk=None):
+        """Save the per-image annotation list (id, x, y, text)."""
+        image = self.get_object()
+        value = request.data.get("annotations")
+        if not isinstance(value, list):
+            return Response(
+                {"error": "annotations must be a list"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        for item in value:
+            if not isinstance(item, dict) or "id" not in item or "text" not in item:
+                return Response(
+                    {"error": "each annotation needs id and text"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            for key in ("x", "y"):
+                if key in item and not isinstance(item[key], (int, float)):
+                    return Response(
+                        {"error": f"{key} must be numeric"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+        image.annotations = value
+        image.save(update_fields=["annotations", "updated_at"])
+        return Response({"annotations": image.annotations})
 
 
 class StyleItemViewSet(viewsets.ModelViewSet):

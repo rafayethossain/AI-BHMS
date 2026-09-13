@@ -1898,3 +1898,52 @@ mutable field is re-assigned and saved after the lookup so recipe edits propagat
 70; master-backlog Addendum 12).
 **Result:** GATE_A VERIFIED - backend only: targeted 9/9, adjacency 45/45; dev DB re-seeded live
 (5 sheets x 2-4 fit specs + 2-3 job requests).
+
+## 2026-09-13 - Design image annotations (slice #71)
+
+**What happened:** Added per-image annotations to the Design Images section of the design-sheet detail
+(US-036). Each DesignImage gets an `annotations` JSON list of [id, x, y, text] placed by a new shared
+`ImageAnnotationOverlay` component in a per-tile modal, saved via a new
+`PATCH .../design-images/{id}/annotations/` action.
+
+**What went well:**
+- Reusing the ragged sketch_annotations precedent meant the backend action, serializer field,
+  migration and validation were near-verbatim copies - no new interaction patterns or permissions to
+  invent (merchandising:edit already existed).
+- Keeping ImageAnnotationOverlay **API-free** (pure UI; the host persists) made it trivially
+  testable with no mocks at all and gives Fit Spec photos a drop-in path later.
+- The tenant isolation test "passed by accident" during RED (endpoint 404 for everyone). It still
+  guards the real behaviour post-GREEN, but a 404-based RED is no evidence a requirement exists - the
+  other 9 reds carried the proof.
+
+**What to do differently:** when a whole endpoint is missing, all server tests fail uniformly with 404
+and the tenant-isolation assertion passes vacuously - don't treat that one green as meaningful until
+after GREEN reruns.
+
+**Linked slice/requirement:** slice #71 / new US-036 under RQ-036-042 infra + sketch_annotations
+precedent (TDD_TRACKER entry 71; master-backlog Addendum 13).
+**Result:** GATE_A VERIFIED - backend targeted 10/10 + owning app 51/51; frontend targeted 23/23,
+vitest full 408/408 (50 files), tsc 0, lint 0 errors.
+
+## 2026-09-13 - Annotations "not working" in the live app: dev-DB migration + stale server (slice #71 follow-up)
+
+**What happened:** Feature worked in tests (fresh test DB migrates automatically) but failed live. Two
+deployment-ops causes, neither visible to the pytest/vitest suite:
+1.  042_designimage_annotations was **never applied to the dev DB** - the `annotations` column did
+   not exist, so every read/save of a design image errored.
+2. The running unserver (started 20:03) predated the viewset action added at 22:02 - it still served
+   the old code, so the `annotations` route 404'd.
+
+**Fixes:** `manage.py migrate merchandising` + restart the backend dev server. Verified live against
+the dev DB: PATCH `.../design-images/{id}/annotations/` -> 200, persisted, exposed by retrieve,
+cleanup 200; unauthenticated probe of the route now returns 401 (was 404).
+
+**What to do differently:** the test suite proves code, NOT the live database schema or the running
+process. After any backend field/route change: run migrate, then confirm the dev server was started
+after the change (restart if not). Check `server started` vs `views.py LastWriteTime` to detect
+stale processes; the JS dev server (Vite) hot-reloads, Django unserver usually auto-reloads but a
+long-lived process can be stale.
+
+**Linked slice/requirement:** slice #71 / US-036 (TDD_TRACKER entry 71; master-backlog Addendum 13).
+**Result:** live backend verified: route live (401 unauthenticated), full annotation round-trip 200 on
+the dev DB. Frontend unchanged (Vite hot-reload).

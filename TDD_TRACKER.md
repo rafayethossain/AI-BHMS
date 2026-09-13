@@ -1509,3 +1509,46 @@
       specs + 2-3 job requests each. **VERIFIED.**
 
 ---
+
+71. **Design Images: per-image annotations (click-to-place notes; US-036)** - user request: mark points
+    on a design image and attach notes, with multiple annotations per image. Scope agreed with BA: the
+    **Design Images** section only (Fit Spec photos deferred). Reuses the `sketch_annotations`
+    [id, x, y, text] pattern per image instead of per sheet.
+    - Triage: PRIORITY P1 / TIER Design module (design-sheet detail) / BLAST_RADIUS moderate (backend:
+      DesignImage model + serializer + viewset action + migration; frontend: new shared
+      `ImageAnnotationOverlay` + `DesignSheetImages` host + `client.ts` type/API) / TRACE:
+      RQ-036-042 infrastructure + `sketch_annotations` precedent -> new US-036 ->
+      `test_design_image_annotations.py` + `ImageAnnotationOverlay.test.tsx` +
+      `DesignSheetImages.test.tsx` -> `merchApi.saveDesignImageAnnotations` / GATE_PLAN GATE_A
+      backend + frontend.
+    - RED (backend): `tests/unit/test_design_image_annotations.py` - 10 tests: model default `[]` +
+      store/retrieve; PATCH `design-images/{id}/annotations/` saves + echoes, exposed in retrieve,
+      empty-list clears, 400 on non-list / item missing id+text / non-numeric x/y, 404 for foreign
+      tenant image, 403 without permission. Failed first (**9/10 red** - endpoint absent -> 404s; the
+      tenant-isolation case passed opportunistically).
+    - GREEN (backend): `DesignImage.annotations` JSONField(default=list, blank=True); migration
+      `0042_designimage_annotations`; `DesignImageSerializer` adds `annotations`;
+      `DesignImageViewSet.annotations` action mirrors the design-sheet sketch action
+      (`merchandising:edit`, tenant-filtered get_object). Targeted **10/10**.
+    - RED (frontend): `ImageAnnotationOverlay.test.tsx` (7 tests: render image + markers, place in
+      annotate mode, no-place outside, edit note, delete, save passes the list, save disabled while
+      saving) + `DesignSheetImages.test.tsx` +4 (annotate button opens dialog, close without persist,
+      existing notes shown, save -> onSaveAnnotations with the placed note). Failed first (import
+      unresolved + annotate testids absent).
+    - GREEN (frontend): new shared `ImageAnnotationOverlay` (image + annotate toggle + inline markers
+      + Save; API-free - the host persists); `DesignSheetImages` gains a per-tile Annotate button +
+      modal dialog with a local draft that closes on successful save and stays open on failure;
+      `client.ts` `saveDesignImageAnnotations` + `DesignImage.annotations`;
+      `DesignSheetPage.handleDesignImageSaveAnnotations` -> PATCH + `refreshImages()`.
+    - Gates (GATE_A): backend targeted **10/10** + owning app (merchandising) **51/51** (no cross-app
+      API consumers of `design-images` - `seed_demo_data` is model-level only); frontend targeted
+      **23/23** (overlay 7 + DesignSheetImages 16), `tsc -b` exit 0, lint 0 errors (baseline
+      warnings), vitest full **408 passed / 408 (50 files; session baseline 397 -> +11)**. **VERIFIED.**
+- Real-browser note: the annotate dialog is standard DOM (no Tabulator), so jsdom covers it; a CDP
+      smoke pass is still recommended when the devtools MCP is up.
+    - Live follow-up (same day): first browser attempt failed. Root cause = **ops, not code** - (1)
+      `0042_designimage_annotations` was not applied to the dev DB (column missing -> errors on
+      read/save) and (2) the running `runserver` predated the new viewset action (stale route 404).
+      Fixed: `manage.py migrate merchandising` + backend restart; live probe of the route now 401
+      (was 404) and a full authenticated PATCH round-trip against the dev DB returned 200 with
+      persistence + retrieve exposure. See `lessons-learned.md` (deployment-ops entry).

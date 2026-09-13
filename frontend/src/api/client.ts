@@ -213,6 +213,7 @@ export interface DesignImage {
   colourway: string;
   sort_order: number;
   is_main: boolean;
+  annotations: SketchAnnotation[];
   created_at: string;
 }
 
@@ -1372,6 +1373,9 @@ export const merchApi = {
 
   setMainDesignImage: (id: string) =>
     api.post<{ id: string; is_main: boolean }>(`/merchandising/design-images/${id}/set_main/`),
+
+  saveDesignImageAnnotations: (id: string, annotations: SketchAnnotation[]) =>
+    api.patch<{ annotations: SketchAnnotation[] }>(`/merchandising/design-images/${id}/annotations/`, { annotations }),
 
   createStyleItem: (data: Record<string, unknown>) =>
     api.post<StyleItem>('/merchandising/style-items/', data),

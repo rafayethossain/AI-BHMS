@@ -635,6 +635,10 @@ class DesignImage(TenantModel):
     colourway = models.CharField(max_length=100, blank=True)
     sort_order = models.IntegerField(default=0)
     is_main = models.BooleanField(default=False)
+    annotations = models.JSONField(
+        default=list, blank=True,
+        help_text="Per-image annotation list: [{id, x, y, text}].",
+    )
 
     class Meta:
         ordering = ["sort_order", "-is_main", "created_at"]

@@ -13,6 +13,7 @@ import type { MaterialItem } from '../components/DesignSheetMaterial';
 import type { UserOption } from '../components/DesignSheetJobRequests';
 import type { DesignSheet } from '../api/client';
 import type { DesignImage } from '../api/client';
+import type { SketchAnnotation } from '../api/client';
 
 const DEFAULT_BLOCK_ORDER = [
   'header', 'sketch', 'material', 'fit_specs',
@@ -341,6 +342,17 @@ export default function DesignSheetPage() {
       .catch(() => setError('Failed to delete image'));
   };
 
+  const handleDesignImageSaveAnnotations = (imageId: string, annotations: SketchAnnotation[]) => {
+    setError(null);
+    return merchApi
+      .saveDesignImageAnnotations(imageId, annotations)
+      .then(() => refreshImages())
+      .catch(() => {
+        setError('Failed to save image annotations');
+        throw new Error('save annotations failed');
+      });
+  };
+
   const refreshImages = () => {
     if (!sheet?.style_id) return Promise.resolve();
     return merchApi
@@ -462,6 +474,7 @@ export default function DesignSheetPage() {
                     onSetMain={handleDesignImageSetMain}
                     onSetRole={handleDesignImageSetRole}
                     onDelete={handleDesignImageDelete}
+                    onSaveAnnotations={handleDesignImageSaveAnnotations}
                   />],
                 ['job_requests',
                   <DesignSheetJobRequests

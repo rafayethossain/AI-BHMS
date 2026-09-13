@@ -15,6 +15,7 @@ function image(overrides: Partial<DesignImage>): DesignImage {
     colourway: '',
     sort_order: 0,
     is_main: true,
+    annotations: [],
     created_at: '2026-08-10T10:00:00Z',
     ...overrides,
   };
@@ -124,6 +125,53 @@ describe('DesignSheetImages', () => {
     fireEvent.contextMenu(screen.getByTestId('design-images-tile-img-3'));
     fireEvent.click(screen.getByRole('button', { name: /Delete image/i }));
     expect(onDelete).toHaveBeenCalledWith('img-3');
+  });
+
+  it('opens an annotation dialog for a design image tile', () => {
+    render(<DesignSheetImages images={images} />);
+    fireEvent.click(screen.getByTestId('design-images-annotate-img-1'));
+    expect(screen.getByRole('dialog', { name: 'Annotate image' })).toBeInTheDocument();
+    expect(screen.getByTestId('image-annotate-area')).toBeInTheDocument();
+  });
+
+  it('closes the annotation dialog without persisting', () => {
+    const onSaveAnnotations = vi.fn();
+    render(<DesignSheetImages images={images} onSaveAnnotations={onSaveAnnotations} />);
+    fireEvent.click(screen.getByTestId('design-images-annotate-img-1'));
+    fireEvent.click(screen.getByTestId('design-images-annotate-close'));
+    expect(screen.queryByRole('dialog', { name: 'Annotate image' })).not.toBeInTheDocument();
+    expect(onSaveAnnotations).not.toHaveBeenCalled();
+  });
+
+  it('shows existing annotations inside the annotation dialog', () => {
+    render(
+      <DesignSheetImages
+        images={[
+          image({
+            id: 'img-ann',
+            annotations: [{ id: 'a1', x: 20, y: 30, text: 'WAIST SEAM' }],
+          }),
+        ]}
+      />
+    );
+    fireEvent.click(screen.getByTestId('design-images-annotate-img-ann'));
+    expect(screen.getByDisplayValue('WAIST SEAM')).toBeInTheDocument();
+  });
+
+  it('saves annotations placed in the dialog via onSaveAnnotations', () => {
+    const onSaveAnnotations = vi.fn();
+    render(<DesignSheetImages images={images} onSaveAnnotations={onSaveAnnotations} />);
+    fireEvent.click(screen.getByTestId('design-images-annotate-img-1'));
+    fireEvent.click(screen.getByTestId('image-annotate-toggle'));
+    fireEvent.click(screen.getByTestId('image-annotate-area'));
+    fireEvent.click(screen.getByTestId('image-annotate-save'));
+
+    expect(onSaveAnnotations).toHaveBeenCalledTimes(1);
+    const [id, annotations] = onSaveAnnotations.mock.calls[0] as [string, unknown[]];
+    expect(id).toBe('img-1');
+    expect(annotations).toEqual([
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number), text: '' }),
+    ]);
   });
 });
 
