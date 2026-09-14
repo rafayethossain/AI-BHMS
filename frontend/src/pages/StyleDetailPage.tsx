@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { merchApi, setupApi } from '../api/client';
-import type { Style, StyleVersion, StyleItem, FileOpening, PurchaseOrder, BOM, Vendor, UOM, DesignImage, StyleTechPack } from '../api/client';
+import type { Style, StyleVersion, StyleItem, FileOpening, PurchaseOrder, BOM, Vendor, UOM, DesignImage, StyleTechPack, SalesOrderRow, RiskPayload } from '../api/client';
 import api from '../api/client';
 import SearchableSelect from '../components/SearchableSelect';
 import { useToast } from '../contexts/ToastContext';
@@ -32,7 +32,22 @@ const TECH_PACK_STATUS_COLORS: Record<string, string> = {
   completed: 'bg-emerald-500/20 text-badge-emerald',
 };
 
-type Tab = 'overview' | 'sketches' | 'versions' | 'file_openings' | 'purchase_orders' | 'items' | 'bom' | 'design_images' | 'tech_packs';
+const SALES_STATUS_CLASSES: Record<string, string> = {
+  none: 'bg-surface-alt/50 text-muted',
+  green: 'bg-emerald-500/15 text-emerald-500',
+  amber: 'bg-amber-500/15 text-amber-500',
+  red: 'bg-red-500/15 text-red-400',
+};
+
+function SalesStatusPill({ payload }: { payload: RiskPayload }) {
+  return (
+    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium capitalize ${SALES_STATUS_CLASSES[payload.code] || SALES_STATUS_CLASSES.none}`}>
+      {payload.label || payload.code}
+    </span>
+  );
+}
+
+type Tab = 'overview' | 'sketches' | 'versions' | 'file_openings' | 'purchase_orders' | 'items' | 'bom' | 'design_images' | 'tech_packs' | 'sales_order';
 
 export default function StyleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -48,6 +63,8 @@ export default function StyleDetailPage() {
   const [styleItems, setStyleItems] = useState<StyleItem[]>([]);
   const [designImages, setDesignImages] = useState<DesignImage[]>([]);
   const [techPacks, setTechPacks] = useState<StyleTechPack[]>([]);
+  const [salesOrderRows, setSalesOrderRows] = useState<SalesOrderRow[]>([]);
+  const [salesOrderVersionId, setSalesOrderVersionId] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [previewDesignImage, setPreviewDesignImage] = useState<{ url: string; label: string } | null>(null);
   const [deleteImageId, setDeleteImageId] = useState<string | null>(null);
@@ -117,6 +134,28 @@ export default function StyleDetailPage() {
     setupApi.getVendors({ page_size: '500' }).then(r => setVendors(r.data.results)).catch(() => {});
     setupApi.getUOMs({ page_size: '500' }).then(r => setUoms(r.data.results)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (tab !== 'sales_order' || !id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        let list = versions;
+        if (list.length === 0) {
+          const res = await merchApi.getStyleVersions(id);
+          list = res.data as unknown as StyleVersion[];
+          setVersions(list);
+        }
+        const current = list.find((v) => v.version_number === style?.current_version);
+        const target = list.find((v) => v.id === salesOrderVersionId) || current || list[0];
+        if (!target) { if (!cancelled) setSalesOrderRows([]); return; }
+        if (!salesOrderVersionId) setSalesOrderVersionId(target.id);
+        const res = await merchApi.getStyleVersionSalesOrder(target.id);
+        if (!cancelled) setSalesOrderRows(res.data);
+      } catch { if (!cancelled) toast('error', 'Failed to load sales order'); }
+    })();
+    return () => { cancelled = true; };
+  }, [tab, id, salesOrderVersionId, style?.current_version]);
 
   useEffect(() => {
     if (!id) return;
@@ -290,6 +329,7 @@ export default function StyleDetailPage() {
     { key: 'bom', label: 'BOM' },
     { key: 'design_images', label: 'Design Images', count: designImages.length },
     { key: 'tech_packs', label: 'Tech Packs', count: techPacks.length },
+    { key: 'sales_order', label: 'Sales Order' },
   ];
 
   return (
@@ -687,6 +727,73 @@ export default function StyleDetailPage() {
                   )}
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {tab === 'sales_order' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-muted">
+                {salesOrderRows.length} sales order{salesOrderRows.length !== 1 ? 's' : ''} &middot; statuses derived live from pipeline data
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted">Version</span>
+                <select value={salesOrderVersionId}
+                  onChange={(e) => setSalesOrderVersionId(e.target.value)}
+                  className="px-3 py-1.5 bg-input border border-input-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+                  {versions.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      V{v.version_number}{v.version_number === style.current_version ? ' (current)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {salesOrderRows.length === 0 ? (
+              <p className="text-muted text-sm py-8 text-center">No sales orders for this version</p>
+            ) : (
+              <div className="bg-surface rounded-xl border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">PO</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">File</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Buyer</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Factory</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Destination</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Qty</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Total</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">TOD (Cust. Del.)</th>
+                      <th className="text-center px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Fabric</th>
+                      <th className="text-center px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Trims</th>
+                      <th className="text-center px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Production</th>
+                      <th className="text-center px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Delivery</th>
+                      <th className="text-center px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Overall</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {salesOrderRows.map((row) => (
+                      <tr key={row.id} onClick={() => navigate(`/purchase-orders/${row.id}`)}
+                        className="border-b border-border/50 last:border-0 hover:bg-surface-alt/30 transition-colors cursor-pointer">
+                        <td className="px-4 py-3 font-mono text-emerald-400">{row.po_number}</td>
+                        <td className="px-4 py-3 font-mono text-blue-400">{row.file_number || '-'}</td>
+                        <td className="px-4 py-3">{row.buyer_name || '-'}</td>
+                        <td className="px-4 py-3 text-muted">{row.factory_name || '-'}</td>
+                        <td className="px-4 py-3 text-muted">{row.destination_country_name || '-'}</td>
+                        <td className="px-4 py-3 text-right font-mono">{row.quantity}</td>
+                        <td className="px-4 py-3 text-right font-mono">${Number(row.total_value).toLocaleString()}</td>
+                        <td className="px-4 py-3">{row.delivery_date || '-'}</td>
+                        <td className="px-4 py-3 text-center"><SalesStatusPill payload={row.sales_statuses.fabric} /></td>
+                        <td className="px-4 py-3 text-center"><SalesStatusPill payload={row.sales_statuses.trims} /></td>
+                        <td className="px-4 py-3 text-center"><SalesStatusPill payload={row.sales_statuses.production} /></td>
+                        <td className="px-4 py-3 text-center"><SalesStatusPill payload={row.sales_statuses.delivery} /></td>
+                        <td className="px-4 py-3 text-center"><SalesStatusPill payload={row.sales_statuses.overall} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}

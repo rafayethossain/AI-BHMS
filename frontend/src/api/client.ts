@@ -232,6 +232,30 @@ export interface OrderRisk {
   overall: RiskPayload;
 }
 
+export interface SalesOrderStatuses {
+  fabric: RiskPayload;
+  trims: RiskPayload;
+  production: RiskPayload;
+  delivery: RiskPayload;
+  overall: RiskPayload;
+}
+
+export interface SalesOrderRow {
+  id: string;
+  po_number: string;
+  file_number: string | null;
+  buyer_name: string | null;
+  factory_name: string | null;
+  destination_country_name: string | null;
+  delivery_date: string;
+  quantity: number;
+  unit_price: string;
+  total_value: string;
+  status: string;
+  items: PurchaseOrderItem[];
+  sales_statuses: SalesOrderStatuses;
+}
+
 export interface PurchaseOrder {
   id: string;
   po_number: string;
@@ -1345,6 +1369,9 @@ export const merchApi = {
 
   getAllStyleVersions: (params?: Record<string, string>) =>
     api.get<PaginatedResponse<StyleVersion>>('/merchandising/style-versions/', { params }),
+
+  getStyleVersionSalesOrder: (versionId: string) =>
+    api.get<SalesOrderRow[]>(`/merchandising/style-versions/${versionId}/sales_order/`),
 
   createStyleVersion: (styleId: string, data: { revision_notes: string; status?: string }) =>
     api.post<StyleVersion>('/merchandising/style-versions/', { style: styleId, ...data }),

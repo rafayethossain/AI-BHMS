@@ -3379,7 +3379,7 @@ Original 116-story backlog across 14 epics. Every requirement's live status and 
 
 ---
 
-### Stage 2: Style & Design (RQ-005 ? RQ-006) 2/2 ? 100%
+### Stage 2: Style & Design (RQ-005 ? RQ-006 + RQ-051) 3/3 ? 100%
 
 > RQ-005 sits beside Style Management (Epic 4) and Style Information � before File Opening / PO.
 
@@ -3387,8 +3387,25 @@ Original 116-story backlog across 14 epics. Every requirement's live status and 
 |------|---------------------------|---------------|---------|--------|-------|-----------|---------|
 | RQ-005 | Design Image Management (target-033) | � | �6.1.1 Design | ? 100% | 16 + 3 seed | Main/range/detail image per style � child of Style, nested API `/styles/{id}/design_images/`, managed in Style screen | RQ-005 � DesignImage model (Sprint 2 add-on) |
 | RQ-006 | Not Sold Analysis (target-034) | � | �6.1.1 Design | ? 100% | 17 + 3 seed | Completed sample job per style; styles with a FileOpening are "sold", rest "not sold" � action `/job-requests/unsold_analysis/` | RQ-006 � analytic action (Sprint 2 add-on) |
+| RQ-051 | Design-Version Sales Order report (new gap) | ✅ | ✅6.1.1 Design | ✍️ Done | test_sales_order.py (24) + StyleDetailPage.test.tsx (+5) | none (computed live from POs; no new models) | RQ-051 ✅ per-design-version Sales Order tab on StyleDetailPage: every PO across the version's file openings w/ destinations, quantity, unit price, total value, TOD (customer delivery date � PO.delivery_date) + color-coded pipeline pills (Fabric / Trims & Accessories / Production / Delivery / Overall, all computed from child data); version dropdown (defaults current/latest); row drill-down to `/purchase-orders/:id`; `GET /api/v1/merchandising/style-versions/{id}/sales_order/` (RBAC merchandising:view); pure status module in `merchandising/sales_order.py` reusing the risk engine; backend 24/24 + owning 103/103 + adjacency 35/35; frontend vitest 418/418 (51 files), tsc 0, lint 0 errors |
 
-**Stage 2 total**: 2 items, 39 tests ?
+**Stage 2 total**: 3 items, 63 tests ?
+
+> **2026-09-14 — Design-Version Sales Order report (RQ-051, tracker #74):** the Design module now
+> answers "where is this version in the pipeline?" with a **Sales Order** tab on `StyleDetailPage`.
+> For a chosen design version it lists every purchase order under that version (across its file
+> openings) with buyer/factory/destination, quantity, unit price, total value, the customer delivery
+> date (TOD = `PurchaseOrder.delivery_date`; no new field/migration), and five color-coded status
+> pills per area: **Fabric** (reuses the risk engine), **Trims & Accessories** (live `BOMItem`
+> progress — incomplete/TBC → amber), **Production** (delivered / actual output ≥ order → green),
+> **Delivery** (overdue → red), **Overall** (max). Version dropdown defaults to current/latest;
+> rows drill down to `/purchase-orders/:id`. Read-only, computed live from child data — no new
+> models or schema changes. Backend: pure `sales_order.py` derivation + `SalesOrderRowSerializer` +
+> `sales_order` `@action` on `StyleVersionViewSet` (RBAC `merchandising:view` — explicitly registered
+> in `required_permissions`). Frontend: `client.ts` types/API + tab block (styled `<table>`, not
+> `SpreadsheetGrid` — flat grid columns cannot color individual cells, see lessons #66/#69).
+> VERIFIED (GATE_A): targeted 24/24 + owning app 103/103 + adjacency 35/35; vitest 418/418
+> (51 files, baseline 413 → +5), tsc 0, lint 0 errors.
 
 ---
 
@@ -3442,6 +3459,14 @@ Original 116-story backlog across 14 epics. Every requirement's live status and 
 > backend 59/59 (ladder 16, model 7, API 4, prepare 10, adjacency 18) + adjacency (`test_costing.py` +
 > `test_merchandising_api.py` + `test_cost_reconcile.py`) 74/74; frontend 413/413 vitest, tsc 0, lint 0 errors.
 > All new `Costing` fields are defaulted (0 / null=True) — no downstream consumer breakage.
+>
+> **2026-09-14 — Design-costing demo seed (tracker #73 follow-up):** new `seed_design_costing`
+> command seeds 5 `DesignCosting` records — one per design-register style (REG-1001..1005), each
+> with 5 cost lines + the full price-ladder fields. Styles are resolved by `style_number` (falls
+> back to creating demo styles + a default buyer if the register was never seeded), statuses
+> exercise the workflow (3 approved / 1 pending / 1 draft), approved rows stamped with the first
+> active tenant user, one live costing per style, idempotent re-runs. VERIFIED: targeted 8/8 +
+> design-costing adjacency 37/37; live seed = 5 costings / 25 lines on tenant `default`.
 
 ---
 

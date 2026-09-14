@@ -1,104 +1,114 @@
-# Implementation Plan: Design Costing per Piece → PO Costing (reference "Cost Report — Live/Delivered")
+# Spec: Design-Version Sales Order Report (RQ-051)
 
-## Overview
-Extend the Style-level per-piece `DesignCosting` with the reference price **ladder** (customer
-discount %, origin/UK overhead %, USD→GBP exchange rate → Base Cost / Selling Price / Margin $ / %),
-then make `prepare_po_costing` snapshot that ladder + compute **PO-level totals** (per-piece × PO
-quantity) on the order-level `Costing`. Confirmed scope: **Slice A + B** (Slice C — budget-vs-actual /
-shipment variance / P&L by PI — is a follow-up). This closes the "single-piece costing → PO costing"
-loop shown in the reference artifact (per-piece cost table feeding the PO cost report).
+## Objective
 
-## Triage (AGENTS.md §2)
-- PRIORITY: **P1** · TIER: Phase 4 — Costing (grows RQ-013 / RQ-014 / G-12 design-costing story).
-- BLAST_RADIUS: **shared across the design-cost → order-cost path** (`DesignCosting` → `prepare_po_costing` → `Costing`), but contained in `apps/merchandising` only. No other app consumed; escalates to GATE_A + documented adjacency grep (no GATE_B).
-- TRACE: RQ-013/RQ-014 + reference "Cost Report — Live/Delivered" → Slice A (per-piece ladder) → Slice B (PO totals) → tests (`test_design_costing_ladder.py`, extended `test_design_costing_prepare.py`, new `DesignCostingDetailPage.test.tsx`) → evidence in TDD_TRACKER.
-- GATE_PLAN: backend targeted + owning-app `pytest apps/merchandising -q` + adjacency grep on `design-costings`/`costings` in `backend/tests`; frontend `tsc -b` + lint + full `vitest`.
+Build a read-only **Sales Order** report per design version that lists every Purchase Order placed under that version (across all its file openings), showing destinations, sizes, quantities, customer delivery date (TOD), and **color-coded pipeline statuses** for Fabric, Trims & Accessories, Production, Delivery, and Overall. Drill-down: clicking a PO row navigates to the PO detail page.
 
-## Ladder formula (user-confirmed: discount on selling)
-For a design costing with `selling_price` set (None-guarded otherwise; legacy
-`(target-total)/total` margin retained as fallback when `selling_price` is absent so existing
-rows/tests keep behaving):
-- `discount_amount = selling_price × customer_discount_pct / 100`
-- `overhead_amount = total_cost × (origin_overhead_pct + uk_overhead_pct) / 100`
-- `base_cost = total_cost + discount_amount + overhead_amount`
-- `margin_amount = selling_price − base_cost`
-- `margin_percent = margin_amount / selling_price × 100`
-- `landed_cost (GBP) = total_cost × exchange_rate` (quantized 0.01; None until rate set)
+**Who:** Merchandiser / sales viewing a design on the Design Register (`/design`) → detail page → Sales Order tab.
+**Success:** Opening the Sales Order tab on a design version shows all its POs with live-derived color-coded area statuses that update from child data (fabric bookings, BOM trim progress, production plan/daily production, delivery dates). Row click navigates to `/purchase-orders/:id`.
+**Why now:** POs currently only appear per-file-opening or as a flat style-level list; there is no per-design-version sales picture with color-coded pipeline progress.
 
-Money quantized 0.01, margin_percent 2dp.
+## Tech Stack
 
-## Architecture Decisions
-- **Snapshot onto Costing (user-confirmed):** `prepare_po_costing` copies ladder inputs +
-  `selling_price` and freezes PO totals (`po_quantity`, `po_total_cost`, `po_base_cost`,
-  `po_margin_amount`) at prepare time. The order-level `Costing` remains an independently-editable
-  worksheet (RQ-013 behaviour intact); the design is the *source*, the PO is a *frozen snapshot*.
-- **Backward-zero-break:** all new fields nullable / defaulted in one migration `0043`; existing
-  `margin`/`target_price`/`margin_percent` semantics unchanged when the ladder is unused.
-- **Properties not stored (design):** `base_cost`, `discount_amount`, `overhead_amount`,
-  `margin_amount`, `landed_cost` are computed on `DesignCosting` (like the existing
-  `margin_percent`). **Stored** on `Costing` at prepare time (snapshot semantics).
-- **No new libraries.** Decimal math + existing `landed_cost` pattern.
+- Backend: Django 5 + DRF (existing `merchandising` app)
+- Frontend: React 18 + TypeScript + Tailwind (existing `StyleDetailPage.tsx`)
+- No new model, no migration — all computed from existing data
 
-## Task List
+## Commands
 
-### Slice A — Per-piece price ladder
-- **T1 — RED: ladder model/serializer tests** (`backend/apps/merchandising/tests/test_design_costing_ladder.py`)
-  - Model properties: `discount_amount`, `overhead_amount`, `base_cost`, `margin_amount`,
-    `margin_percent` (selling basis), `landed_cost`; None-guards when `selling_price`/rate absent;
-    legacy margin fallback preserved.
-  - Serializer: create/PATCH persists 5 ladder fields; derived fields exposed in response;
-    validation rejects negative pct, pct > 100, zero/negative `selling_price`, non-positive
-    `exchange_rate`.
-  - Acceptance: new tests fail first (RED evidence in TDD_TRACKER).
-- **T2 — GREEN: models + migration + serializer** (models.py `DesignCosting` + `DesignCostingLine`
-  untouched, `serializers.py`, new `migrations/0043_designcosting_ladder.py`)
-  - Add `customer_discount_pct`, `origin_overhead_pct`, `uk_overhead_pct` (Decimal 5,2 def 0),
-    `exchange_rate` (12,6 null), `selling_price` (10,2 null) to `DesignCosting`.
-  - Add derived properties + extend `margin_percent` (fallback path). Expose new fields on
-    `DesignCostingSerializer` + validations.
-- **T3 — Frontend: ladder block + client** (`frontend/src/api/client.ts`,
-  `frontend/src/pages/DesignCostingDetailPage.tsx`, new
-  `frontend/src/pages/__tests__/DesignCostingDetailPage.test.tsx`)
-  - Extend `DesignCosting` type; add `updateDesignCosting` PATCH.
-  - Detail page "Landed / Price Ladder" block: 5 editable inputs (PATCH) + readouts Base Cost,
-    Margin $, Margin %, landed GBP.
-  - New page test (RED first).
-- **CHECKPOINT A:** targeted + owning-app backend pytest, full frontend suite green.
+```
+# Backend targeted test
+cd backend
+.\venv\Scripts\python.exe -m pytest apps\merchandising\tests\test_sales_order.py -q
 
-### Slice B — PO costing totals from design
-- **T4 — RED: prepare-action ladder + PO totals tests** (extend
-  `backend/apps/merchandising/tests/test_design_costing_prepare.py`)
-  - Ladder fields + `selling_price` copied onto `Costing`.
-  - `po_quantity` frozen to `purchase_order.quantity`; `po_total_cost = total_cost × po_quantity`;
-    `po_base_cost` / `po_margin_amount` ×quantity (None when `selling_price` unset).
-  - Tenant/status/duplicate guards unchanged.
-- **T5 — GREEN: order-level snapshot** (models.py `Costing`, `prepare_po_costing` in
-  `views.py`, `CostingSerializer`, same migration `0043`)
-  - Add the 5 ladder fields + `selling_price` + `po_quantity` + `po_total_cost` +
-    `po_base_cost` + `po_margin_amount` to `Costing`; copy at prepare.
-  - Expose ladder + PO totals on `CostingSerializer` (per-piece and PO-level readouts).
-- **CHECKPOINT B:** owning-app `pytest apps/merchandising -q` + adjacency grep hits green;
-  frontend `tsc -b` / lint / vitest green.
+# Backend owning-app regression
+.\venv\Scripts\python.exe -m pytest apps\merchandising -q
 
-### Docs / completion
-- **T6 — Traceability:** `TDD_TRACKER.md` entry (gate evidence + RED→GREEN), `master-backlog.md`
-  Addendum (RQ-013/RQ-014), `lessons-learned.md` entry.
+# Frontend
+cd frontend
+npx tsc -b
+npm run lint
+npx vitest run
+```
 
-## Risks and Mitigations
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| `margin_percent` semantics change breaks existing consumers | Med | Keep legacy fallback when `selling_price` unset; existing tests still pass |
-| PO qty 0 / negative at prepare | Low | PO totals quantized from quantity as-is; guard negative → 0 in snapshot |
-| `prepare_po_costing` copies widen | Med | Ladder copy added inside existing create + explicit new snapshot fields; duplicate-guard intact |
-| Missing frontend create/edit path for design costings (client has no create/update) | Low | Scope is Detail-page PATCH only (T3 adds `updateDesignCosting`) |
+## Project Structure
+
+```
+backend/apps/merchandising/
+  models.py           # Style, StyleVersion, FileOpening, PurchaseOrder, PurchaseOrderItem, Hit, BOMItem
+  serializers.py      # PurchaseOrderSerializer (existing, reuse risk engine pattern)
+  views.py            # StyleVersionViewSet (add @action sales_order)
+  sales_order.py      # NEW — pure status derivation module (fabric/trims/production/delivery/overall)
+  risk_engine.py      # EXISTING — reuse RISK_ORDER/RISK_COLORS/risk_payload for color encoding
+  tests/
+    test_sales_order.py  # NEW — unit + API tests for sales_order endpoint + status derivation
+
+frontend/src/pages/
+  StyleDetailPage.tsx  # MODIFY — add 'sales_order' tab + SalesOrderTab component
+
+frontend/src/api/
+  client.ts           # MODIFY — add merchApi.getStyleVersionSalesOrder() type + function
+```
+
+## Code Style
+
+- Backend pure functions: `compute_sales_order_statuses(po) -> dict[str, RiskPayload]` in `sales_order.py`, no side effects, no DB writes.
+- Frontend: styled `<table>` (not SpreadsheetGrid — grid columns are flat and cannot express per-cell background colors; see lessons learned). Tailwind classes for status cells.
+- Naming: `sales_order` snake_case; `SalesOrderTab` PascalCase; `RISK_COLORS` reused from `risk_engine.py`.
+
+## Testing Strategy
+
+- Backend: pytest, `apps/merchandising/tests/test_sales_order.py`
+  - Unit tests for `compute_sales_order_statuses` (fabric/trims/production/delivery/overall derivation per PO)
+  - API test for `StyleVersionViewSet.sales_order` action (returns correct POs for a version, status payloads present)
+  - Edge cases: PO with no BOM → trims none; PO with no shipment → fabric none; PO delivered → delivery green; overdue → red
+- Frontend: Vitest, `StyleDetailPage.test.tsx` (extend existing)
+  - Sales Order tab renders version dropdown + PO table
+  - Click PO row navigates to `/purchase-orders/:id`
+  - Status cells render correct Tailwind classes per status code
+- Gate: GATE_A (targeted → owning-app → adjacency)
+
+## Boundaries
+
+- **Always:** Run `tsc -b` + lint + vitest before commit; follow existing RiskPayload interface; reuse RISK_COLORS; tenant-scoped queries; RBAC `merchandising:view`.
+- **Ask first:** Any new model field, any shared component change (SpreadsheetGrid), any new library.
+- **Never:** Commit secrets; add a new model when computation suffices; break existing PO list/detail consumers; use the product's proper name.
+
+## Success Criteria
+
+- [ ] `GET /api/v1/merchandising/style-versions/{id}/sales_order/` returns per-PO rows with status payloads (5 areas + overall)
+- [ ] Status derivation module is pure (no DB writes) and unit-tested for all area × status combinations
+- [ ] Sales Order tab on `StyleDetailPage` renders a styled table with color-coded status cells
+- [ ] Version dropdown defaults to latest version; selecting a version fetches that version's POs
+- [ ] Clicking a PO row navigates to `/purchase-orders/:id`
+- [ ] Color palette matches `RISK_COLORS` (none=gray #6b7280, green=#16a34a, amber=#d97706, red=#dc2626)
+- [ ] All existing tests remain green (no regression in merchandising adjacency)
+- [ ] No new migration, no new model, no shared component change
+
+## Status Derivation Rules
+
+### Fabric (reuse risk_engine pattern)
+- Source: `BookingScheduleItem` via PO → shipments → schedule_items
+- Delivered → green; in_work → amber; risk_level red (sticky) → red; no items → none
+
+### Trims & Accessories (merged)
+- Source: `BOMItem` via PO → file_opening → style_version → boms → items
+- Filter: category in {Trim, Trims, Accessories}
+- Status field (`BOMItem.status`): Completed → green; Ordered/Partial → amber; TBC → amber if vendor assigned, none if no items
+
+### Production
+- Source: `PO.status` + `DailyProduction` (actual_quantity sum) + `BookingScheduleItem` (cut_qty, garments_ready_qty)
+- Delivered/Ready → green; in_production/quality_check with actual >= ordered → green; in_production with actual > 0 → amber; draft/open → none
+
+### Delivery
+- Source: `PO.status` + `PO.delivery_date` (TOD) + `Hit.actual_delivery_date` (max)
+- PO delivered → green; shipped → green; in_production/quality_check + not overdue → amber; overdue (today > delivery_date + not delivered/shipped) → red; no delivery_date → none
+
+### Overall
+- Max of all area risk_orders (same as risk_engine `overall_risk`)
 
 ## Open Questions
-- None blocking Shice A+B. (Follow-up C: budget-vs-actual + shipment variance + P&L per PI —
-  needs its own BA pass.)
 
-## Verification Checklist
-- Every new/changed test failed first (RED) then passed (GREEN).
-- Slice A: `.\venv\Scripts\python.exe -m pytest apps/merchandising/tests/test_design_costing_ladder.py -q` green.
-- Slice B: `prepare` suite green; `pytest apps/merchandising -q` (owning app) green; adjacency hits green.
-- Frontend: `npx tsc -b` exit 0, `npm run lint` 0 errors, `npx vitest run` full green.
-- Docs updated; no migration breakage (single `0043`).
+1. **"Other relevant information"** — user mentioned "other" as a sixth area. v1 includes Overall as the sixth. If additional areas (e.g., T&A critical path, commercial docs) are needed, they become a follow-on slice.
+2. **Export/print** — out of scope for v1; follow-on slice can add xlsx export + print-with-tick (A4 pattern).
+3. **Create PO from Sales Order** — out of scope for v1; existing PO creation via FileOpening detail page is the current flow.

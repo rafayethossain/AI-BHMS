@@ -77,6 +77,7 @@ from .serializers import (
     POAmendmentSerializer,
     PurchaseOrderItemSerializer,
     PurchaseOrderSerializer,
+    SalesOrderRowSerializer,
     material_item_grid_row,
     StockFabricAllocationSerializer,
     StyleItemSerializer,
@@ -645,6 +646,7 @@ class StyleVersionViewSet(viewsets.ModelViewSet):
         "list": "merchandising:view", "retrieve": "merchandising:view",
         "create": "merchandising:create", "update": "merchandising:edit",
         "partial_update": "merchandising:edit", "destroy": "merchandising:delete",
+        "sales_order": "merchandising:view",
     }
 
     def get_queryset(self):
@@ -658,6 +660,16 @@ class StyleVersionViewSet(viewsets.ModelViewSet):
         serializer.save(tenant=tenant, version_number=next_ver, created_by=self.request.user)
         style.current_version = next_ver
         style.save(update_fields=["current_version"])
+
+    @action(detail=True, methods=["get"], url_path="sales_order")
+    def sales_order(self, request, pk=None):
+        """Read-only pipeline status report for a design version's POs (RQ-051)."""
+        version = self.get_object()
+        pos = PurchaseOrder.objects.filter(
+            tenant=request.tenant, file_opening__style_version=version
+        )
+        serializer = SalesOrderRowSerializer(pos, many=True)
+        return Response(serializer.data)
 
 
 class FileOpeningViewSet(viewsets.ModelViewSet):

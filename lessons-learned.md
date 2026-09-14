@@ -2028,3 +2028,81 @@ recomputed in `save()`, plus a frozen PO snapshot on `Costing` with computed tot
 **Linked slice/requirement:** tracker #73 / RQ-013 design costing ladder + PO snapshot.
 **Result:** GATE_A VERIFIED — backend 59/59 (ladder 16, model 7, API 4, prepare 10, adjacency 18) +
 adjacency 74/74; frontend 413/413 vitest, tsc 0, lint 0 errors.
+
+---
+
+## 2026-09-14 — Design-costing demo seed, connected to the design register (tracker #73 follow-up)
+
+**What happened:** Sliced the "insert 4–5 sample seed records for costings" request the right way:
+wrote a dedicated `seed_design_costing` management command whose records attach to the existing
+design-register styles (REG-1001..1005) by `style_number`, instead of creating a parallel throwaway
+data set. One `DesignCosting` per style, each with cost lines and the full price-ladder fields;
+statuses exercise the workflow (3 approved / 1 pending / 1 draft) and approved rows get
+`approved_by`/`approved_at` stamped from the first active tenant user.
+
+**What went wrong / well:**
+- **Well — first RED attempt failed for the wrong reason.** The first version of the seed test used
+  `TestCase` + `setUpTestData` and failed with
+  `RuntimeError('No active tenant; run seed_demo_data first.')` across 6 setup errors — the test DB
+  has no tenant until a fixture creates one. Rewiring to pytest fixtures (`tenant`, `buyer`,
+  `styles`) created the context the models need and matched the `seed_design_sheet_demo` precedent.
+- **Well — keying the seed on the design register.** Resolving styles by `style_number` means the
+  demo costings appear in the UI *inside* the existing designs (the user's "connect them to design"
+  ask) and the command still works standalone by creating demo styles + a default buyer if the
+  register was never seeded.
+- **Watch — `get_or_create` never updates.** `get_or_create` only guards creation; idempotent
+  re-runs must explicitly re-write mutable fields (and pass them in `update_fields`, including the
+  recomputed `total_cost`), otherwise a re-seed silently serves stale values.
+
+**What to do differently:**
+- For seed commands, write the test against **pytest fixtures that create the Tenant first**, and
+  assert on properties that prove the data is *connected* (costings link to existing styles,
+  `<=1` live per style, re-run creates 0 new rows) rather than just row counts.
+- Keep the price-ladder fields in the demo spec so a seeded approved costing is immediately usable
+  by `prepare_po_costing` on the PO side.
+
+**Linked slice/requirement:** tracker #73 seed follow-up / RQ-013 design costing.
+**Result:** GATE_A VERIFIED — targeted 8/8 + design-costing adjacency 37/37; live seed created
+5 costings / 25 lines on tenant `default` (linked to REG-1001..1005), idempotent re-run → 0 new.
+
+---
+
+## 2026-09-14 — Design-Version Sales Order report on StyleDetailPage (RQ-051)
+
+**What happened:** Delivered the "per-design-version Sales Order view" — a **Sales Order** tab on
+`StyleDetailPage` listing every PO under a version across its file openings, with destinations,
+quantities, unit price, total value, the customer delivery date (TOD = `PO.delivery_date`, no new
+field), and five color-coded pipeline status pills (Fabric / Trims & Accessories / Production /
+Delivery / Overall), with row drill-down to `/purchase-orders/:id`.
+
+**What went wrong / well:**
+- **Well — statuses are derived, not stored.** A brand-new pure module
+  `merchandising/sales_order.py` computes every pill live from child data and *reuses* the risk
+  engine (`_fabric_risk`, `_bom_items`, `TRIMS_CATEGORIES`, `overall_risk`, `risk_payload`) instead
+  of duplicating it. Zero models/migrations — the DoD "migration present where schema changes" was
+  vacuously satisfied.
+- **Guard caught — RBAC silently default-open.** `required_permissions` in `StyleVersionViewSet`
+  is the ONLY thing keeping new `@action`s behind authorization: DRF's `HasPermission` treats an
+  action absent from the dict as *allowed*. The 403 test failed first and exposed it; the
+  `"sales_order": "merchandising:view"` entry is now registered. Rule: **additive actions must also
+  be additive to `required_permissions`, or they ship wide open.**
+- **Watch — trims pill is a different question than the risk engine.** The risk engine flags a BOM
+  item for *vendor* reasons; the Sales Order trims pill is about *progress* (any non-Completed /
+  TBC → amber). Reusing the same helper silently would have produced wrong semantics — the module
+  docstring records why it deliberately aggregates `BOMItem.status` instead.
+- **Watch — `SpreadsheetGrid` cannot color cells.** Grid columns are flat (one value per cell);
+  the color-coded status matrix needs per-cell backgrounds, so a plain styled `<table>` was the
+  right call (consistent with lessons #66/#69).
+- **Well — honest RED on the frontend.** Temporarily disabling the tab proved the 5 new tests
+  genuinely fail without the feature (5 failed / 3 pass), then restored → 8/8.
+
+**What to do differently:**
+- Version-scoped nested lookups reuse `style.versions` (via `StyleVersionViewSet`); keep the
+  dropdown default = current/latest so the tab is truthful without user effort.
+- Prefer a pure derivation module + serializer + `@action` over a stored report for anything that
+  can be computed from child models (no staleness, free tenant/RBAC scoping).
+
+**Linked slice/requirement:** tracker #74 / RQ-051 (Stage 2, Design module).
+**Result:** GATE_A VERIFIED — targeted 24/24 + owning app (merchandising) 103/103 + adjacency
+(`test_merchandising_api.py`) 35/35; frontend tsc exit 0, lint 0 errors (baseline warnings),
+vitest full 418/418 (51 files; baseline 413 → +5).

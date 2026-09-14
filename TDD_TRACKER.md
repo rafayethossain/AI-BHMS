@@ -1646,3 +1646,72 @@
         in downstream consumers (`CostingDetailPage`, `CostingsListPage`, `CostReconcilePage`).
       - Migration note: `0043_designcosting_*` + `0044_costing_*` must be applied to the dev DB
         (`manage.py migrate merchandising`) and the backend server restarted (`--noreload` is stale).
+    - **Seed follow-up (5 demo design costings, connected to the design register):** new
+      `seed_design_costing` management command seeds one `DesignCosting` per design-register style
+      (REG-1001..1005), each with 5 cost lines (fabric/trim/label/making/overhead) and the full
+      price-ladder fields (selling price, discount %, origin/UK overhead %, exchange rate). Styles
+      are resolved by `style_number` so costings attach to the records created by
+      `seed_design_register` / `seed_design_sheet_demo`; absent styles + buyer are created so the
+      command works standalone. Statuses exercise the workflow (3 approved, 1 pending, 1 draft);
+      `approved_by`/`approved_at` stamped from the first active tenant user. Idempotent via
+      `get_or_create` keyed (tenant, style, version) + forced re-write of mutable fields.
+      - RED (backend): `tests/unit/test_seed_design_costing.py` = 8 tests (>=5 costings, >=3 lines
+        each, total == sum of line totals, linked to design styles, ladder populated on approved,
+        discount == selling × pct, <=1 live per style, idempotent re-run). Failed first (command
+        absent → `Unknown command`).
+      - GREEN (backend): command implemented. Targeted **8/8**; design-costing adjacency **37/37**
+        (model 7 + api 4 + ladder 16 + prepare 10).
+      - Live: dev DB migrated (`0043` + `0044` are pre-requisites for the ladder fields) then
+        `manage.py seed_design_costing` → **5 costings / 25 lines** on tenant `default`, each linked
+        to REG-1001..1005; live smoke confirms ladder math (e.g. REG-1001: selling 19.95 →
+        discount 1.00, overhead 0.67, base 12.87, margin 7.08); re-run creates **0** new rows
+        (idempotent). **GATE_A VERIFIED.**
+
+---
+
+74. **Design-Version Sales Order report (RQ-051)** — user request: a per-design-version Sales Order
+    view (reference Excel-familiar desktop workflow) listing every PO under a version across its file
+    openings, with destinations, quantities, customer delivery date (TOD), and color-coded pipeline
+    statuses for Fabric / Trims & Accessories / Production / Delivery / Overall, drill-down to the PO.
+    - Triage: PRIORITY P1 / TIER merchandising report / BLAST_RADIUS isolated (new pure module +
+      new `@action` + new serializer + frontend tab; no model/migration) / TRACE: RQ-051 → design-version
+      sales order → `test_sales_order.py` → `sales_order.compute_sales_order_statuses` →
+      `StyleVersionViewSet.sales_order` / `SalesOrderRowSerializer` → `SalesOrderTab` on
+      `StyleDetailPage` / GATE_PLAN GATE_A backend + frontend.
+    - **Task 1 — pure status derivation (`apps/merchandising/sales_order.py`):**
+      - RED (backend): `apps/merchandising/tests/test_sales_order.py` — 21 derivation tests covering
+        all areas × statuses: empty PO → none everywhere; fabric delivered→green, in_work→amber,
+        sticky red risk_level→red; trims no BOM→none, all Completed→green, any Ordered/TBC→amber;
+        production delivered/actual≥qty→green, partial/no-records→amber, draft/cancelled→none;
+        delivery delivered/shipped→green, overdue→red, future TOD→amber, draft→none; overall = max;
+        payload shape. Failed first (`No module named 'apps.merchandising.sales_order'`).
+      - GREEN (backend): `sales_order.py` reuses `risk_engine._fabric_risk` + `_bom_items` +
+        `TRIMS_CATEGORIES` / `overall_risk` / `risk_payload` (no duplicated logic); trims progress uses
+        `BOMItem.status` (deliberately different question vs the risk engine's vendor rule); production
+        sums `DailyProduction.actual_quantity` + booking-schedule `garments_ready_qty` vs `PO.quantity`;
+        delivery compares `PO.delivery_date` (TOD) to `today` (default `timezone.localdate()`). Pure,
+        no DB writes. Targeted **21/21**.
+    - **Task 2 — read-only API action:**
+      - RED (backend): +3 API tests in the same file — `GET /api/v1/merchandising/style-versions/{id}/sales_order/`
+        returns only that version's POs (v1 vs v2 isolation), rows carry `sales_statuses` payloads +
+        PO headline fields, user without `merchandising:view` → 403. Failed first (route 404).
+      - GREEN (backend): `SalesOrderRowSerializer` (PO headline fields + `items` +
+        `sales_statuses` via `compute_sales_order_statuses(po, today=localdate())`); `@action`
+        `sales_order` on `StyleVersionViewSet` + `"sales_order": "merchandising:view"` registered in
+        `required_permissions` (without it `HasPermission` would ALLOW by default — RBAC closed).
+        Targeted **24/24**.
+    - **Tasks 3–4 — frontend:**
+      - RED (frontend): `StyleDetailPage.test.tsx` +5 — defaults to latest version and renders POs
+        with status pills, per-status Tailwind pill classes (`bg-emerald-500/15`/`bg-amber-500/15`/
+        `bg-red-500/15`), refetch on version dropdown change, empty state, row click → `/purchase-orders/:id`.
+        Proven to fail first (Sales Order tab disabled → 5 failed / 3 passed), then restored.
+      - GREEN (frontend): `SalesOrderRow`/`SalesOrderStatuses` types + `getStyleVersionSalesOrder`
+        in `client.ts`; `sales_order` tab on `StyleDetailPage` with a version dropdown (defaults to
+        current/latest) + styled `<table>` (deliberately not `SpreadsheetGrid` — grid columns are flat
+        and cannot express per-cell background colors; sees lessons #66/#69) with `SalesStatusPill`
+        per area + Overall, row click navigates to `/purchase-orders/:id`. Targeted **8/8**.
+    - Gates (GATE_A): backend targeted **24/24** + owning app (merchandising) **103/103** + cross-app
+      adjacency (`tests/unit/test_merchandising_api.py`) **35/35** (grep for `style-versions` consumers:
+      list/create only, unaffected by the additive action); frontend `tsc -b` exit 0, lint 0 errors
+      (baseline warnings), vitest full **418 passed / 416 (51 files; session baseline 413 → +5)**.
+      **VERIFIED.**

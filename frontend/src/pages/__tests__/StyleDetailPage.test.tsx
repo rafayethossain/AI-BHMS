@@ -18,6 +18,7 @@ vi.mock('../../api/client', () => ({
     getStyleBOMs: vi.fn(),
     getStyleDesignImages: vi.fn(),
     getStyleTechPacks: vi.fn(),
+    getStyleVersionSalesOrder: vi.fn(),
     getDesignSheets: vi.fn(),
   },
   setupApi: {
@@ -60,7 +61,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import StyleDetailPage from '../StyleDetailPage';
 import { merchApi, setupApi } from '../../api/client';
-import type { Style } from '../../api/client';
+import type { Style, StyleVersion, SalesOrderRow } from '../../api/client';
 
 const STYLE: Style = {
   id: 'sty-1',
@@ -84,7 +85,58 @@ const STYLE: Style = {
   pattern_request_date: '',
   design_note: '',
   created_at: '2026-09-01T00:00:00Z',
+  current_version: 2,
 } as unknown as Style;
+
+const VERSIONS = [
+  { id: 'sv-2', version_number: 2, revision_notes: '', status: 'active', created_at: '2026-09-02T00:00:00Z' },
+  { id: 'sv-1', version_number: 1, revision_notes: '', status: 'active', created_at: '2026-09-01T00:00:00Z' },
+] as unknown as StyleVersion[];
+
+const ROWS = [
+  {
+    id: 'po-1',
+    po_number: 'PO-101',
+    file_number: 'FO-101',
+    buyer_name: 'Aldi',
+    factory_name: 'F1',
+    destination_country_name: 'UK',
+    delivery_date: '2026-06-01',
+    quantity: 1000,
+    unit_price: '10.00',
+    total_value: '10000.00',
+    status: 'in_production',
+    items: [],
+    sales_statuses: {
+      fabric: { code: 'green', label: 'Green', color: '#16a34a', numeric: 1 },
+      trims: { code: 'amber', label: 'Amber', color: '#d97706', numeric: 2 },
+      production: { code: 'amber', label: 'Amber', color: '#d97706', numeric: 2 },
+      delivery: { code: 'red', label: 'Red', color: '#dc2626', numeric: 4 },
+      overall: { code: 'red', label: 'Red', color: '#dc2626', numeric: 4 },
+    },
+  },
+  {
+    id: 'po-2',
+    po_number: 'PO-102',
+    file_number: 'FO-102',
+    buyer_name: 'Aldi',
+    factory_name: 'F2',
+    destination_country_name: 'US',
+    delivery_date: '2026-07-01',
+    quantity: 500,
+    unit_price: '9.00',
+    total_value: '4500.00',
+    status: 'draft',
+    items: [],
+    sales_statuses: {
+      fabric: { code: 'none', label: 'None', color: '#6b7280', numeric: 0 },
+      trims: { code: 'none', label: 'None', color: '#6b7280', numeric: 0 },
+      production: { code: 'none', label: 'None', color: '#6b7280', numeric: 0 },
+      delivery: { code: 'none', label: 'None', color: '#6b7280', numeric: 0 },
+      overall: { code: 'none', label: 'None', color: '#6b7280', numeric: 0 },
+    },
+  },
+] as unknown as SalesOrderRow[];
 
 function renderPage() {
   return render(
@@ -99,12 +151,13 @@ beforeEach(() => {
   navCapture.reset();
   (merchApi.getStyle as ReturnType<typeof vi.fn>).mockResolvedValue({ data: STYLE });
   (merchApi.getStyleItems as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
-  (merchApi.getStyleVersions as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
+  (merchApi.getStyleVersions as ReturnType<typeof vi.fn>).mockResolvedValue({ data: VERSIONS });
   (merchApi.getStyleFileOpenings as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
   (merchApi.getStylePOs as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
   (merchApi.getStyleBOMs as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
   (merchApi.getStyleDesignImages as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
   (merchApi.getStyleTechPacks as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
+  (merchApi.getStyleVersionSalesOrder as ReturnType<typeof vi.fn>).mockResolvedValue({ data: ROWS });
   (merchApi.getDesignSheets as ReturnType<typeof vi.fn>).mockResolvedValue({
     data: { results: [{ id: 'ds-1', style_id: 'sty-1' }], count: 1 },
   });
@@ -145,5 +198,66 @@ describe('StyleDetailPage Design Information (merged Design surface)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Open in Design' }));
     expect(navCapture.to).toBe('/design');
+  });
+});
+
+describe('StyleDetailPage Sales Order tab (RQ-051)', () => {
+  async function openSalesOrderTab() {
+    renderPage();
+    await screen.findByText('Test Style');
+    await userEvent.click(screen.getByRole('button', { name: 'Sales Order' }));
+  }
+
+  it('defaults to the latest version and renders POS with status pills', async () => {
+    await openSalesOrderTab();
+
+    await screen.findByText('PO-101');
+    expect(screen.getByText('PO-102')).toBeInTheDocument();
+    expect(merchApi.getStyleVersionSalesOrder).toHaveBeenCalledWith('sv-2');
+    expect(screen.getByText('FO-101')).toBeInTheDocument();
+    expect(screen.getAllByText('Red').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('None').length).toBeGreaterThan(0);
+  });
+
+  it('renders per-status tailwind pill classes', async () => {
+    await openSalesOrderTab();
+    await screen.findByText('PO-101');
+
+    const amberPills = screen.getAllByText('Amber');
+    expect(amberPills.length).toBeGreaterThan(0);
+    expect(amberPills[0].className).toContain('bg-amber-500/15');
+
+    const redPills = screen.getAllByText('Red');
+    expect(redPills[0].className).toContain('bg-red-500/15');
+
+    const greenPills = screen.getAllByText('Green');
+    expect(greenPills[0].className).toContain('bg-emerald-500/15');
+  });
+
+  it('refetches when the version dropdown changes', async () => {
+    await openSalesOrderTab();
+    await screen.findByText('PO-101');
+    expect(merchApi.getStyleVersionSalesOrder).toHaveBeenCalledWith('sv-2');
+
+    const dropdown = screen.getByRole('combobox', { name: '' });
+    await userEvent.selectOptions(dropdown, 'sv-1');
+    await vi.waitFor(() =>
+      expect(merchApi.getStyleVersionSalesOrder).toHaveBeenCalledWith('sv-1'),
+    );
+  });
+
+  it('shows an empty state when the version has no POS', async () => {
+    (merchApi.getStyleVersionSalesOrder as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
+    await openSalesOrderTab();
+
+    expect(await screen.findByText('No sales orders for this version')).toBeInTheDocument();
+  });
+
+  it('navigates to the purchase order on row click', async () => {
+    await openSalesOrderTab();
+    await screen.findByText('PO-101');
+
+    await userEvent.click(screen.getByText('PO-101'));
+    expect(navCapture.to).toBe('/purchase-orders/po-1');
   });
 });

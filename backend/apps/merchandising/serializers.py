@@ -10,7 +10,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.setup.serializers import RiskLevelSerializer
 
-from . import risk_engine
+from . import risk_engine, sales_order
 from .models import (
     BOM,
     TA,
@@ -462,6 +462,30 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         price = validated_data.get("unit_price") or Decimal("0")
         validated_data["total_value"] = Decimal(str(qty)) * price
         return super().create(validated_data)
+
+
+class SalesOrderRowSerializer(serializers.ModelSerializer):
+    """A Sales Order report row (RQ-051): PO headline fields + pipeline statuses."""
+
+    items = PurchaseOrderItemSerializer(many=True, read_only=True)
+    file_number = serializers.CharField(source="file_opening.file_number", read_only=True)
+    buyer_name = serializers.CharField(source="buyer.name", read_only=True)
+    factory_name = serializers.CharField(source="factory.name", read_only=True)
+    destination_country_name = serializers.CharField(
+        source="destination_country.name", read_only=True, default=None
+    )
+    sales_statuses = serializers.SerializerMethodField()
+
+    def get_sales_statuses(self, obj):
+        return sales_order.compute_sales_order_statuses(obj, today=timezone.localdate())
+
+    class Meta:
+        model = PurchaseOrder
+        fields = [
+            "id", "po_number", "file_number", "buyer_name", "factory_name",
+            "destination_country_name", "delivery_date", "quantity", "unit_price",
+            "total_value", "status", "items", "sales_statuses",
+        ]
 
 
 class BOMItemSerializer(serializers.ModelSerializer):
