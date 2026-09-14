@@ -205,6 +205,21 @@ Standard CRUD for each master-data resource:
 
 Each resource: `GET /` (list), `POST /` (create), `GET/PUT/PATCH/DELETE /{id}/`.
 
+#### Design Costing actions — `/api/v1/merchandising/design-costings/{id}/…`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/design-costings/` | Create a style-level single-piece cost (`DesignCosting`) |
+| POST | `/{id}/approve/` | Approve the design costing |
+| POST | `/{id}/reject/` | Reject the design costing |
+| POST | `/{id}/set_live/` | Mark the design costing as live (source for PO costing) |
+| POST | `/{id}/prepare_po_costing/` | **Derive an order-level `Costing`** from the approved design cost: copies cost lines, snapshots the **price-ladder** fields (`customer_discount_pct`, `origin_overhead_pct`, `uk_overhead_pct`, `selling_price`, `exchange_rate`) and computes PO-level totals (`po_quantity`, `po_total_cost`, `po_base_cost`, `po_margin_amount`) from a target PO's quantity. Returns the prepared `Costing` (serialized with method fields `discount_amount`, `overhead_amount`, `base_cost`, `margin_amount`). Guard: 400 on the duplicate-PO case. |
+
+The `DesignCosting` serializer round-trips the ladder source fields
+(`customer_discount_pct`, `origin_overhead_pct`, `uk_overhead_pct`, `selling_price`,
+`exchange_rate`) and the computed ladder (`discount_amount`, `overhead_amount`, `base_cost`,
+`margin_amount`, `landed_cost`).
+
 ### 4.6 Fabric — `/api/v1/fabric/`
 
 `categories`, `hts-codes`, `suppliers`, `mills`, `rfqs`, `rfq-line-items`,

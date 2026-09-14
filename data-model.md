@@ -316,14 +316,27 @@ FK: `style`. Fields: `image`, `role` (sketch/layout/…) , `caption`, `colourway
 `is_single_size`, `size_ratio`, `confirmed`, `confirmed_at`, `is_patterned`,
 `patterned_fabric_options`.
 
+Design-costing ladder **snapshot** (frozen at `prepare_po_costing` time, all defaulted:
+`0` or `null=True`): `customer_discount_pct`, `origin_overhead_pct`, `uk_overhead_pct`,
+`selling_price`. PO-level computed totals: `po_quantity`, `po_total_cost`, `po_base_cost`,
+`po_margin_amount`. The serializer exposes computed method fields `discount_amount`,
+`overhead_amount`, `base_cost`, `margin_amount` (per-piece ladder values carried from the
+snapshot).
+
 `costingline` FK: `costing`, `approved_by`. Fields: `category`, `description`,
 `unit_price`, `consumption`, `is_additional`, `original_description`, `approved_at`,
 `size_width`, `sort_order`.
 
 ### 4.15 Design Costing (Style-level) — `merchandising.designcosting` + `designcostingline`
 
-Like Costing but FK `style` (not PO) and with no `exchange_rate`/`confirmed` fields;
-`designcostingline` has no approval fields. Fields mirror `costing`/`costingline`.
+`designcosting` FK: `style`, `approved_by`. Fields mirror `costing` (`version`, `status`,
+`sheet_type`, `is_live`, `target_price`, `fabric_cost`, `trim_cost`, `cm_cost`, `overhead_cost`,
+`total_cost`, `margin`, `approved_at`, `notes`, `is_single_size`, `size_ratio`, `confirmed`,
+`is_patterned`, `patterned_fabric_options`) plus the **price-ladder** source fields:
+`customer_discount_pct`, `origin_overhead_pct`, `uk_overhead_pct`, `selling_price`,
+`exchange_rate`. Ladder decomposes in `save()` to `discount_amount`, `overhead_amount`,
+`base_cost`, `margin_amount`, `landed_cost`. `designcostingline` has no approval fields; fields
+mirror `costingline`.
 
 ### 4.16 T&A / T&Milestone — `merchandising.ta` + `merchandising.tamilestone`
 

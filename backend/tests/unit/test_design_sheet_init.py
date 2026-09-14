@@ -157,6 +157,7 @@ def source_sheet(tenant, style, product_type, source_buyer):
         length="100cm",
         sketch="SK-SOURCE",
         contains="Div 3 / 3446",
+        issue_date=date(2026, 7, 10),
         risk_date=date(2026, 9, 1),
         pattern_request_date=date(2026, 8, 15),
         other_images=["photo_a.png", "photo_b.png"],
@@ -279,6 +280,55 @@ class TestInitFresh:
         assert sheet.sketch_annotations == []
         assert sheet.tech_pack.note == ""
 
+    def test_fresh_persists_full_design_information(self, client, product_type, buyer):
+        resp = client.post(
+            "/api/v1/merchandising/design-sheets/init/",
+            {
+                "mode": "fresh",
+                "product_type": str(product_type.id),
+                "buyer": str(buyer.id),
+                "block_reference": "A-Block",
+                "description": "Brand new design",
+                "designer": "Ava.Designer",
+                "pattern_cutter": "Pat.Cutter",
+                "issuer": "Issuer Two",
+                "cloth_code": "CC-200",
+                "size": "L/XL",
+                "length": "34 inches",
+                "issue_date": "2026-09-14",
+                "risk_date": "2026-09-20",
+                "pattern_request_date": "2026-09-10",
+                "design_note": "Direct entry note",
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_201_CREATED
+        sheet = DesignSheet.objects.get(id=resp.data["id"])
+        tp = sheet.tech_pack
+        assert tp.block == "A-Block"
+        assert tp.description == "Brand new design"
+        assert tp.designer == "Ava.Designer"
+        assert tp.pattern_cutter == "Pat.Cutter"
+        assert tp.issuer == "Issuer Two"
+        assert tp.cloth_code == "CC-200"
+        assert tp.size == "L/XL"
+        assert tp.length == "34 inches"
+        assert tp.issue_date == date(2026, 9, 14)
+        assert tp.risk_date == date(2026, 9, 20)
+        assert tp.pattern_request_date == date(2026, 9, 10)
+        assert tp.note == "Direct entry note"
+        assert resp.data["designer"] == "Ava.Designer"
+        assert resp.data["issue_date"] == "2026-09-14"
+        assert resp.data["note"] == "Direct entry note"
+
+    def test_fresh_rejects_invalid_issue_date(self, client):
+        resp = client.post(
+            "/api/v1/merchandising/design-sheets/init/",
+            {"mode": "fresh", "issue_date": "not-a-date"},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
 
 @pytest.mark.django_db
 class TestInitCopy:
@@ -364,6 +414,39 @@ class TestInitCopy:
         tp = DesignSheet.objects.get(id=resp.data["id"]).tech_pack
         assert tp.buyer_id == buyer.id
         assert tp.product_type_id == source_sheet.tech_pack.product_type_id
+
+    def test_copy_carries_design_dates_from_source(self, client, source_sheet):
+        resp = client.post(
+            self.INIT_URL,
+            {"mode": "copy", "source_design_sheet": str(source_sheet.id)},
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_201_CREATED
+        tp = DesignSheet.objects.get(id=resp.data["id"]).tech_pack
+        assert tp.issue_date == date(2026, 7, 10)
+        assert tp.risk_date == date(2026, 9, 1)
+        assert tp.pattern_request_date == date(2026, 8, 15)
+
+    def test_copy_user_design_info_overrides_source(self, client, source_sheet):
+        resp = client.post(
+            self.INIT_URL,
+            {
+                "mode": "copy",
+                "source_design_sheet": str(source_sheet.id),
+                "designer": "New.Designer",
+                "issue_date": "2026-10-01",
+                "design_note": "Override note",
+            },
+            format="json",
+        )
+        assert resp.status_code == status.HTTP_201_CREATED
+        tp = DesignSheet.objects.get(id=resp.data["id"]).tech_pack
+        assert tp.relationship == "based_on"
+        assert tp.designer == "New.Designer"
+        assert tp.issue_date == date(2026, 10, 1)
+        assert tp.note == "Override note"
+        assert tp.size == "M"
+        assert tp.risk_date == date(2026, 9, 1)
 
     def test_copy_requires_source_design_sheet(self, client):
         resp = client.post(self.INIT_URL, {"mode": "copy"}, format="json")

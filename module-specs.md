@@ -541,6 +541,54 @@
 
 ---
 
+### 5.2 Design Costing (Style-level single-piece cost)
+
+Mirrors the PO-level Costing but is keyed to a **Style** (not a PO): one single-piece garment cost
+per Style that serves as the source of truth for the "tech pack import → single-piece costing →
+PO costing" flow. Approval lifecycle (`approve` / `reject` / `set_live`) gates whether it can be
+pushed to an order.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| Style | Reference | Yes | Related style |
+| Version | Number | Auto | Version number (unique per style) |
+| Status | Dropdown | Yes | Draft / Approved / Rejected / Live |
+| Total Cost | Currency | Auto | Sum of cost lines (recomputed in `save()`) |
+| Cost Lines | Table | Yes | Fabric / Trims / Labels / Making / Overheads categories |
+
+**Per-Piece Price Ladder (ME-016):** the design costing also carries a selling-price decomposition
+recomputed on save, mirroring the reference cost-report layout:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| Selling Price | Currency | No | Proposed per-piece selling price |
+| Customer Discount % | Percent | No | Discount applied to the **selling price** |
+| Origin Overhead % | Percent | No | Origin-side overhead share of total cost |
+| UK Overhead % | Percent | No | UK-side overhead share of total cost |
+| Exchange Rate | Number | No | Rate used to derive the landed cost |
+| Discount Amount | Currency | Auto | Selling × Discount% ÷ 100 |
+| Overhead Amount | Currency | Auto | Total Cost × (Origin% + UK%) ÷ 100 |
+| Base Cost | Currency | Auto | Total Cost + Discount + Overhead |
+| Margin | Currency | Auto | Selling Price − Base Cost |
+| Landed Cost | Currency | Auto | Total Cost × Exchange Rate |
+
+**Ladder formulas (locked by tests):**
+```
+discount_amount  = selling_price × customer_discount_pct / 100
+overhead_amount  = total_cost × (origin_overhead_pct + uk_overhead_pct) / 100
+base_cost        = total_cost + discount_amount + overhead_amount
+margin_amount    = selling_price − base_cost
+landed_cost      = total_cost × exchange_rate
+```
+
+**Prepare PO Costing:** the `prepare_po_costing` action snapshots the ladder fields
+(`customer_discount_pct`, `origin_overhead_pct`, `uk_overhead_pct`, `selling_price`,
+`exchange_rate`) onto the derived order-level `Costing` and computes PO-level totals
+(per-piece ladder × PO quantity): `po_total_cost`, `po_base_cost`, `po_margin_amount`
+and `po_quantity`. If no ladder is set, only `total_cost` is carried.
+
+---
+
 ## 6. Commercial Module
 
 ### 6.1 LC Management

@@ -612,9 +612,93 @@ describe('DesignsPage (New Design flow)', () => {
         description: 'Front pocket changed',
         include_annotation: true,
         include_notes: true,
+        designer: 'Emmi.Huynh',
+        risk_date: '2026-09-01',
+        pattern_request_date: '2026-08-15',
+        design_note: 'Front pocket changed',
       }),
     );
     expect(await screen.findByText('DS-DETAIL-SHEET')).toBeInTheDocument();
+  });
+
+  it('fresh mode exposes the full Design Information inputs and sends them', async () => {
+    renderPage();
+    await screen.findByText('REG-1001');
+    fireEvent.click(screen.getByRole('button', { name: '+ New Design' }));
+    await screen.findByTestId('new-design-modal');
+
+    expect(screen.getByLabelText(/Issue Date/)).toHaveAttribute('type', 'date');
+    expect(screen.getByLabelText(/Risk Date/)).toHaveAttribute('type', 'date');
+    expect(screen.getByLabelText(/Pattern Request Date/)).toHaveAttribute('type', 'date');
+    expect(screen.getByLabelText('Design Note').tagName).toBe('TEXTAREA');
+
+    fireEvent.change(screen.getByLabelText('Designer'), { target: { value: 'Ava.Designer' } });
+    fireEvent.change(screen.getByLabelText('Pattern Cutter'), { target: { value: 'Pat.Cutter' } });
+    fireEvent.change(screen.getByLabelText('Issuer'), { target: { value: 'Issuer Two' } });
+    fireEvent.change(screen.getByLabelText('Cloth Code'), { target: { value: 'CC-200' } });
+    fireEvent.change(screen.getByLabelText('Size'), { target: { value: 'L/XL' } });
+    fireEvent.change(screen.getByLabelText('Length'), { target: { value: '34 inches' } });
+    fireEvent.change(screen.getByLabelText(/Issue Date/), { target: { value: '2026-09-14' } });
+    fireEvent.change(screen.getByLabelText(/Risk Date/), { target: { value: '2026-09-20' } });
+    fireEvent.change(screen.getByLabelText(/Pattern Request Date/), { target: { value: '2026-09-10' } });
+    fireEvent.change(screen.getByLabelText('Design Note'), { target: { value: 'Direct entry note' } });
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Brand new jogger' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create Design' }));
+    await waitFor(() =>
+      expect(merchApi.initDesignSheet).toHaveBeenCalledWith({
+        mode: 'fresh',
+        block_reference: '',
+        description: 'Brand new jogger',
+        include_annotation: false,
+        include_notes: false,
+        designer: 'Ava.Designer',
+        pattern_cutter: 'Pat.Cutter',
+        issuer: 'Issuer Two',
+        cloth_code: 'CC-200',
+        size: 'L/XL',
+        length: '34 inches',
+        issue_date: '2026-09-14',
+        risk_date: '2026-09-20',
+        pattern_request_date: '2026-09-10',
+        design_note: 'Direct entry note',
+      }),
+    );
+  });
+
+  it('copy mode pre-fills Design Information from the source and lets it be overridden', async () => {
+    renderPage();
+    await screen.findByText('REG-1001');
+    fireEvent.click(screen.getByRole('button', { name: '+ New Design' }));
+    await screen.findByTestId('new-design-modal');
+    fireEvent.click(screen.getByRole('button', { name: 'Copy From Existing' }));
+
+    const source = screen.getByLabelText(/Copy From Existing Design/);
+    fireEvent.change(source, { target: { value: 'REG-1001' } });
+    fireEvent.click(screen.getByRole('button', { name: /REG-1001/ }));
+
+    expect(screen.getByLabelText('Designer')).toHaveValue('Emmi.Huynh');
+    expect(screen.getByLabelText(/Risk Date/)).toHaveValue('2026-09-01');
+    expect(screen.getByLabelText(/Pattern Request Date/)).toHaveValue('2026-08-15');
+    expect(screen.getByLabelText('Design Note')).toHaveValue('Front pocket changed');
+
+    fireEvent.change(screen.getByLabelText('Designer'), { target: { value: 'New.Designer' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create Design' }));
+    await waitFor(() =>
+      expect(merchApi.initDesignSheet).toHaveBeenCalledWith({
+        mode: 'copy',
+        source_design_sheet: 'reg-1',
+        block_reference: '59073T',
+        description: 'Front pocket changed',
+        include_annotation: false,
+        include_notes: false,
+        designer: 'New.Designer',
+        risk_date: '2026-09-01',
+        pattern_request_date: '2026-08-15',
+        design_note: 'Front pocket changed',
+      }),
+    );
   });
 
   it('blocks submission until a copy source is chosen', async () => {

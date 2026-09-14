@@ -3430,6 +3430,18 @@ Original 116-story backlog across 14 epics. Every requirement's live status and 
 > 30/30; tsc 0, lint 0 errors, vitest 298/298; live smoke create/prepare/guard 200/201/400. This closes the
 > "tech pack import → single-piece costing → PO costing" design narrative; the order-level `Costing` remains
 > PO-scoped (RQ-013/014).
+>
+> **2026-09-14 — Design costing per-piece price ladder + PO snapshot (Slice A+B, tracker #73):** extended the
+> `DesignCosting` model with a **discount + overhead price ladder** (`customer_discount_pct`, `origin_overhead_pct`,
+> `uk_overhead_pct`, `selling_price`, `exchange_rate`) recomputed in `save()` (discount = selling × discount_pct / 100,
+> overhead = total_cost × (origin_pct + uk_pct) / 100, base cost = total + discount + overhead, margin = selling −
+> base, landed cost = total × rate). `prepare_po_costing` now carries a **frozen snapshot** of the ladder fields +
+> computed PO-level totals (`po_quantity`, `po_total_cost`, `po_base_cost`, `po_margin_amount`) onto `Costing`.
+> `CostingSerializer` exposes computed `discount_amount`, `overhead_amount`, `base_cost`, `margin_amount` + the new
+> model fields. Migrations `0043` (DesignCosting ladder) + `0044` (Costing ladder snapshot + PO totals). VERIFIED:
+> backend 59/59 (ladder 16, model 7, API 4, prepare 10, adjacency 18) + adjacency (`test_costing.py` +
+> `test_merchandising_api.py` + `test_cost_reconcile.py`) 74/74; frontend 413/413 vitest, tsc 0, lint 0 errors.
+> All new `Costing` fields are defaulted (0 / null=True) — no downstream consumer breakage.
 
 ---
 
@@ -4967,6 +4979,36 @@ same click-to-place-note interaction as the sketch.
   4 new: dialog open, close-without-persist, existing notes shown, save plumbing). GATE_A VERIFIED:
   backend targeted 10/10 + owning app 51/51; frontend tsc `-b` 0, lint 0 errors, vitest **408/408**
   (50 files; session baseline 397 → +11).
+
+## Part 15 Addendum 14 - New Design flow: full Design Information entry (2026-09-14)
+
+User request: when creating a new design from the register, **all** attributes of the Design
+Information section should be available to enter at creation time, with input fields typed to fit
+(dropdowns / calendar / text / multiline), modeled on the techpack-import experience. Extends the
+Part 14 "New Design" flow (`NewDesignModal` + `POST /design-sheets/init/`).
+
+- Scope agreed with BA: every Design Information attribute becomes an editable input in both modes,
+  matching the authoritative editor (`DesignSheetHeader.tsx`) field set + input types — text for
+  Designer / Pattern Cutter / Issuer / Cloth Code / Size / Length (no pure-numeric attribute exists
+  in Design Information, so no number inputs apply); `type="date"` (calendar) for Issue / Risk /
+  Pattern-Request Date; multiline textareas for Design Note + Description; dropdowns stay for the
+  typed picks (Garments Type, Buyer). Server-enforced/derived attributes stay out of the form
+  (Relationship, Based On, Style Code, Style Reference).
+- Backend: `DesignInitSerializer` +9 fields (`designer`, `pattern_cutter`, `issuer`, `cloth_code`,
+  `size`, `length`, `issue_date`, `risk_date`, `pattern_request_date`, `design_note`) with
+  client-wins fallback-to-source semantics in `init` (mirrors the existing `block`/`description`
+  pattern); `design_note` maps to the tech-pack `note`; `issue_date` re-added to the copy carry set
+  (it was silently dropped before).
+- Frontend: `NewDesignModal` gains a 2-col Design Information grid inside the create dialog (modal
+  widened `max-w-lg` → `max-w-2xl`); copy mode pre-fills the grid from the chosen source and lets the
+  user override; only non-empty values are submitted; `initDesignSheet` body extracted to the
+  `InitDesignSheetData` type in `client.ts`.
+- Tests: RED-first backend `test_design_sheet_init.py` **+4 → 20/20** (fresh full-set persistence +
+  response exposure, bad-date 400, copy date carry, copy override); frontend `DesignsPage.test.tsx`
+  **+2 → 24/24** (fresh inputs + typed payload; copy prefill + override). GATE_A VERIFIED: backend
+  targeted 20/20 + owning app (merchandising) 51/51 + adjacency `test_buyer_merge.py` 13/13;
+  frontend `tsc -b` 0, lint 0 errors (baseline warnings), vitest **410/410** (50 files; session
+  baseline 408 → +2). Fits `TDD_TRACKER` #72.
 
 ---
 

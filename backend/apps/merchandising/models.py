@@ -726,6 +726,42 @@ class Costing(TenantModel):
     is_patterned = models.BooleanField(default=False, help_text="Patterned fabric requires additional options for an accurate costing")
     patterned_fabric_options = models.JSONField(default=list, blank=True, help_text="Subset of the 4 pattern options for patterned fabric")
 
+    # ── Price-ladder snapshot (copied from DesignCosting at prepare time) ────
+    customer_discount_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="Customer discount % snapshot from the design costing."
+    )
+    origin_overhead_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="Origin overhead % snapshot from the design costing."
+    )
+    uk_overhead_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="UK overhead % snapshot from the design costing."
+    )
+    selling_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Selling price snapshot from the design costing."
+    )
+
+    # ── PO-level totals (computed at prepare time from PO quantity × per-piece) ──
+    po_quantity = models.IntegerField(
+        default=0,
+        help_text="Frozen PO quantity snapshot at prepare time."
+    )
+    po_total_cost = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True,
+        help_text="PO total cost = per-piece total_cost × po_quantity."
+    )
+    po_base_cost = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True,
+        help_text="PO base cost = per-piece base_cost × po_quantity."
+    )
+    po_margin_amount = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True,
+        help_text="PO margin = per-piece margin_amount × po_quantity."
+    )
+
     class Meta:
         ordering = ["-version"]
         unique_together = ["purchase_order", "version"]
@@ -819,6 +855,26 @@ class DesignCosting(TenantModel):
     overhead_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     margin = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    customer_discount_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="Customer discount % applied on the selling price (reference price ladder)."
+    )
+    origin_overhead_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="BD/VN/CN origin overhead % applied on the per-piece total cost."
+    )
+    uk_overhead_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="UK overhead % applied on the per-piece total cost."
+    )
+    exchange_rate = models.DecimalField(
+        max_digits=12, decimal_places=6, null=True, blank=True,
+        help_text="GBP per 1 USD (dollar rate); converts total cost into GBP landed cost."
+    )
+    selling_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Selling price for the per-piece ladder (reference 'Selling Price')."
+    )
     is_single_size = models.BooleanField(default=False)
     size_ratio = models.JSONField(default=list, blank=True)
     is_patterned = models.BooleanField(default=False)
@@ -844,9 +900,40 @@ class DesignCosting(TenantModel):
 
     @property
     def margin_percent(self):
+        if self.selling_price is not None and self.selling_price > 0 and self.margin_amount is not None:
+            return round(float(self.margin_amount / self.selling_price * 100), 2)
         if self.total_cost and self.target_price and self.total_cost > 0:
             return round(float((self.target_price - self.total_cost) / self.total_cost * 100), 2)
         return None
+
+    @property
+    def discount_amount(self):
+        if self.selling_price is None:
+            return None
+        return (self.selling_price * self.customer_discount_pct / Decimal("100")).quantize(Decimal("0.01"))
+
+    @property
+    def overhead_amount(self):
+        pct = (self.origin_overhead_pct or 0) + (self.uk_overhead_pct or 0)
+        return (self.total_cost * pct / Decimal("100")).quantize(Decimal("0.01"))
+
+    @property
+    def base_cost(self):
+        if self.discount_amount is None:
+            return None
+        return (self.total_cost + self.discount_amount + self.overhead_amount).quantize(Decimal("0.01"))
+
+    @property
+    def margin_amount(self):
+        if self.selling_price is None or self.base_cost is None:
+            return None
+        return (self.selling_price - self.base_cost).quantize(Decimal("0.01"))
+
+    @property
+    def landed_cost(self):
+        if self.exchange_rate is None:
+            return None
+        return (self.total_cost * self.exchange_rate).quantize(Decimal("0.01"))
 
 
 class DesignCostingLine(TenantModel):

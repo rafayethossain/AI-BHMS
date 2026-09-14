@@ -1947,3 +1947,84 @@ long-lived process can be stale.
 **Linked slice/requirement:** slice #71 / US-036 (TDD_TRACKER entry 71; master-backlog Addendum 13).
 **Result:** live backend verified: route live (401 unauthenticated), full annotation round-trip 200 on
 the dev DB. Frontend unchanged (Vite hot-reload).
+
+## 2026-09-14 - New Design flow: keep the init payload client-wins + blank-omitted (slice #72)
+
+**What happened:** extending the register "+ New Design" flow so all Design Information attributes can
+be entered at creation time. The init endpoint already carried Design Information between copy sources
+(size/designer/... inherited from the source) but the fresh-create path dropped them; `issue_date` was
+silently dropped even in copy mode. The modal now collects the full field set with typed inputs
+(text / date / textarea) and the backend persists them with client-wins-fallback-to-source semantics.
+
+**What went well:** reusing the existing `or`-fallback pattern already used for `block`/`description`
+(blank client value -> inherit source) kept copy mode's inheritance intact with zero special-casing.
+Extracting the init body to a named `InitDesignSheetData` type in `client.ts` removed the need for an
+untyped index-signature payload in the modal. Two existing tests (fresh + copy) stayed green by
+omitting blank fields from the payload; only the copy-mode expectation needed updating (mock `design`
+fixture already carried designer != "" / risk_date / pattern_request_date / note, so they pre-fill).
+
+**What to do differently:** two traps worth recording. (1) TS rejects `payload[key] = value` when `key`
+is typed as a wide `(keyof T)[]` union — narrowing the array to `as const` gives the literal union and
+a clean write target. (2) Date fields must remain `allow_null` on the serializer and the frontend must
+OMIT empty date strings (sending `""` fails `DateField` parsing) — blanks fall through to the source
+inherit by design. Known limitation (accepted this round): clearing a prefilled copy date is not
+supported (blank -> inherit); revisit with `null` semantics if users need to explicitly clear dates on
+copy.
+
+**Linked slice/requirement:** slice #72 / Part 14 "New Design" extension (TDD_TRACKER entry 72;
+master-backlog Addendum 14).
+**Result:** GATE_A VERIFIED - backend targeted 20/20 + owning app 51/51 + adjacency 13/13; frontend
+targeted 24/24, vitest full 410/410 (50 files), tsc 0, lint 0 errors.
+
+---
+
+## 2026-09-14 - Design costing price ladder + PO costing snapshot (tracker #73)
+
+**What happened:** Extended `DesignCosting` with a per-piece discount/overhead price ladder
+(`customer_discount_pct`, `origin_overhead_pct`, `uk_overhead_pct`, `selling_price`, `exchange_rate`),
+recomputed in `save()`, plus a frozen PO snapshot on `Costing` with computed totals at
+`prepare_po_costing` time. Two new migrations (0043 + 0044).
+
+**What went well:**
+- The ladder formula (discount on selling, overhead on total_cost) was pure `save()` recompute logic,
+  so RED tests proved every edge case (zero selling, zero pcts, negative margin) before touching
+  the serializer or frontend.
+- The `Costing` snapshot fields all had defaults (`0` / `null=True`), so existing consumers
+  (`CostingDetailPage`, `CostingsListPage`, `CostReconcilePage`) stayed green with zero changes —
+  the blast radius check was honest.
+- Frontend price-ladder block reused the existing `DesignCostingDetailPage` layout with a new
+  "Price Ladder" section, keeping the UI surface additive.
+
+**What went wrong / two pitfalls worth recording:**
+
+1. **`type="number"` input `.value` is a number, not a string.** The frontend test asserted
+   `toHaveValue(15)` (the expected numeric discount) on a `<input type="number">`. In jsdom,
+   `element.value` for a number input returns the **string** `"15"`, not the number `15`, so
+   `toHaveValue(15)` failed with `expected "15" to be 15`. The fix: `toHaveValue("15")` (string
+   arg) — the jsdom input value is always a string. This only affects `type="number"` inputs
+   checked with `toHaveValue`; for string inputs it is already a string, so the pattern is consistent
+   but the numeric variant trips people up.
+
+2. **`useEffect` derived state needs `waitFor`, not `findByTestId`.** The price-ladder readouts
+   (`discount_amount`, `overhead_amount`, `base_cost`, `margin_amount`) are computed in a `useEffect`
+   that runs after the form state changes. The test used `findByTestId` (which is a one-shot
+   polling query) and the assertion passed on the *initial* render (before the `useEffect` fired),
+   when the derived values were still `0`. Switching to `waitFor(() => expect(...))` inside the
+   `act()` block ensured the assertion ran *after* the effect completed and the derived values were
+   updated. `findByTestId` is for elements that appear later in the DOM (async renders); derived
+   state that changes an existing element needs `waitFor`.
+
+**What to do differently:**
+- When testing `type="number"` inputs, always use string args with `toHaveValue` (e.g.
+  `toHaveValue("15")` not `toHaveValue(15)`), since jsdom's `.value` is always a string regardless
+  of the input type.
+- When testing derived/calculated state that depends on a `useEffect` (computed readouts, derived
+  totals), use `waitFor(() => expect(...))` instead of `findBy*` queries — the effect runs after
+  render, and `findBy*` may resolve before the effect fires.
+- When adding computed `save()` fields to a model, write the RED tests covering zero-boundary,
+  negative-margin, and rate-multiply cases *before* touching the serializer, so the formula is
+  locked down independently of the API layer.
+
+**Linked slice/requirement:** tracker #73 / RQ-013 design costing ladder + PO snapshot.
+**Result:** GATE_A VERIFIED — backend 59/59 (ladder 16, model 7, API 4, prepare 10, adjacency 18) +
+adjacency 74/74; frontend 413/413 vitest, tsc 0, lint 0 errors.

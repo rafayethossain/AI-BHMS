@@ -3159,6 +3159,23 @@ class DesignCostingViewSet(viewsets.ModelViewSet):
             is_patterned=design.is_patterned,
             patterned_fabric_options=design.patterned_fabric_options,
             notes=design.notes,
+            # Price-ladder snapshot
+            customer_discount_pct=design.customer_discount_pct,
+            origin_overhead_pct=design.origin_overhead_pct,
+            uk_overhead_pct=design.uk_overhead_pct,
+            selling_price=design.selling_price,
+            exchange_rate=design.exchange_rate,
+            # PO-level totals
+            po_quantity=purchase_order.quantity,
+            po_total_cost=(design.total_cost * purchase_order.quantity).quantize(Decimal("0.01")),
+            po_base_cost=(
+                (design.base_cost * purchase_order.quantity).quantize(Decimal("0.01"))
+                if design.base_cost is not None else None
+            ),
+            po_margin_amount=(
+                (design.margin_amount * purchase_order.quantity).quantize(Decimal("0.01"))
+                if design.margin_amount is not None else None
+            ),
             created_by=request.user,
         )
         for line in design.lines.all():
@@ -3395,18 +3412,23 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
 
         The Design register "+ New Design" dialog sends ``mode``
         (``fresh``/``copy``), typed selections (``product_type`` and ``buyer``
-        reference setup records), ``block_reference``, ``description`` and the
-        two include flags. ``copy`` requires a tenant-scoped
-        ``source_design_sheet``; the new sheet inherits the source's technical
-        header + sketch and records ``based_on`` = source tech-pack number.
+        reference setup records), ``block_reference`` and the Design
+        Information attributes (``designer``, ``pattern_cutter``, ``issuer``,
+        ``cloth_code``, ``size``, ``length``, ``description``, ``design_note``
+        and the three dates) plus the two include flags. ``copy`` requires a
+        tenant-scoped ``source_design_sheet``; the new sheet inherits the
+        source's technical header + sketch and records ``based_on`` = source
+        tech-pack number. Client-provided Design Information always wins;
+        blank values fall back to the source.
 
         The unique ``style_code`` is generated automatically. ``relationship``
         is always ``new`` in fresh mode and ``based_on`` in copy mode (handled
         by the client, but the server enforces it). ``style_number`` (style
         reference) is never taken from the client: it stays blank in fresh mode
-        and is derived from the source in copy mode. Annotations and the note
-        are carried over only when ``include_annotation`` / ``include_notes``
-        are true.
+        and is derived from the source in copy mode. ``design_note`` maps to
+        the tech-pack ``note``. Annotations and the note are carried over only
+        when ``include_annotation`` / ``include_notes`` are true (a directly
+        entered ``design_note`` wins regardless).
         """
         payload = DesignInitSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
@@ -3480,22 +3502,25 @@ class DesignSheetViewSet(viewsets.ModelViewSet):
                 block=data["block_reference"] or (source_tp.block if source_tp else ""),
                 description=data["description"] or (source_tp.description if source_tp else ""),
                 based_on=(source_tp.techpack_number if source_tp else ""),
-                size=source_tp.size if source_tp else "",
-                designer=source_tp.designer if source_tp else "",
-                pattern_cutter=source_tp.pattern_cutter if source_tp else "",
-                issuer=source_tp.issuer if source_tp else "",
-                cloth_code=source_tp.cloth_code if source_tp else "",
-                length=source_tp.length if source_tp else "",
+                designer=data["designer"] or (source_tp.designer if source_tp else ""),
+                pattern_cutter=(
+                    data["pattern_cutter"] or (source_tp.pattern_cutter if source_tp else "")
+                ),
+                issuer=data["issuer"] or (source_tp.issuer if source_tp else ""),
+                cloth_code=data["cloth_code"] or (source_tp.cloth_code if source_tp else ""),
+                size=data["size"] or (source_tp.size if source_tp else ""),
+                length=data["length"] or (source_tp.length if source_tp else ""),
                 sketch=source_tp.sketch if source_tp else "",
                 contains=source_tp.contains if source_tp else "",
-                risk_date=source_tp.risk_date if source_tp else None,
+                issue_date=data["issue_date"] or (source_tp.issue_date if source_tp else None),
+                risk_date=data["risk_date"] or (source_tp.risk_date if source_tp else None),
                 pattern_request_date=(
-                    source_tp.pattern_request_date if source_tp else None
+                    data["pattern_request_date"]
+                    or (source_tp.pattern_request_date if source_tp else None)
                 ),
                 note=(
-                    source_tp.note
-                    if source_tp and data["include_notes"]
-                    else ""
+                    data["design_note"]
+                    or (source_tp.note if source_tp and data["include_notes"] else "")
                 ),
                 other_images=list(source_tp.other_images) if source_tp else [],
             )

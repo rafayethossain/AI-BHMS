@@ -773,6 +773,16 @@ export interface DesignCosting {
   total_cost: string;
   margin: string;
   margin_percent: number | null;
+  customer_discount_pct: string | null;
+  origin_overhead_pct: string | null;
+  uk_overhead_pct: string | null;
+  exchange_rate: string | null;
+  selling_price: string | null;
+  discount_amount: string | null;
+  overhead_amount: string | null;
+  base_cost: string | null;
+  margin_amount: string | null;
+  landed_cost: string | null;
   is_single_size: boolean;
   size_ratio: SizeRatioEntry[];
   is_patterned: boolean;
@@ -1803,25 +1813,19 @@ export const merchApi = {
     api.patch<DesignSheet>(`/merchandising/design-sheets/${id}/`, data),
   updateDesignSheetDesignInfo: (id: string, data: Record<string, unknown>) =>
     api.patch<DesignSheet>(`/merchandising/design-sheets/${id}/design-info/`, data),
-  initDesignSheet: (data: {
-    mode: 'fresh' | 'copy';
-    source_design_sheet?: string;
-    product_type?: string;
-    buyer?: string;
-    garments_type?: string;
-    style_reference?: string;
-    relationship?: string;
-    block_reference?: string;
-    description?: string;
-    include_annotation?: boolean;
-    include_notes?: boolean;
-  }) => api.post<DesignSheet>('/merchandising/design-sheets/init/', data),
+  initDesignSheet: (data: InitDesignSheetData) =>
+    api.post<DesignSheet>('/merchandising/design-sheets/init/', data),
 
   // Style-level Design Costings (RQ-013 / G-12)
   getDesignCostings: (params?: Record<string, string>) =>
     api.get<{ results: DesignCosting[]; count: number }>('/merchandising/design-costings/', { params }),
   getDesignCosting: (id: string) =>
     api.get<DesignCosting>(`/merchandising/design-costings/${id}/`),
+  updateDesignCosting: (id: string, data: Pick<
+    DesignCosting,
+    'customer_discount_pct' | 'origin_overhead_pct' | 'uk_overhead_pct' | 'exchange_rate' | 'selling_price'
+  >) =>
+    api.patch<DesignCosting>(`/merchandising/design-costings/${id}/`, data),
   approveDesignCosting: (id: string) =>
     api.post<DesignCosting>(`/merchandising/design-costings/${id}/approve/`),
   rejectDesignCosting: (id: string) =>
@@ -1961,6 +1965,27 @@ export interface DesignSheet {
   completed_orders_count?: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface InitDesignSheetData {
+  mode: 'fresh' | 'copy';
+  source_design_sheet?: string;
+  product_type?: string;
+  buyer?: string;
+  block_reference?: string;
+  description?: string;
+  designer?: string;
+  pattern_cutter?: string;
+  issuer?: string;
+  cloth_code?: string;
+  size?: string;
+  length?: string;
+  issue_date?: string;
+  risk_date?: string;
+  pattern_request_date?: string;
+  design_note?: string;
+  include_annotation?: boolean;
+  include_notes?: boolean;
 }
 
 export type DesignSheetMaterialItem = {

@@ -1,7 +1,26 @@
 import { useEffect, useState } from 'react';
 import { merchApi, setupApi } from '../api/client';
-import type { DesignSheet } from '../api/client';
+import type { DesignSheet, InitDesignSheetData } from '../api/client';
 import SearchableSelect from './SearchableSelect';
+
+const DESIGN_INFO_KEYS = [
+  'designer', 'pattern_cutter', 'issuer', 'cloth_code',
+  'size', 'length', 'issue_date', 'risk_date',
+  'pattern_request_date', 'design_note',
+] as const;
+
+const DESIGN_INFO_INITIAL: Record<string, string> = {
+  designer: '',
+  pattern_cutter: '',
+  issuer: '',
+  cloth_code: '',
+  size: '',
+  length: '',
+  issue_date: '',
+  risk_date: '',
+  pattern_request_date: '',
+  design_note: '',
+};
 
 interface NewDesignModalProps {
   items: DesignSheet[];
@@ -18,9 +37,10 @@ export default function NewDesignModal({ items, onClose, onCreated }: NewDesignM
   const [sourceId, setSourceId] = useState('');
   const [productTypeId, setProductTypeId] = useState<string | null>(null);
   const [buyerId, setBuyerId] = useState<string | null>(null);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<Record<string, string>>({
     block_reference: '',
     description: '',
+    ...DESIGN_INFO_INITIAL,
   });
   const [includeAnnotation, setIncludeAnnotation] = useState(false);
   const [includeNotes, setIncludeNotes] = useState(false);
@@ -41,7 +61,7 @@ export default function NewDesignModal({ items, onClose, onCreated }: NewDesignM
     setSourceId('');
     setProductTypeId(null);
     setBuyerId(null);
-    setForm({ block_reference: '', description: '' });
+    setForm({ block_reference: '', description: '', ...DESIGN_INFO_INITIAL });
     setIncludeAnnotation(false);
     setIncludeNotes(false);
     setSubmitting(false);
@@ -65,6 +85,16 @@ export default function NewDesignModal({ items, onClose, onCreated }: NewDesignM
     setForm({
       block_reference: src?.block ?? '',
       description: src?.description ?? '',
+      designer: src?.designer ?? '',
+      pattern_cutter: src?.pattern_cutter ?? '',
+      issuer: src?.issuer ?? '',
+      cloth_code: src?.cloth_code ?? '',
+      size: src?.size ?? '',
+      length: src?.length ?? '',
+      issue_date: src?.issue_date ?? '',
+      risk_date: src?.risk_date ?? '',
+      pattern_request_date: src?.pattern_request_date ?? '',
+      design_note: src?.note ?? '',
     });
   };
 
@@ -74,16 +104,7 @@ export default function NewDesignModal({ items, onClose, onCreated }: NewDesignM
       : !!sourceId && !submitting;
 
   const submit = async () => {
-    const payload: {
-      mode: 'fresh' | 'copy';
-      source_design_sheet?: string;
-      product_type?: string;
-      buyer?: string;
-      block_reference: string;
-      description: string;
-      include_annotation: boolean;
-      include_notes: boolean;
-    } = {
+    const payload: InitDesignSheetData = {
       mode,
       block_reference: form.block_reference,
       description: form.description,
@@ -97,6 +118,12 @@ export default function NewDesignModal({ items, onClose, onCreated }: NewDesignM
     }
     if (buyerId) {
       payload.buyer = buyerId;
+    }
+    for (const key of DESIGN_INFO_KEYS) {
+      const value = form[key];
+      if (value) {
+        payload[key] = value;
+      }
     }
     setSubmitting(true);
     try {
@@ -124,10 +151,11 @@ export default function NewDesignModal({ items, onClose, onCreated }: NewDesignM
   }));
 
   const readOnlyClass = 'w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading disabled:opacity-70';
+  const inputClass = 'w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500';
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" data-testid="new-design-modal">
-      <div className="bg-surface rounded-xl border border-border w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-surface rounded-xl border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-border flex items-center justify-between">
           <h2 className="text-lg font-semibold">New Design</h2>
           <button
@@ -253,28 +281,152 @@ export default function NewDesignModal({ items, onClose, onCreated }: NewDesignM
             </label>
           </div>
 
-          <div>
-            <label htmlFor="nd-block-reference" className="block text-sm text-body mb-1">
-              Block Reference
-            </label>
-            <input
-              id="nd-block-reference"
-              value={form.block_reference}
-              onChange={(e) => setForm({ ...form, block_reference: e.target.value })}
-              className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
-          <div>
-            <label htmlFor="nd-description" className="block text-sm text-body mb-1">
-              Description
-            </label>
-            <textarea
-              id="nd-description"
-              rows={2}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-heading focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="nd-block-reference" className="block text-sm text-body mb-1">
+                Block Reference
+              </label>
+              <input
+                id="nd-block-reference"
+                value={form.block_reference}
+                onChange={(e) => setForm({ ...form, block_reference: e.target.value })}
+                placeholder="e.g. A-Block"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="nd-designer" className="block text-sm text-body mb-1">
+                Designer
+              </label>
+              <input
+                id="nd-designer"
+                value={form.designer}
+                onChange={(e) => setForm({ ...form, designer: e.target.value })}
+                placeholder="Designer name"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="nd-pattern-cutter" className="block text-sm text-body mb-1">
+                Pattern Cutter
+              </label>
+              <input
+                id="nd-pattern-cutter"
+                value={form.pattern_cutter}
+                onChange={(e) => setForm({ ...form, pattern_cutter: e.target.value })}
+                placeholder="Pattern cutter name"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="nd-issuer" className="block text-sm text-body mb-1">
+                Issuer
+              </label>
+              <input
+                id="nd-issuer"
+                value={form.issuer}
+                onChange={(e) => setForm({ ...form, issuer: e.target.value })}
+                placeholder="Issuer name"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="nd-cloth-code" className="block text-sm text-body mb-1">
+                Cloth Code
+              </label>
+              <input
+                id="nd-cloth-code"
+                value={form.cloth_code}
+                onChange={(e) => setForm({ ...form, cloth_code: e.target.value })}
+                placeholder="e.g. CC-001"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="nd-size" className="block text-sm text-body mb-1">
+                Size
+              </label>
+              <input
+                id="nd-size"
+                value={form.size}
+                onChange={(e) => setForm({ ...form, size: e.target.value })}
+                placeholder="e.g. S/M/L"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="nd-length" className="block text-sm text-body mb-1">
+                Length
+              </label>
+              <input
+                id="nd-length"
+                value={form.length}
+                onChange={(e) => setForm({ ...form, length: e.target.value })}
+                placeholder="e.g. 32 inches"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="nd-issue-date" className="block text-sm text-body mb-1">
+                Issue Date
+              </label>
+              <input
+                id="nd-issue-date"
+                type="date"
+                value={form.issue_date}
+                onChange={(e) => setForm({ ...form, issue_date: e.target.value })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="nd-risk-date" className="block text-sm text-body mb-1">
+                Risk Date
+              </label>
+              <input
+                id="nd-risk-date"
+                type="date"
+                value={form.risk_date}
+                onChange={(e) => setForm({ ...form, risk_date: e.target.value })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="nd-pattern-request-date" className="block text-sm text-body mb-1">
+                Pattern Request Date
+              </label>
+              <input
+                id="nd-pattern-request-date"
+                type="date"
+                value={form.pattern_request_date}
+                onChange={(e) => setForm({ ...form, pattern_request_date: e.target.value })}
+                className={inputClass}
+              />
+            </div>
+            <div className="col-span-2">
+              <label htmlFor="nd-design-note" className="block text-sm text-body mb-1">
+                Design Note
+              </label>
+              <textarea
+                id="nd-design-note"
+                rows={2}
+                value={form.design_note}
+                onChange={(e) => setForm({ ...form, design_note: e.target.value })}
+                placeholder="Additional design notes..."
+                className={inputClass}
+              />
+            </div>
+            <div className="col-span-2">
+              <label htmlFor="nd-description" className="block text-sm text-body mb-1">
+                Description
+              </label>
+              <textarea
+                id="nd-description"
+                rows={2}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className={inputClass}
+              />
+            </div>
           </div>
 
           {mode === 'copy' && (

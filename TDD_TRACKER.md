@@ -1552,3 +1552,97 @@
       Fixed: `manage.py migrate merchandising` + backend restart; live probe of the route now 401
       (was 404) and a full authenticated PATCH round-trip against the dev DB returned 200 with
       persistence + retrieve exposure. See `lessons-learned.md` (deployment-ops entry).
+
+---
+
+72. **New Design flow: full Design Information entry (Part 14 extension)** - user request: when
+    creating a new design from the register, **all** Design Information attributes should be available
+    to enter directly, with input fields typed to fit (dropdowns / dates / text / multiline), modeled
+    on the techpack-import page. Scope agreed with BA: every Design Information attribute becomes an
+    editable input in `NewDesignModal` (fresh + copy), matching the authoritative editor
+    (`DesignSheetHeader.tsx`) field set and input types; server-enforced/derived attributes
+    (Relationship, Based On, Style Code, Style Reference) stay out of the typed form. The Design
+    Information set has no pure-numeric attribute, so no number inputs apply.
+    - Triage: PRIORITY P1 / TIER Design module (register creation) / BLAST_RADIUS isolated (init
+      endpoint + `NewDesignModal` + its tests; additive optional payload params safe; shared
+      `client.ts``InitDesignSheetData`` additive) / TRACE: Part 14 "New Design" US (master-backlog §14)
+      -> slice #72 -> `test_design_sheet_init.py` + `DesignsPage.test.tsx` ->
+      `merchApi.initDesignSheet` / GATE_PLAN GATE_A backend + frontend.
+    - RED (backend): `tests/unit/test_design_sheet_init.py` +4 - fresh persists the full Design
+      Information set (designer, pattern_cutter, issuer, cloth_code, size, length, the three dates,
+      design_note -> `note`) on the tech-pack + expose in the response; fresh rejects an invalid
+      issue_date (400); copy carries `issue_date` from source (was silently dropped); copy lets
+      user-entered design info override the source. Source fixture gained `issue_date`. Failed first
+      (**4/20 red**: fields not persisted, bad date accepted 201, issue_date lost, overrides ignored).
+    - GREEN (backend): `DesignInitSerializer` +9 fields (CharFields allow_blank default `""`; three
+      `DateField(allow_null)`) and `init` now writes Design Information with client-wins fallback-to-
+      source semantics (mirrors the existing `block`/`description` `or` pattern), re-adds
+      `issue_date` to the copy carry set, and maps `design_note` -> `note`. Targeted **20/20**.
+    - RED (frontend): `DesignsPage.test.tsx` +2 new tests + 1 expectation update - fresh mode exposes
+      all Design Information inputs (date inputs typed `type="date"`, Design Note as `<textarea>`) and
+      sends non-empty values; copy mode pre-fills Design Information from the source and lets it be
+      overridden (the existing copy test now also asserts the prefilled designer/risk-date/
+      pattern-request-date/design-note in the payload). Failed first (**3 red** - fields absent ->
+      label not found).
+    - GREEN (frontend): `NewDesignModal` gains a 2-col **Design Information** grid (Block Reference,
+      Designer, Pattern Cutter, Issuer, Cloth Code, Size, Length text; Issue/Risk/Pattern-Request
+      Date `type="date"`; Design Note + Description textareas), pre-fills from the selected copy
+      source, and submits only non-empty values; modal widened `max-w-lg` -> `max-w-2xl`;
+      `client.ts` `initDesignSheet` body extracted to `InitDesignSheetData`. `DesignsPage.test.tsx`
+      **24/24**.
+    - Gates (GATE_A): backend targeted **20/20** + owning app (merchandising) **51/51** + cross-app
+      adjacency `test_buyer_merge.py` (init consumer) **13/13**; frontend `tsc -b` exit 0, lint
+      0 errors (baseline warnings), vitest full **410 passed / 410 (50 files; session baseline
+      408 -> +2)**. **VERIFIED.**
+
+---
+
+73. **Design costing per-piece price ladder (Slice A: discount + overhead decomposition on
+    DesignCosting; Slice B: PO costing snapshot + computed totals on Costing)** — user request:
+    the design costing should decompose a per-piece selling price into discount, overhead, base cost,
+    and margin, mirroring the reference manual's cost-report layout. `prepare_po_costing` must carry
+    a frozen snapshot of the ladder plus computed PO-level totals (ladder × PO quantity) onto
+    `Costing`.
+    - Triage: PRIORITY P1 / TIER Costing module / BLAST_RADIUS moderate (backend: `DesignCosting`
+      model fields + `Costing` model fields + `prepare_po_costing` action + `DesignCostingSerializer`
+      + `CostingSerializer`; frontend: `DesignCostingDetailPage` price-ladder block + `DesignCosting`
+      TS type + `updateDesignCosting` API) / TRACE: RQ-013 Order-Level Costing Enhancements →
+      design-costing ladder extension → `test_design_costing_ladder.py` + `test_design_costing_prepare.py`
+      + `DesignCostingDetailPage.test.tsx` → `DesignCosting.save()` recompute /
+      `prepare_po_costing` snapshot copy / GATE_PLAN GATE_A backend + frontend.
+    - **Slice A — Design costing ladder (T1–T3):**
+      - RED (backend): `tests/unit/test_design_costing_ladder.py` — 16 tests: model default
+        `customer_discount_pct=0`, `save()` recomputes discount/overhead/base/margin from selling price
+        and pct fields, zero selling price yields zero amounts, landing cost = total × rate, ladder
+        persists through serializer round-trip, approve/reject preserves ladder. Failed first
+        (fields absent → `AttributeError`).
+      - GREEN (backend): `DesignCosting` gains 4 `DecimalField` fields (`customer_discount_pct`,
+        `origin_overhead_pct`, `uk_overhead_pct`, `selling_price`), `exchange_rate` added; `save()`
+        recomputes discount/overhead/base/margin; `DesignCostingSerializer` extended. Migration
+        `0043`. Targeted **16/16**.
+      - RED (frontend): `DesignCostingDetailPage.test.tsx` — 3 tests: renders price-ladder fields,
+        computes derived values from pct inputs, PATCHes discount/overhead/rate on save. Failed first
+        (inputs absent → label not found).
+      - GREEN (frontend): `DesignCosting` TS type extended; `updateDesignCosting` API function;
+        `DesignCostingDetailPage` renders price-ladder block (discount/origin/UK/rate/selling inputs +
+        base/margin/landed readouts). Targeted **3/3**; **tsc -b exit 0; lint 0 errors (baseline
+        warnings); vitest 413/413 (50 files)**.
+    - CHECKPOINT A: backend design costing suites **55/55** (ladder 16 + model 7 + API 4 + prepare
+      10 + adjacency 18); frontend **413/413** vitest, tsc exit 0, lint 0. All GREEN.
+    - **Slice B — PO costing snapshot + totals (T4–T5):**
+      - RED (backend): `tests/unit/test_design_costing_prepare.py` +4: copies ladder fields onto
+        `Costing`, computes PO totals (ladder × quantity), totals without ladder only fill `total_cost`,
+        prepared response exposes ladder + PO totals. Helper `_approved_design_with_ladder()` added.
+        Failed first (`'Costing' object has no attribute 'selling_price'`).
+      - GREEN (backend): `Costing` gains 8 fields (4 ladder snapshot + `po_quantity` / `po_total_cost` /
+        `po_base_cost` / `po_margin_amount`); `prepare_po_costing` copies ladder fields + computes PO
+        totals with `Decimal.quantize("0.01")`; `CostingSerializer` adds method fields
+        (`discount_amount`, `overhead_amount`, `base_cost`, `margin_amount`) + model fields.
+        Migration `0044`. Targeted **10/10** (6 existing + 4 new).
+      - Gates (GATE_A): backend design costing suites **59/59** + adjacency
+        (`test_costing.py` + `test_merchandising_api.py` + `test_cost_reconcile.py`) **74/74**;
+        frontend **413/413** vitest, tsc exit 0, lint 0 errors (baseline warnings). **VERIFIED.**
+      - Adjacency verified: all new `Costing` fields have defaults (0 or `null=True`) — no breakage
+        in downstream consumers (`CostingDetailPage`, `CostingsListPage`, `CostReconcilePage`).
+      - Migration note: `0043_designcosting_*` + `0044_costing_*` must be applied to the dev DB
+        (`manage.py migrate merchandising`) and the backend server restarted (`--noreload` is stale).

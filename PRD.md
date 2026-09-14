@@ -176,6 +176,8 @@ Legend: ✅ Implemented · ⚠️ Partial (core exists, some depth missing) · �
 | ME-006 | Costing w/ versioning | ✅ (5 sheet types incl. BD, live tick) |
 | ME-007 | Yield calculation | ⚠️ Partial (costing lines; yield engine not built) |
 | ME-008 | BOM-based costing | ✅ |
+| ME-015 | Design costing (style-level single-piece cost) | ✅ (`DesignCosting` per Style; approve/reject/set-live; **Prepare PO Costing** derives the order-level `Costing`) |
+| ME-016 | Per-piece price ladder (discount + overhead decomposition) | ✅ (selling, customer discount %, origin % / UK % overhead, base cost, margin, landed cost × exchange rate; frozen snapshot carried onto the PO costing) |
 | ME-009 | Sourcing management | ✅ (fabric RFQ/booking/order, vendors) |
 | ME-010 | Material booking | ✅ |
 | ME-011 | Work order generation | ⚠️ JobRequest/queue; formal work orders not built |

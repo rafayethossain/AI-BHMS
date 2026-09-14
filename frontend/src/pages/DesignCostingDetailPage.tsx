@@ -21,6 +21,13 @@ export default function DesignCostingDetailPage() {
   const [selectedPo, setSelectedPo] = useState('');
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+  const [ladder, setLadder] = useState({
+    customerDiscountPct: '',
+    originOverheadPct: '',
+    ukOverheadPct: '',
+    exchangeRate: '',
+    sellingPrice: '',
+  });
 
   const fetchCosting = async () => {
     if (!id) return;
@@ -32,6 +39,18 @@ export default function DesignCostingDetailPage() {
   };
 
   useEffect(() => { fetchCosting(); }, [id]);
+
+  useEffect(() => {
+    if (costing) {
+      setLadder({
+        customerDiscountPct: costing.customer_discount_pct ?? '',
+        originOverheadPct: costing.origin_overhead_pct ?? '',
+        ukOverheadPct: costing.uk_overhead_pct ?? '',
+        exchangeRate: costing.exchange_rate ?? '',
+        sellingPrice: costing.selling_price ?? '',
+      });
+    }
+  }, [costing]);
 
   useEffect(() => {
     (async () => {
@@ -74,6 +93,22 @@ export default function DesignCostingDetailPage() {
     } finally { setActing(false); }
   };
 
+  const handleSaveLadder = async () => {
+    if (!id) return;
+    setActing(true);
+    try {
+      await merchApi.updateDesignCosting(id, {
+        customer_discount_pct: ladder.customerDiscountPct === '' ? '0.00' : ladder.customerDiscountPct,
+        origin_overhead_pct: ladder.originOverheadPct === '' ? '0.00' : ladder.originOverheadPct,
+        uk_overhead_pct: ladder.ukOverheadPct === '' ? '0.00' : ladder.ukOverheadPct,
+        exchange_rate: ladder.exchangeRate === '' ? null : ladder.exchangeRate,
+        selling_price: ladder.sellingPrice === '' ? null : ladder.sellingPrice,
+      });
+      toast('success', 'Price ladder saved');
+      fetchCosting();
+    } catch { toast('error', 'Failed to save price ladder'); } finally { setActing(false); }
+  };
+
   if (loading) return <Layout><div className="py-20 flex items-center justify-center"><div className="animate-spin h-8 w-8 border-2 border-emerald-400 border-t-transparent rounded-full" /></div></Layout>;
 
   if (!costing) return <Layout><div className="py-20 flex items-center justify-center">Design costing not found</div></Layout>;
@@ -86,6 +121,21 @@ export default function DesignCostingDetailPage() {
   ];
   const total = parseFloat(String(costing.total_cost));
   const target = costing.target_price ? parseFloat(String(costing.target_price)) : null;
+
+  const selling = parseFloat(ladder.sellingPrice);
+  const discountPct = parseFloat(ladder.customerDiscountPct || '0');
+  const originPct = parseFloat(ladder.originOverheadPct || '0');
+  const ukPct = parseFloat(ladder.ukOverheadPct || '0');
+  const rate = parseFloat(ladder.exchangeRate || '0');
+  const hasSelling = Number.isFinite(selling) && selling > 0;
+  const discountAmt = hasSelling ? selling * discountPct / 100 : NaN;
+  const overheadAmt = Number.isFinite(total) ? total * (originPct + ukPct) / 100 : NaN;
+  const base = hasSelling && Number.isFinite(total) ? total + discountAmt + overheadAmt : NaN;
+  const marginLadder = hasSelling ? selling - base : NaN;
+  const marginPctLadder = hasSelling && selling > 0 ? (marginLadder / selling) * 100 : NaN;
+  const landed = Number.isFinite(total) && Number.isFinite(rate) && rate > 0 ? total * rate : NaN;
+  const fmt = (v: number, digits = 2) =>
+    Number.isFinite(v) ? v.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits }) : '—';
 
   return (
     <Layout>
@@ -177,6 +227,100 @@ export default function DesignCostingDetailPage() {
                   <p className="text-xs text-muted">At: <span className="text-heading">{costing.approved_at}</span></p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-surface rounded-xl border border-border p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-muted">Price Ladder (per piece)</h3>
+            <button
+              onClick={handleSaveLadder}
+              disabled={acting}
+              data-testid="save-ladder"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors">
+              Save Ladder
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <label className="text-xs text-muted">
+              Customer Discount %
+              <input
+                type="number" min="0" max="100" step="0.01"
+                data-testid="input-discount"
+                value={ladder.customerDiscountPct}
+                onChange={(e) => setLadder({ ...ladder, customerDiscountPct: e.target.value })}
+                className="mt-1 w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-heading" />
+            </label>
+            <label className="text-xs text-muted">
+              Origin Overhead %
+              <input
+                type="number" min="0" max="100" step="0.01"
+                data-testid="input-origin"
+                value={ladder.originOverheadPct}
+                onChange={(e) => setLadder({ ...ladder, originOverheadPct: e.target.value })}
+                className="mt-1 w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-heading" />
+            </label>
+            <label className="text-xs text-muted">
+              UK Overhead %
+              <input
+                type="number" min="0" max="100" step="0.01"
+                data-testid="input-uk"
+                value={ladder.ukOverheadPct}
+                onChange={(e) => setLadder({ ...ladder, ukOverheadPct: e.target.value })}
+                className="mt-1 w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-heading" />
+            </label>
+            <label className="text-xs text-muted">
+              Exchange Rate (GBP per USD)
+              <input
+                type="number" min="0" step="0.000001"
+                data-testid="input-rate"
+                value={ladder.exchangeRate}
+                onChange={(e) => setLadder({ ...ladder, exchangeRate: e.target.value })}
+                className="mt-1 w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-heading" />
+            </label>
+            <label className="text-xs text-muted">
+              Selling Price ($)
+              <input
+                type="number" min="0" step="0.01"
+                data-testid="input-selling"
+                value={ladder.sellingPrice}
+                onChange={(e) => setLadder({ ...ladder, sellingPrice: e.target.value })}
+                className="mt-1 w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-heading" />
+            </label>
+          </div>
+          <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="flex justify-between text-sm">
+              <span className="text-body">Total Cost</span>
+              <span data-testid="ladder-cost" className="text-heading font-mono">${fmt(total)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-body">Discount</span>
+              <span data-testid="ladder-discount" className="text-heading font-mono">${fmt(discountAmt)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-body">Overhead</span>
+              <span data-testid="ladder-overhead" className="text-heading font-mono">${fmt(overheadAmt)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-body font-medium">Base Cost</span>
+              <span data-testid="ladder-base" className="text-heading font-semibold font-mono">${fmt(base)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-body font-medium">Margin</span>
+              <span data-testid="ladder-margin" className={`font-mono ${hasSelling && marginLadder >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                ${fmt(marginLadder)}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-body font-medium">Margin %</span>
+              <span data-testid="ladder-margin-pct" className={`font-mono ${hasSelling && marginPctLadder >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {Number.isFinite(marginPctLadder) ? `${marginPctLadder.toFixed(2)}%` : '—'}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm md:col-span-3">
+              <span className="text-body">Landed (GBP)</span>
+              <span data-testid="ladder-landed" className="text-heading font-mono">GBP {fmt(landed)}</span>
             </div>
           </div>
         </div>

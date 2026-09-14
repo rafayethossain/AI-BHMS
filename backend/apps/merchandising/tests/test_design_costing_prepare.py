@@ -102,6 +102,20 @@ def _approved_design(seed, lines=True):
     return dc
 
 
+def _approved_design_with_ladder(seed):
+    return DesignCosting.objects.create(
+        tenant=seed["tenant"], style=seed["style"], version=1, status="approved",
+        sheet_type="bd", fabric_cost=Decimal("10.00"), trim_cost=Decimal("2.50"),
+        cm_cost=Decimal("5.00"), overhead_cost=Decimal("1.25"),
+        selling_price=Decimal("25.00"),
+        customer_discount_pct=Decimal("2.00"),
+        origin_overhead_pct=Decimal("4.00"),
+        uk_overhead_pct=Decimal("16.00"),
+        exchange_rate=Decimal("1.360000"),
+        created_by=seed["user"],
+    )
+
+
 def _make_po(seed, po_number="PO-DCP-1"):
     fo = FileOpening.objects.create(
         tenant=seed["tenant"], file_number=f"FO-{po_number}", style=seed["style"],
@@ -187,3 +201,52 @@ class TestPreparePoCosting:
         )
         resp = _post(client, dc.id, other_po.id)
         assert resp.status_code in (400, 404)
+
+    def test_copies_ladder_fields_onto_po_costing(self, client, seed):
+        dc = _approved_design_with_ladder(seed)
+        po = _make_po(seed)
+        resp = _post(client, dc.id, po.id)
+        assert resp.status_code == 201, resp.content
+        costing = Costing.objects.get(purchase_order=po, tenant=seed["tenant"])
+        assert costing.selling_price == Decimal("25.00")
+        assert costing.customer_discount_pct == Decimal("2.00")
+        assert costing.origin_overhead_pct == Decimal("4.00")
+        assert costing.uk_overhead_pct == Decimal("16.00")
+        assert costing.exchange_rate == Decimal("1.360000")
+        assert costing.landed_cost == Decimal("25.50")
+
+    def test_computes_po_totals_from_quantity(self, client, seed):
+        dc = _approved_design_with_ladder(seed)
+        po = _make_po(seed)  # quantity 1000
+        resp = _post(client, dc.id, po.id)
+        assert resp.status_code == 201, resp.content
+        costing = Costing.objects.get(purchase_order=po, tenant=seed["tenant"])
+        assert costing.po_quantity == 1000
+        assert costing.po_total_cost == Decimal("18750.00")
+        assert costing.po_base_cost == Decimal("23000.00")
+        assert costing.po_margin_amount == Decimal("2000.00")
+
+    def test_po_totals_without_ladder_only_fill_total(self, client, seed):
+        dc = _approved_design(seed, lines=False)
+        po = _make_po(seed)
+        resp = _post(client, dc.id, po.id)
+        assert resp.status_code == 201, resp.content
+        costing = Costing.objects.get(purchase_order=po, tenant=seed["tenant"])
+        assert costing.po_quantity == 1000
+        assert costing.po_total_cost == Decimal("18750.00")
+        assert costing.po_base_cost is None
+        assert costing.po_margin_amount is None
+
+    def test_prepared_response_exposes_ladder_and_po_totals(self, client, seed):
+        dc = _approved_design_with_ladder(seed)
+        po = _make_po(seed)
+        resp = _post(client, dc.id, po.id)
+        assert resp.status_code == 201, resp.content
+        data = resp.json()
+        assert data["selling_price"] == "25.00"
+        assert data["base_cost"] == "23.00"
+        assert data["margin_amount"] == "2.00"
+        assert data["po_quantity"] == 1000
+        assert data["po_total_cost"] == "18750.00"
+        assert data["po_base_cost"] == "23000.00"
+        assert data["po_margin_amount"] == "2000.00"

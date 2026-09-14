@@ -138,6 +138,20 @@
 | CS-022 | Waste% must be within buyer-approved limits | System | Warning |
 | CS-023 | Yield changes require version update | System | Auto |
 
+### 3.4 Design Costing Price Ladder
+
+| Rule ID | Rule | Validation | Action |
+|---------|------|------------|--------|
+| CS-030 | Discount is applied to the **selling price**, not the base cost | System | Auto |
+| CS-031 | Overhead is applied to **total cost** as (origin % + UK %) | System | Auto |
+| CS-032 | Base cost = total cost + discount amount + overhead amount | System | Auto |
+| CS-033 | Margin = selling price − base cost (can be negative) | System | Auto |
+| CS-034 | Landed cost = total cost × exchange rate | System | Auto |
+| CS-035 | Ladder is recomputed on every `save()` from source fields | System | Auto |
+| CS-036 | PO costing snapshots the ladder fields at `prepare_po_costing` time (frozen, not live-linked) | System | Auto |
+| CS-037 | PO-level totals = per-piece ladder × PO quantity | System | Auto |
+| CS-038 | PO costing with no ladder set carries only `total_cost` | System | Auto |
+
 ---
 
 ## 4. Commercial & LC Rules

@@ -578,6 +578,10 @@ class CostingSerializer(serializers.ModelSerializer):
     single_size_watermark = serializers.BooleanField(read_only=True)
     is_live = serializers.BooleanField(default=True)
     lines = CostingLineSerializer(many=True, read_only=True)
+    discount_amount = serializers.SerializerMethodField()
+    overhead_amount = serializers.SerializerMethodField()
+    base_cost = serializers.SerializerMethodField()
+    margin_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = Costing
@@ -587,6 +591,12 @@ class CostingSerializer(serializers.ModelSerializer):
             "exchange_rate", "landed_cost",
             "target_price", "fabric_cost", "trim_cost", "cm_cost",
             "overhead_cost", "total_cost", "margin", "margin_percent",
+            # Price-ladder snapshot
+            "customer_discount_pct", "origin_overhead_pct", "uk_overhead_pct",
+            "selling_price", "discount_amount", "overhead_amount",
+            "base_cost", "margin_amount",
+            # PO-level totals
+            "po_quantity", "po_total_cost", "po_base_cost", "po_margin_amount",
             "approved_by", "approved_at", "created_at", "lines",
             "notes", "is_single_size", "single_size_watermark", "size_ratio",
             "confirmed", "confirmed_by", "confirmed_at",
@@ -609,6 +619,31 @@ class CostingSerializer(serializers.ModelSerializer):
 
     def get_landed_cost(self, obj):
         return str(obj.landed_cost) if obj.landed_cost is not None else None
+
+    def get_discount_amount(self, obj):
+        if obj.selling_price is None:
+            return None
+        return str(
+            (obj.selling_price * obj.customer_discount_pct / Decimal("100")).quantize(Decimal("0.01"))
+        )
+
+    def get_overhead_amount(self, obj):
+        pct = (obj.origin_overhead_pct or 0) + (obj.uk_overhead_pct or 0)
+        return str((obj.total_cost * pct / Decimal("100")).quantize(Decimal("0.01")))
+
+    def get_base_cost(self, obj):
+        discount = self.get_discount_amount(obj)
+        if discount is None:
+            return None
+        return str(
+            (obj.total_cost + Decimal(discount) + Decimal(self.get_overhead_amount(obj))).quantize(Decimal("0.01"))
+        )
+
+    def get_margin_amount(self, obj):
+        base = self.get_base_cost(obj)
+        if base is None or obj.selling_price is None:
+            return None
+        return str((obj.selling_price - Decimal(base)).quantize(Decimal("0.01")))
 
     def validate_patterned_fabric_options(self, value):
         allowed = {option for option, _ in Costing.PATTERN_OPTIONS}
@@ -677,6 +712,11 @@ class DesignCostingSerializer(serializers.ModelSerializer):
     style_name = serializers.CharField(source="style.name", read_only=True)
     sheet_type_label = serializers.CharField(source="get_sheet_type_display", read_only=True)
     margin_percent = serializers.SerializerMethodField()
+    discount_amount = serializers.SerializerMethodField()
+    overhead_amount = serializers.SerializerMethodField()
+    base_cost = serializers.SerializerMethodField()
+    margin_amount = serializers.SerializerMethodField()
+    landed_cost = serializers.SerializerMethodField()
     is_live = serializers.BooleanField(default=True)
     lines = DesignCostingLineSerializer(many=True, read_only=True)
 
@@ -687,6 +727,9 @@ class DesignCostingSerializer(serializers.ModelSerializer):
             "version", "status", "sheet_type", "sheet_type_label", "is_live",
             "target_price", "fabric_cost", "trim_cost", "cm_cost",
             "overhead_cost", "total_cost", "margin", "margin_percent",
+            "customer_discount_pct", "origin_overhead_pct", "uk_overhead_pct",
+            "exchange_rate", "selling_price", "discount_amount", "overhead_amount",
+            "base_cost", "margin_amount", "landed_cost",
             "is_single_size", "size_ratio", "is_patterned", "patterned_fabric_options",
             "approved_by", "approved_at", "created_at", "lines", "notes",
         ]
@@ -694,6 +737,45 @@ class DesignCostingSerializer(serializers.ModelSerializer):
 
     def get_margin_percent(self, obj):
         return obj.margin_percent
+
+    def get_discount_amount(self, obj):
+        return str(obj.discount_amount) if obj.discount_amount is not None else None
+
+    def get_overhead_amount(self, obj):
+        return str(obj.overhead_amount)
+
+    def get_base_cost(self, obj):
+        return str(obj.base_cost) if obj.base_cost is not None else None
+
+    def get_margin_amount(self, obj):
+        return str(obj.margin_amount) if obj.margin_amount is not None else None
+
+    def get_landed_cost(self, obj):
+        return str(obj.landed_cost) if obj.landed_cost is not None else None
+
+    def _validate_ladder_pct(self, value):
+        if value is not None and (value < 0 or value > 100):
+            raise serializers.ValidationError("Percentage must be between 0 and 100.")
+        return value
+
+    def validate_customer_discount_pct(self, value):
+        return self._validate_ladder_pct(value)
+
+    def validate_origin_overhead_pct(self, value):
+        return self._validate_ladder_pct(value)
+
+    def validate_uk_overhead_pct(self, value):
+        return self._validate_ladder_pct(value)
+
+    def validate_selling_price(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Selling price must be greater than 0 when set.")
+        return value
+
+    def validate_exchange_rate(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Exchange rate must be greater than 0 when set.")
+        return value
 
     def validate_patterned_fabric_options(self, value):
         allowed = {option for option, _ in DesignCosting.PATTERN_OPTIONS}
@@ -1226,5 +1308,15 @@ class DesignInitSerializer(serializers.Serializer):
     )
     block_reference = serializers.CharField(required=False, allow_blank=True, default="")
     description = serializers.CharField(required=False, allow_blank=True, default="")
+    designer = serializers.CharField(required=False, allow_blank=True, default="")
+    pattern_cutter = serializers.CharField(required=False, allow_blank=True, default="")
+    issuer = serializers.CharField(required=False, allow_blank=True, default="")
+    cloth_code = serializers.CharField(required=False, allow_blank=True, default="")
+    size = serializers.CharField(required=False, allow_blank=True, default="")
+    length = serializers.CharField(required=False, allow_blank=True, default="")
+    issue_date = serializers.DateField(required=False, allow_null=True, default=None)
+    risk_date = serializers.DateField(required=False, allow_null=True, default=None)
+    pattern_request_date = serializers.DateField(required=False, allow_null=True, default=None)
+    design_note = serializers.CharField(required=False, allow_blank=True, default="")
     include_annotation = serializers.BooleanField(required=False, default=False)
     include_notes = serializers.BooleanField(required=False, default=False)
