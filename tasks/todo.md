@@ -108,8 +108,9 @@
 **Acceptance criteria:**
 - [x] GATE_A passes: targeted 24/24 → owning-app (merchandising) 103/103 → adjacency (`test_merchandising_api.py`) 35/35
 - [x] No new schema — statuses are computed live from existing children (PO / BOMItem / booking schedule / DailyProduction); no migrations to apply
-- [ ] Dev-DB live smoke: `GET /api/v1/merchandising/style-versions/{id}/sales_order/` returns 200 with PO rows + status payloads (no dev servers running; covered by pytest against a real test DB — see checkpoint)
-- [ ] Real-browser check of the Sales Order tab with colored status cells (manual step; jsdom covers logic, pill styles are plain Tailwind classes)
+- [x] Dev-DB live smoke: `GET /api/v1/merchandising/style-versions/{id}/sales_order/` returns 200 with PO rows + status payloads (17 rows across REG-1004/DSD-1002; fabric red sticky override, delivered green, etc. verified live)
+- [ ] Real-browser check of the Sales Order tab with colored status cells (manual step — jsdom covers logic, pills are plain Tailwind classes; needs a browser session on http://localhost:5173/designs → any STY/REG design → Sales Order tab)
+- [x] Dev-DB data chain repaired: `seed_demo_data` leaves `FileOpening.style_version` null → PO → version link broken; backfilled all 9 FileOpenings to their style's version 1 (dev-only one-off, no app code change)
 - [x] TDD_TRACKER updated with entry #74 (RQ-051)
 - [x] master-backlog updated with RQ-051 row
 - [x] lessons-learned entry added
