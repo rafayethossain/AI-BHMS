@@ -7,9 +7,11 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  maxWidthClass?: string;
+  contentClassName?: string;
 }
 
-export default function Modal({ open, onClose, title, children, footer }: ModalProps) {
+export default function Modal({ open, onClose, title, children, footer, maxWidthClass = 'max-w-lg', contentClassName }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
 
@@ -66,7 +68,7 @@ export default function Modal({ open, onClose, title, children, footer }: ModalP
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="w-full max-w-lg bg-surface border border-input-border rounded-xl shadow-2xl outline-none"
+        className={`w-full ${maxWidthClass} bg-surface border border-input-border rounded-xl shadow-2xl outline-none`}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-input-border">
           <h3 className="text-sm font-medium text-heading">{title}</h3>
@@ -79,7 +81,7 @@ export default function Modal({ open, onClose, title, children, footer }: ModalP
             ✕
           </button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className={`p-4 ${contentClassName || ''}`}>{children}</div>
         {footer && (
           <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-input-border">
             {footer}

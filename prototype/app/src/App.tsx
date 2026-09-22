@@ -1,0 +1,34 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastProvider } from './components/Toast';
+import Layout from './components/Layout';
+import DashboardPage from './pages/DashboardPage';
+import DesignsPage from './pages/DesignsPage';
+import DesignDetailPage from './pages/DesignDetailPage';
+import DesignSheetPrintPage from './pages/DesignSheetPrintPage';
+import DesignMaterialsPage from './pages/DesignMaterialsPage';
+import PlaceholderPage from './pages/PlaceholderPage';
+
+function App() {
+  return (
+    <ThemeProvider>
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/design" element={<DesignsPage />} />
+              <Route path="/designs/:designCode" element={<DesignDetailPage />} />
+              <Route path="/designs/:designCode/materials" element={<DesignMaterialsPage />} />
+              <Route path="*" element={<PlaceholderPage />} />
+            </Route>
+            <Route path="/designs/:designCode/print" element={<DesignSheetPrintPage />} />
+          </Routes>
+        </BrowserRouter>
+      </ToastProvider>
+    </ThemeProvider>
+  );
+}
+
+export default App;

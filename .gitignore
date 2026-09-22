@@ -67,6 +67,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# ===== Prototype local artifacts (logs / scratch) =====
+prototype/app/dev-server.log
+prototype/app/gt.txt
+
 # ===== Celery =====
 celerybeat-schedule
 celerybeat.pid

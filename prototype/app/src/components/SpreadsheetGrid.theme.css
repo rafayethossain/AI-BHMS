@@ -16,13 +16,13 @@
 .tabulator .tabulator-header {
   background-color: var(--color-bg-surface-alt);
   border-bottom: 1px solid var(--color-border-default);
-  color: var(--color-text-muted);
+  color: var(--color-text-body);
 }
 
 .tabulator .tabulator-header .tabulator-col {
   background: var(--color-bg-surface-alt);
   border-right: 1px solid var(--color-border-subtle);
-  color: var(--color-text-muted);
+  color: var(--color-text-body);
 }
 
 .tabulator .tabulator-header .tabulator-col.tabulator-moving {
@@ -55,7 +55,26 @@
 }
 
 .tabulator .tabulator-header .tabulator-col .tabulator-header-filter input::placeholder {
-  color: var(--color-text-faint);
+  color: var(--color-text-muted);
+}
+
+/* In-cell editors must follow the input theme so editing is legible in
+ * both light and dark (native Tabulator defaults are light-only). */
+.tabulator .tabulator-cell.tabulator-editing {
+  background: var(--color-bg-input);
+}
+
+.tabulator input.tabulator-edit,
+.tabulator select.tabulator-edit,
+.tabulator textarea.tabulator-edit,
+.tabulator .tabulator-edit {
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border-input);
+  color: var(--color-text-body);
+  border-radius: 0.375rem;
+  padding: 0.2rem 0.4rem;
+  font-weight: 400;
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
 }
 
 .tabulator .tabulator-tableholder .tabulator-table {
@@ -100,12 +119,12 @@
 .tabulator .tabulator-footer {
   background-color: var(--color-bg-surface-alt);
   border-top: 1px solid var(--color-border-default);
-  color: var(--color-text-muted);
+  color: var(--color-text-body);
 }
 
 .tabulator .tabulator-footer .tabulator-paginator,
 .tabulator .tabulator-footer .tabulator-pages {
-  color: var(--color-text-muted);
+  color: var(--color-text-body);
 }
 
 .tabulator .tabulator-footer .tabulator-page {
@@ -117,7 +136,7 @@
 .tabulator .tabulator-footer .tabulator-page.active {
   background: var(--color-button-primary);
   border-color: var(--color-button-primary);
-  color: #ffffff;
+  color: var(--color-button-foreground);
 }
 
 .tabulator .tabulator-footer .tabulator-page-size {
@@ -127,7 +146,7 @@
 }
 
 .tabulator .tabulator-tableholder .tabulator-placeholder .tabulator-placeholder-contents {
-  color: var(--color-text-faint);
+  color: var(--color-text-muted);
 }
 
 /* Menus (row context / header) */
@@ -149,7 +168,7 @@
 
 /* Sort arrows */
 .tabulator .tabulator-col .tabulator-col-sorter .tabulator-arrow {
-  border-bottom: 6px solid var(--color-text-faint);
+  border-bottom: 6px solid var(--color-text-muted);
 }
 
 /* A6 row-actions menu */
@@ -174,6 +193,38 @@
   padding: 0.2rem 0.45rem;
 }
 
+.grid-row-actions-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: transparent;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.375rem;
+  color: var(--color-text-body);
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+}
+
+.grid-row-actions-trigger:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+.grid-row-actions-caret {
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .grid-row-actions-trigger:hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-border-strong, var(--color-border-default));
+    color: var(--color-text-heading);
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .grid-row-actions-toggle:hover {
     background: var(--color-bg-hover);
@@ -183,14 +234,14 @@
 }
 
 .grid-row-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 40;
-  min-width: 160px;
+  position: fixed;
+  z-index: 65;
+  min-width: 190px;
+  max-height: 60vh;
+  overflow-y: auto;
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border-default);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
   border-radius: 0.5rem;
   padding: 0.25rem;
   display: flex;
@@ -214,6 +265,10 @@
 .grid-row-menu-item:disabled {
   color: var(--color-text-faint);
   cursor: not-allowed;
+}
+
+.grid-row-menu-item--danger {
+  color: var(--color-red-400);
 }
 
 @media (hover: hover) and (pointer: fine) {

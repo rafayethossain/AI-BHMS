@@ -35,7 +35,7 @@ npm run build          # tsc -b && vite build
 ```
 
 No backend, no database, no auth server — every page reads from `src/mock/` (see
-`docs/mock-data-spec.md`).
+`mock-data-spec.md`).
 
 ---
 
@@ -56,9 +56,10 @@ No backend, no database, no auth server — every page reads from `src/mock/` (s
 | `app/` | The standalone Vite + React + Tabulator + Tailwind + Vitest prototype |
 | `tasks/` | Active task checklists (`todo.md`) for the slice in progress |
 
-Canonical source docs (authoritative, at repo root): `PRD.md`, `business-rules.md`, `data-model.md`,
-`api-design.md`, `uiux-guidelines.md`, `module-specs.md`, `workflow-diagrams.md`, `glossary.md`,
-`master-backlog.md`. The prototype copies the *relevant* content into its own docs so it is
+Canonical source docs (authoritative, at repo root): `PRD.md`, `business-rules.md`,
+`business-workflow.md`, `data-model.md`, `api-design.md`, `uiux-guidelines.md`, `module-specs.md`,
+`workflow-diagrams.md`, `glossary.md`, `master-backlog.md`. The prototype copies the *relevant*
+content into its own docs so it is
 self-contained for the dev team; when the two disagree, the prototype docs win **for the prototype
 phase only** and the delta goes to `scope.md → "Feature & attribute change log"`.
 

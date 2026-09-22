@@ -23,9 +23,10 @@ Before ANY task, load context in this order:
    **latest entries first** — recent work sets the conventions for this session).
 5. `master-backlog.md` — the consolidated backlog (`RQ-###` requirements, US story backlog) and its
    cross-references; find the next requirement / task.
-6. Domain references as needed: `business-rules.md`, `data-model.md`, `api-design.md`,
-   `security-model.md`, `glossary.md`, `uiux-guidelines.md`, `workflow-diagrams.md`, `module-specs.md`,
-   `GAP_ANALYSIS.md` / `REQUIREMENTS_GAP_ANALYSIS.md` / `analysis/` (feature catalog & gap docs).
+6. Domain references as needed: `business-rules.md`, `business-workflow.md` (canonical order-chain),
+   `data-model.md`, `api-design.md`, `security-model.md`, `glossary.md`, `uiux-guidelines.md`,
+   `workflow-diagrams.md`, `module-specs.md`, `GAP_ANALYSIS.md` / `REQUIREMENTS_GAP_ANALYSIS.md` /
+   `analysis/` (feature catalog & gap docs).
 7. **Historical lessons** — read `lessons-learned.md` (retrospectives) BEFORE starting so past mistakes
    are not repeated. If the file does not exist yet, create it (see §6).
 8. Only then: the referenced source code + its tests.

@@ -9,7 +9,7 @@
 1. **P0** proves the shell + grid chrome + mock service pattern on ONE module (Design register) —
    the foundation everything else reuses.
 2. **P1** covers the buying-house **core order lifecycle** (the highest-value flow reviewers test
-   first): Design → File Opening → PO → BOM/Trims → Costing → Order Manager.
+   first): Design → BOM/Trims → Costing File → Opening → PO → Order Manager.
 3. **P2** covers **supporting modules** that stack on the same patterns but have their own
    workflows: Commercial (LC, PI, Sales Contract/Confirmation, Debits, Invoice Approvals),
    Procurement (Fabric), Production, Quality.
@@ -25,20 +25,24 @@
 - [ ] PT-003 `SpreadsheetGrid` wrapper (Tabulator chrome re-export, export, header filters, actions)
 - [ ] PT-004 Mock service layer + seed data (Design register slice first)
 - [ ] PT-005 App shell: module nav (Layout), router, dashboard placeholder
-- [ ] PT-006 Design register screen on grid (list + filter + add modal + view detail + print)
-- [ ] PT-007 Micro-interactions kit: status pill, hover preview, optimistic interactions
+- [x] PT-006 Design register screen on grid (list + filter + add modal + view detail + print)
+- [x] PT-007 Micro-interactions kit: status pill, hover preview, optimistic interactions
 - **Checkpoint**: `npm run dev` renders a full Design-register flow on mock data; gates green;
   real-browser CDP clean; human review.
 
 ## Phase P1 — Core order lifecycle
 
-- [ ] PT-010 Style detail (tabs: Overview, Versions, File Openings, POs, BOM, Sales Order report)
-- [ ] PT-011 File Openings list + detail (quick lead, repeat, departments, POs)
-- [ ] PT-012 Purchase Orders list + detail (lifecycle tabs, items, hits, trailing, risk)
+- [x] PT-010 Design detail (tabs: Overview, Sketches, Versions, File Openings, POs, Items, BOM,
+        Design Images, Tech Packs, Sales Order report + status wizard)
+- [ ] PT-011 FN/version commercial file list + detail (quick lead, repeat, departments, POs, notes)
+- [ ] PT-012 Purchase Orders list + detail (lifecycle tabs, items, hits, amendments, trail, risk)
 - [ ] PT-013 BOM list + detail (trims/labels/T&A, copy-from-order)
-- [ ] PT-014 Costing list + detail (cost lines, live tick, design-costing ladder, prepare PO costing)
+- [ ] PT-014 Costing list + detail (cost lines, live tick, design-costing ladder, prepare PO costing,
+        create PO from costing)
 - [ ] PT-015 Order Manager dashboard (critical path, weekly review print)
 - [ ] PT-016 Shipment-level Sales Order report (design version report print + xlsx)
+- [ ] PT-017 Tech-pack import wizard (3-step: upload → extract/review → write-through to
+        design/items/BOM) + Design detail progress panel (REQ-p-008)
 - **Checkpoint**: end-to-end order lifecycle demoable on mock data with all major interactions;
   human review.
 
@@ -47,14 +51,16 @@
 - [ ] PT-020 T&A (list, detail milestones, calendar, heatmap)
 - [ ] PT-021 Commercial (LC + amendments, banks, proforma invoices, sales contracts/confirmations)
 - [ ] PT-022 Debits & invoice approvals + dashboards
-- [ ] PT-023 Procurement (fabric categories/HTS/suppliers/mills/RFQ/bookings/orders + schedule)
-- [ ] PT-024 Production (plans, daily reports, factory portal, dashboard, detail)
+- [ ] PT-023 Procurement (fabric categories/HTS/suppliers/mills, bookings → **materials POs + print**,
+        schedule + handoff audit + tolerances + utilization) (REQ-p-023/025; RFQ deferred)
+- [ ] PT-024 Production (plans, daily reports, factory portal, dashboard, detail + line performance)
 - [ ] PT-025 Quality (inspections, CAPA, quality dashboard)
 - **Checkpoint**: all secondary modules demoable; human review.
 
 ## Phase P3 — Logistics, reports, setup
 
-- [ ] PT-030 Logistics (shipments, detail, dashboard, forwarders, dockets, recaps)
+- [ ] PT-030 Logistics (shipments, 9-stage flow, detail, dashboard, forwarders, dockets,
+        paperwork comparison, recaps, forward order book, reconciliations) (REQ-p-040/043/044)
 - [ ] PT-031 Supplier payments + cost reconcile (grid + pivot + release workflow)
 - [ ] PT-032 Summary reports (sales summary, recap reports) + report builder/viewer/schedules
 - [ ] PT-033 Setup & admin (tenant, offices, master data, users, roles, audit logs, health)

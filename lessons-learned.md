@@ -6,7 +6,30 @@
 
 ---
 
-## 2026-09-01 ??? Real-browser grid verification (Slices A3 Styles & PurchaseOrders, A5)
+## 2026-09-21 ??? Materials add/edit modal standardization (prototype PT-010c)
+
+**What happened:** The standalone materials page's Add/Edit modal was a hand-rolled `<dialog>`: no focus
+trap, no Esc/backdrop/✕ close, no `aria-modal`, and the whole form (footer included) scrolled as one
+`max-h-[85vh]`, so on short viewports lower fields and the footer were unreachable. Type was free-text
+with a datalist instead of a master-data `<select>`. Replaced with the shared `components/Modal.tsx`
+(centered `fixed inset-0` flex, `max-w-2xl`, body `max-h-[75vh] overflow-y-auto pr-1` with pinned
+header/footer), Type as a `<select>`, and the delete confirm converted too. RED-first +7 tests; gates
+tsc 0 / lint 0 (24 baseline warnings) / vitest 177/177 (14 files); real-browser: panel centered (ΔY 0),
+all 10 fields visible, Esc closes, 0 console warnings.
+
+**What went wrong / well:** jsdom can't verify centering or that all fields stay reachable when the body
+scrolls (layout is 0 in jsdom) — real-browser `getBoundingClientRect()` was the proof. The native
+`<dialog>` default `margin: auto` also made the old "centered" claim layout-dependent.
+
+**What to do differently:** Never hand-roll a `<dialog>` when `components/Modal.tsx` exists — the shared
+contract (focus trap, Esc/backdrop/✕, `aria-modal`, scrollable body with pinned header/footer) IS the
+standard (prototype `standards.md` §5); master-data fields are `<select>`s (§6).
+
+**Linked slice:** prototype PT-010c (Design Materials page).
+
+---
+
+## 2026-09-01 — Real-browser grid verification (Slices A3 Styles & PurchaseOrders, A5)
 
 **What happened:** The Tabulator grid crashed thrown p at runtime (`TypeError: Cannot read properties
 of null (reading 'verticalFillMode')`) because the wrapper re-supplied a brand-new array every render

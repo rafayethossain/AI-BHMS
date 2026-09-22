@@ -18,7 +18,7 @@ backend. The prototype **becomes the real frontend**; the mock service is the AP
 | Framework | React 19 + TypeScript 6 (strict) |
 | Bundler / dev server | Vite 8 (Rolldown), `@vitejs/plugin-react` |
 | Styling | Tailwind CSS 4 (CSS-first via `@tailwindcss/vite`), semantic CSS variables |
-| Grid | Tabulator 6 via a single shared `SpreadsheetGrid` wrapper (+ `react-tabulator`) |
+| Grid | Tabulator via a single shared `SpreadsheetGrid` wrapper (pinned `tabulator-tables` + `@types/tabulator-tables`; the wrapper isolates the library) |
 | Routing | React Router 7 (same route map as the target frontend) |
 | Data | In-app mock service layer (`src/mock/`) — NO axios/backend calls in prototype |
 | Tests | Vitest 4 + jsdom + Testing Library; real-browser CDP for grid/print |
@@ -48,10 +48,10 @@ app/
 │   ├── main.tsx              # entry: router + theme provider
 │   ├── App.tsx               # module shell + route table (mirrors target routes)
 │   ├── theme/
-│   │   ├── tokens.css        # design tokens (colors, spacing, type) + dark/light
-│   │   └── tabulator.css     # Tabulator light/dark theme overrides
+│   │   └── tokens.css        # design tokens (colors, spacing, type) + dark/light
 │   ├── components/
-│   │   ├── SpreadsheetGrid/  # THE shared Tabulator wrapper (chrome + export + actions)
+│   │   ├── SpreadsheetGrid.tsx + SpreadsheetGrid.theme.css + gridFilters.ts
+│   │   │                     # THE shared Tabulator wrapper (chrome + export + actions, light/dark)
 │   │   ├── StatusPill/
 │   │   ├── Modal/  Drawer/  Toast/  Confirm/
 │   │   └── PageChrome/        # page header, toolbar, empty/loading/error states

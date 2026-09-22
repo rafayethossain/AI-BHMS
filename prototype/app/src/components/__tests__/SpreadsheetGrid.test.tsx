@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const tabulatorCapture = vi.hoisted(() => ({
   instances: [] as {
     options: Record<string, unknown>;
+    callbacks: Record<string, (arg1?: unknown, arg2?: unknown) => void>;
     undoCalls: number;
     redoCalls: number;
     downloadArgs: unknown[];
@@ -230,6 +231,46 @@ describe('SpreadsheetGrid', () => {
     expect(opts.clipboard).toBe(true);
     expect(opts.history).toBe(true);
     expect(opts.clipboardPasteAction).toBe('range');
+  });
+
+  it('suppresses onRowClick when the click lands on a grid action control', () => {
+    const onRowClick = vi.fn<(row: Record<string, unknown>) => void>();
+    renderGrid({ onRowClick, actionColumn: true });
+    const inst = tabulatorCapture.instances[0];
+    const actionEl = document.createElement('button');
+    actionEl.dataset.gridAction = 'actions-menu';
+    inst.callbacks.rowClick?.(
+      { target: actionEl },
+      { getData: () => ({ material: 'DENIM 12oz' }) },
+    );
+    expect(onRowClick).not.toHaveBeenCalled();
+    inst.callbacks.rowClick?.(undefined, { getData: () => ({ material: 'DENIM 12oz' }) });
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a single Actions menu column instead of inline row actions', () => {
+    renderGrid({ actionColumn: true });
+    const cols = tabulatorCapture.instances[0].options.columns as { field: string; title: string }[];
+    const fields = cols.map((c) => c.field);
+    expect(fields).toContain('__actions');
+    expect(fields).not.toContain('__rowmenu');
+    expect(cols.find((c) => c.field === '__actions')?.title).toBe('Actions');
+  });
+
+  it('renders the Actions menu column when only rowActions is supplied', () => {
+    renderGrid({ rowActions: () => [{ label: 'Print Design Sheet' }] });
+    const fields = (
+      tabulatorCapture.instances[0].options.columns as { field: string }[]
+    ).map((c) => c.field);
+    expect(fields).toContain('__actions');
+  });
+
+  it('does not add an Actions column by default', () => {
+    renderGrid();
+    const fields = (
+      tabulatorCapture.instances[0].options.columns as { field: string }[]
+    ).map((c) => c.field);
+    expect(fields).not.toContain('__actions');
   });
 
   it('exposes undo, redo and Excel export through the grid ref', () => {

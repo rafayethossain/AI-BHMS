@@ -27,16 +27,21 @@
 | StyleVersions | 20 | 1–2 per style; current_version link on style |
 | Buyers | 7 | Nike Inc., Zara, Primark, Aldi, Addidas, Walmart, Costco |
 | Factories | 5 | Bangladesh mills |
-| File Openings | 9 | incl. 2 quick-lead (1 fully agreed), 2 repeats (1 approved), 2 stock fabric |
+| FN / version files (on StyleVersion) | 9 | incl. 2 quick-lead (1 fully agreed), 2 repeats (1 approved), 2 stock fabric |
 | Purchase Orders | 12 | PO-2025-0001..0008 + PO-DEMO-01/02 + PO-PC-OVER/SHORT; all statuses incl. overdue |
 | PO Items | ~40 | color/size/qty per PO |
 | Hits | 18 | boxed/hanging, sea/air, some delivered |
 | Costings | 8 | sheet types SL/VN/BD/CN/other; 1 live; lines fabric/trim/label/making/overhead |
 | Design Costings | 5 | REG styles: 3 approved (ladder populated), 1 pending, 1 draft; 1 live per style |
 | BOM items | 75 | trimmed categories w/ Ordered/TBC/Partial/Completed mix |
-| Shipments | 5 | incl. 1 past ETA no booking-ref (14-day alert demo) |
+| Shipments | 6 | 9-stage flow, 8 doc types, incl. 1 past ETA no booking-ref (14-day alert demo) |
+| Freight forwarders | 5 | linked to bookings/shipments |
 | Booking schedule | 15 | live/in_work/delivered; last-hit marker; snapshot |
-| Fabric orders | 3 | draft/bulk_approved/delivered + risk levels (red w/ notes) |
+| Materials POs | 8 | fabric (2) / trims (2) / labels (2) / accessories (1) / other (1); terms & clauses; booking refs; draft/confirmed/partial/delivered |
+| Fabric orders | 4 | draft/bulk_approved/delivered + risk levels (red w/ notes); one docket >200m sales |
+| Fabric tolerances | 6 | customer_type × qty-band thresholds incl. a resolve case |
+| Fabric utilization | 4 | 2 monthly + 2 quarterly cut/qty rows |
+| Paperwork comparison | 8 | ordered vs shipped vs docket tolerance; over/short + covers-order cases |
 | T&A rows | 8 | milestone sets: no-ta / on-track / off-track / complete |
 | Quality | 6 inspections + 12 audits + 5 gold seals + 3 CAPA | pass/fail/pending mix |
 | Production | 5 plans + daily rows | incl. one where output ≥ qty (green) and one partial (amber) |
@@ -54,6 +59,22 @@
   trail page lists lifecycle events.
 - **Order Manager**: critical path complete + on-track + off-track rows; weekly review print.
 - **Booking schedule**: inline-edit a cut qty, last-hit row highlighted, snapshot columns.
+- **Tech-pack import wizard**: run the 3-step flow on a design (upload → extract/review → write
+  through) → creates/links style + version + items + BOM; Style detail Tech Packs tab shows section
+  progress (REQ-p-008).
+- **Shipping paperwork comparison**: rows with ordered vs shipped vs docket tolerance; over/short
+  cases; covers-order flag (REQ-p-044).
+- **Fabric tolerances + utilization**: a customer × qty-band case that resolves; monthly and
+  quarterly utilization grids (REQ-p-025).
+- **Freight forwarders**: CRUD + bookings linked to shipment detail.
+- **Materials booking + print**: from a design version's materials breakdown + PO, generate
+  materials POs (fabric/trims/labels/accessories/other) and print with terms & clauses (REQ-p-023).
+- **FN/version commercial file**: open the file for a design version → quick-lead/repeat + department
+  approvals + stock flags → POs roll up under the FN (REQ-p-010).
+- **Dockets over-200m**: a docket above the sales threshold shows the red flag + notification.
+- **Setup / audit / health**: master-data rows in 20 categories, action-coloured audit log rows, one
+  degraded health check.
+- **Invoice approval rules**: one >20-unit and one 5%/2% tolerance case for Approve/Reject.
 - **Empty/loading states**: one list (e.g. LCs) pre-filtered to show "No rows yet" + the search
   box query surfacing the empty state without a reload.
 

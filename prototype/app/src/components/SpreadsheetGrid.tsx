@@ -59,6 +59,7 @@ export interface SpreadsheetActionCallbacks {
 export interface SpreadsheetMenuItem {
   label: string;
   disabled?: boolean;
+  variant?: 'default' | 'danger';
   action?: (...args: unknown[]) => void;
 }
 
@@ -280,91 +281,131 @@ export default function SpreadsheetGrid({
     const el = containerRef.current;
     if (!el) return;
 
-    const actionFormatter: ColumnDefinition['formatter'] = (cell) => {
-      const rowData = cell.getRow().getData() as Record<string, unknown>;
-      const span = document.createElement('div');
-      span.className = 'flex items-center justify-end gap-3';
-      const mk = (label: string, cls: string, action: string) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.textContent = label;
-        b.className = cls;
-        b.dataset.gridAction = action;
-        b.dataset.rowId = String(rowData['__id'] ?? '');
-        span.appendChild(b);
-        return b;
-      };
-      if (onView) mk('View', 'text-sm text-blue-400 hover:text-blue-300', 'view');
-      if (onEdit) mk('Edit', 'text-sm text-amber-400 hover:text-amber-300', 'edit');
-      if (onDelete) mk('Delete', 'text-sm text-red-400 hover:text-red-300', 'delete');
-      return span;
+    const rowMap = new WeakMap<HTMLElement, Record<string, unknown>>();
+    let activeMenu: { el: HTMLElement; trigger: HTMLElement } | null = null;
+
+    const menuItemsFor = (rowData: Record<string, unknown>): SpreadsheetMenuItem[] => {
+      const items: SpreadsheetMenuItem[] = [];
+      if (onView) items.push({ label: 'View', action: () => onView(rowData) });
+      if (onEdit) items.push({ label: 'Edit', action: () => onEdit(rowData) });
+      if (onDelete) items.push({ label: 'Delete', variant: 'danger', action: () => onDelete(rowData) });
+      items.push(...(rowActionsRef.current?.(rowData) ?? []));
+      return items;
     };
 
-    const actionCol = actionColumn
+    const closeRowMenu = () => {
+      if (!activeMenu) return;
+      activeMenu.el.remove();
+      activeMenu.trigger.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('mousedown', onMenuOutsideClick, true);
+      window.removeEventListener('scroll', closeRowMenu, true);
+      window.removeEventListener('resize', closeRowMenu);
+      activeMenu = null;
+    };
+
+    const onMenuOutsideClick = (e: MouseEvent) => {
+      if (!activeMenu) return;
+      const target = e.target as Node;
+      if (activeMenu.el.contains(target) || activeMenu.trigger.contains(target)) return;
+      closeRowMenu();
+    };
+
+    const openRowMenu = (trigger: HTMLElement, items: SpreadsheetMenuItem[]) => {
+      closeRowMenu();
+      if (items.length === 0) return;
+      const rowData = rowMap.get(trigger) ?? {};
+      const menu = document.createElement('div');
+      menu.className = 'grid-row-menu';
+      menu.setAttribute('role', 'menu');
+      items.forEach((item) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.disabled = item.disabled ?? false;
+        b.className =
+          'grid-row-menu-item' + (item.variant === 'danger' ? ' grid-row-menu-item--danger' : '');
+        b.setAttribute('role', 'menuitem');
+        b.textContent = item.label;
+        if (!item.disabled && item.action) {
+          b.addEventListener('click', () => {
+            closeRowMenu();
+            item.action?.(rowData);
+          });
+        }
+        menu.appendChild(b);
+      });
+      menu.addEventListener('keydown', (e) => {
+        const buttons = Array.from(
+          menu.querySelectorAll<HTMLButtonElement>('.grid-row-menu-item:not(:disabled)'),
+        );
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          const triggerEl = activeMenu?.trigger;
+          closeRowMenu();
+          triggerEl?.focus();
+          return;
+        }
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        e.preventDefault();
+        const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const step = e.key === 'ArrowDown' ? 1 : -1;
+        buttons[(current + step + buttons.length) % buttons.length]?.focus();
+      });
+      document.body.appendChild(menu);
+      const rect = trigger.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+      const gap = 4;
+      let top = rect.bottom + gap;
+      if (top + menuRect.height > window.innerHeight - 8) {
+        top = Math.max(8, rect.top - gap - menuRect.height);
+      }
+      const left = Math.max(8, Math.min(rect.right - menuRect.width, window.innerWidth - menuRect.width - 8));
+      menu.style.top = `${Math.round(top)}px`;
+      menu.style.left = `${Math.round(left)}px`;
+      trigger.setAttribute('aria-expanded', 'true');
+      activeMenu = { el: menu, trigger };
+      document.addEventListener('mousedown', onMenuOutsideClick, true);
+      window.addEventListener('scroll', closeRowMenu, true);
+      window.addEventListener('resize', closeRowMenu);
+      menu.querySelector<HTMLButtonElement>('.grid-row-menu-item:not(:disabled)')?.focus({ preventScroll: true });
+    };
+
+    const actionFormatter: ColumnDefinition['formatter'] = (cell) => {
+      const rowData = cell.getRow().getData() as Record<string, unknown>;
+      const wrap = document.createElement('div');
+      wrap.className = 'grid-row-actions';
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = 'grid-row-actions-trigger';
+      trigger.dataset.gridAction = 'actions-menu';
+      trigger.dataset.rowId = String(rowData['__id'] ?? '');
+      trigger.setAttribute('aria-haspopup', 'menu');
+      trigger.setAttribute('aria-expanded', 'false');
+      trigger.title = 'Actions';
+      trigger.textContent = 'Actions';
+      const caret = document.createElement('span');
+      caret.className = 'grid-row-actions-caret';
+      caret.setAttribute('aria-hidden', 'true');
+      caret.textContent = '\u25BE';
+      trigger.appendChild(document.createTextNode(' '));
+      trigger.appendChild(caret);
+      wrap.appendChild(trigger);
+      rowMap.set(trigger, rowData);
+      return wrap;
+    };
+
+    const actionCol = actionColumn || rowActions
       ? {
           formatter: actionFormatter,
           field: '__actions',
           title: 'Actions',
-          hozAlign: 'left' as const,
-          width: 140,
-          headerSort: false,
-        }
-      : null;
-
-    const closeRowMenu = (wrap?: HTMLElement | null) => {
-      wrap?.querySelector('.grid-row-menu')?.remove();
-    };
-
-    const rowMap = new WeakMap<HTMLElement, Record<string, unknown>>();
-
-    const openRowMenu = (wrap: HTMLElement, row: Record<string, unknown>) => {
-      closeRowMenu(wrap);
-      const items = rowActionsRef.current?.(row) ?? [];
-      if (items.length === 0) return;
-      const menu = document.createElement('div');
-      menu.className = 'grid-row-menu';
-      items.forEach((item, i) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.disabled = item.disabled ?? false;
-        b.className = 'grid-row-menu-item';
-        b.dataset.gridAction = 'rowmenu-item';
-        b.dataset.menuIndex = String(i);
-        b.textContent = item.label;
-        menu.appendChild(b);
-      });
-      wrap.appendChild(menu);
-    };
-
-    const rowMenuCol = rowActions
-      ? {
-          field: '__rowmenu',
-          title: '',
           hozAlign: 'right' as const,
-          width: 44,
+          width: 120,
           headerSort: false,
           cssClass: 'grid-row-actions-cell',
-          formatter: (cell: { getRow(): { getData(): Record<string, unknown> } }) => {
-            const rowData = cell.getRow().getData() as Record<string, unknown>;
-            const wrap = document.createElement('div');
-            wrap.className = 'grid-row-actions';
-            rowMap.set(wrap, rowData);
-            const toggle = document.createElement('button');
-            toggle.type = 'button';
-            toggle.setAttribute('aria-label', 'Row actions');
-            toggle.title = 'Row actions';
-            toggle.className = 'grid-row-actions-toggle';
-            toggle.dataset.gridAction = 'rowmenu';
-            toggle.dataset.rowId = String(rowData['__id'] ?? '');
-            toggle.textContent = '\u22EF';
-            wrap.appendChild(toggle);
-            return wrap;
-          },
         }
       : null;
 
     const tableColumns: ColumnDefinition[] = [
-      ...(rowMenuCol ? [rowMenuCol] : []),
       ...(actionCol ? [actionCol] : []),
       ...visibleColumns.map((c) => {
         const filterType: SpreadsheetHeaderFilterType = c.headerFilterType ?? 'list';
@@ -423,6 +464,8 @@ export default function SpreadsheetGrid({
     });
 
     table.on('rowClick', (_e, row) => {
+      const target = (_e as MouseEvent | undefined)?.target as HTMLElement | null | undefined;
+      if (target?.closest('[data-grid-action]')) return;
       callbacksRef.current.onRowClick?.(row.getData());
     });
     table.on('cellEdited', (cell) => {
@@ -431,31 +474,13 @@ export default function SpreadsheetGrid({
     table.on('cellClick', (_e, cell) => {
       const target = (_e as MouseEvent).target as HTMLElement | null;
       const actionEl = target?.closest('[data-grid-action]') as HTMLElement | null;
-      if (!actionEl) return;
-      const action = actionEl.dataset.gridAction;
-      const rowId = actionEl.dataset.rowId;
-      const row = data.find((r) => String(r['__id']) === rowId) ?? cell.getRow().getData();
-      if (action === 'rowmenu') {
-        const wrap = actionEl.closest('.grid-row-actions') as HTMLElement | null;
-        if (!wrap) return;
-        const menuRow = rowMap.get(wrap) ?? cell.getRow().getData();
-        if (wrap.querySelector('.grid-row-menu')) closeRowMenu(wrap);
-        else openRowMenu(wrap, menuRow);
+      if (actionEl?.dataset.gridAction !== 'actions-menu') return;
+      if (activeMenu?.trigger === actionEl) {
+        closeRowMenu();
         return;
       }
-      if (action === 'rowmenu-item') {
-        const wrap = actionEl.closest('.grid-row-actions') as HTMLElement | null;
-        if (!wrap) return;
-        const idx = Number(actionEl.dataset.menuIndex);
-        const menuRow = rowMap.get(wrap) ?? cell.getRow().getData();
-        const item = (rowActionsRef.current?.(menuRow) ?? [])[idx];
-        closeRowMenu(wrap);
-        if (item && !item.disabled) item.action?.(menuRow);
-        return;
-      }
-      if (action === 'view') onView?.(row);
-      if (action === 'edit') onEdit?.(row);
-      if (action === 'delete') onDelete?.(row);
+      const menuRow = rowMap.get(actionEl) ?? cell.getRow().getData();
+      openRowMenu(actionEl, menuItemsFor(menuRow));
     });
 
     table.on('dataFiltered', () => {
@@ -473,6 +498,7 @@ export default function SpreadsheetGrid({
 
     tableRef.current = table;
     return () => {
+      closeRowMenu();
       table.destroy();
       tableRef.current = null;
     };
