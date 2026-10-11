@@ -136,4 +136,4 @@
 - [ ] Sales Order tab renders on a real design version with color-coded statuses (manual/live — dev servers not running this session)
 - [x] No regression in existing merchandising/design tests
 - [x] TDD_TRACKER, master-backlog, lessons-learned updated
-- [ ] Ready for commit (pending user go-ahead)
+- [x] Ready for commit — RQ-051 was committed (`ef50f8d`, `0f9faf0`); box was left unticked
