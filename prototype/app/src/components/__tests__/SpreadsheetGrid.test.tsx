@@ -8,6 +8,8 @@ const tabulatorCapture = vi.hoisted(() => ({
     undoCalls: number;
     redoCalls: number;
     downloadArgs: unknown[];
+    externalSetDataCalls: number;
+    setDataBeforeBuilt: boolean;
   }[],
   reset() {
     this.instances.length = 0;
@@ -27,9 +29,28 @@ vi.mock('tabulator-tables/dist/js/tabulator_esm.js', () => {
       this.headerEl = this.renderHeader();
       this.element.appendChild(this.headerEl);
       if (Array.isArray(options.data)) {
-        this.setData(options.data as Record<string, unknown>[]);
+        // The constructor's initial data load is internal (mirrors Tabulator's
+        // own `_loadInitialData`); only *external* calls count as re-feeds.
+        this.renderRows(options.data as Record<string, unknown>[]);
       }
+      // Real Tabulator builds the table (and its row renderer) on a deferred
+      // timer after the constructor; emulate that so tests can catch `setData`
+      // calls that would land in the pre-build window.
+      setTimeout(() => {
+        this.initialized = true;
+        this.callbacks.tableBuilt?.();
+      }, 0);
       tabulatorCapture.instances.push(this);
+    }
+
+    initialized = false;
+    externalSetDataCalls = 0;
+    setDataBeforeBuilt = false;
+
+    setData(data: Record<string, unknown>[]) {
+      if (!this.initialized) this.setDataBeforeBuilt = true;
+      this.externalSetDataCalls += 1;
+      this.renderRows(data);
     }
 
     renderHeader(): HTMLElement {
@@ -60,7 +81,7 @@ vi.mock('tabulator-tables/dist/js/tabulator_esm.js', () => {
       this.downloadArgs = [type, fileName, params];
     }
 
-    setData(data: Record<string, unknown>[]) {
+    renderRows(data: Record<string, unknown>[]) {
       const body = document.createElement('div');
       body.className = 'tabulator-body';
       for (const row of data) {
@@ -288,5 +309,41 @@ describe('SpreadsheetGrid', () => {
     gridRef.current?.downloadXlsx('bom.xlsx');
     expect(tabulatorCapture.instances[0].downloadArgs[0]).toBe('xlsx');
     expect(tabulatorCapture.instances[0].downloadArgs[1]).toBe('bom.xlsx');
+  });
+});
+
+describe('SpreadsheetGrid data changes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tabulatorCapture.reset();
+  });
+
+  it('does not re-feed data to a table that was just rebuilt with the new data', () => {
+    // Mount with an empty grid (data not loaded yet), then swap in the rows —
+    // exactly the mock/API pattern (grid mounts empty, data arrives async). The
+    // rows change rebuilds the Tabulator instance with the new data already in
+    // its constructor options. Re-feeding that same data via `setData` in the
+    // sync data-sync effect runs before Tabulator's deferred `_create()` (which
+    // assigns the row renderer) — the real library throws `Cannot read
+    // properties of null (reading 'verticalFillMode')` in `adjustTableSize`.
+    const { rerender } = render(<SpreadsheetGrid data={[]} columns={columns} />);
+    rerender(<SpreadsheetGrid data={rows} columns={columns} />);
+
+    const instances = tabulatorCapture.instances;
+    expect(instances.length).toBe(2); // the first instance was rebuilt
+    expect(instances[1].externalSetDataCalls).toBe(0);
+  });
+
+  it('defers a data feed until the table is built when a filter changes in the build window', async () => {
+    render(<SpreadsheetGrid data={rows} columns={columns} toolbar />);
+    const inst = tabulatorCapture.instances[0];
+    // Typing in the grid search changes `gridData` without rebuilding the table,
+    // so it flows through the data-sync effect — while the (fake) Tabulator has
+    // not yet fired `tableBuilt` (its build is deferred, as in the real library).
+    fireEvent.change(screen.getByTestId('grid-search'), { target: { value: 'DENIM' } });
+    expect(inst.setDataBeforeBuilt).toBe(false);
+    // Once the table is built, the filtered rows are pushed.
+    await waitFor(() => expect(inst.externalSetDataCalls).toBe(1));
+    expect(inst.setDataBeforeBuilt).toBe(false);
   });
 });

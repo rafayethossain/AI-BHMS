@@ -497,6 +497,15 @@ export default function SpreadsheetGrid({
     });
 
     tableRef.current = table;
+    // The instance is constructed with `data: gridData` in its options, so it is
+    // already loaded with this exact data. Record it here so the data-sync
+    // effect below does not redundantly re-feed a table that Tabulator has not
+    // finished building yet: Tabulator defers `_create()` (which assigns the row
+    // renderer) to a timer after the constructor, and calling `setData` before
+    // then throws `Cannot read properties of null (reading 'verticalFillMode')`
+    // in `adjustTableSize`. Rebuilding on a data change previously left the seed
+    // stale, so the effect fired a pre-build `setData` on every data swap.
+    lastFedRef.current = gridData;
     return () => {
       closeRowMenu();
       table.destroy();
@@ -510,8 +519,26 @@ export default function SpreadsheetGrid({
     if (!table) return;
     if (typeof table.setData !== 'function') return;
     if (lastFedRef.current === gridData) return;
-    lastFedRef.current = gridData;
-    (table as { setData(data: Record<string, unknown>[]): void }).setData(gridData);
+
+    const feed = () => {
+      if (lastFedRef.current === gridData) return;
+      lastFedRef.current = gridData;
+      (table as { setData(data: Record<string, unknown>[]): void }).setData(gridData);
+    };
+
+    // Tabulator builds the table (and assigns its row renderer) on a deferred
+    // timer after the constructor; feeding data before then throws in
+    // `adjustTableSize`. If a data/filter change lands inside that build window,
+    // wait for `tableBuilt` before pushing the new rows.
+    const late = table as unknown as {
+      initialized?: boolean;
+      on?: (evt: string, cb: () => void) => void;
+    };
+    if (late.initialized === false && typeof late.on === 'function') {
+      late.on('tableBuilt', feed);
+      return;
+    }
+    feed();
   }, [gridData]);
 
   const handleSearch = (value: string) => {
