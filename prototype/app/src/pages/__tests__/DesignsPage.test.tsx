@@ -218,7 +218,7 @@ describe('DesignsPage (Design register)', () => {
       'Delete',
       'Materials',
       'Fit Specs',
-      'Job Description',
+      'Job Requests',
       'Costings',
       'Print Design Sheet',
       'Sales Report',
@@ -828,5 +828,39 @@ describe('DesignsPage — view modal scroll + form dropdowns', () => {
     const formScroll = within(dialog).getByTestId('materials-grid-scroll');
     expect(formScroll.className).toContain('overflow-auto');
     expect(formScroll.className).toContain('min-h-');
+  });
+});
+
+describe('DesignsPage — responsive page shell', () => {
+  beforeEach(() => {
+    resetDb();
+    tabulatorCapture.reset();
+  });
+
+  it('renders a fluid, full-width page container (no fixed max-width cap)', async () => {
+    renderPage();
+    await screen.findByText('REG-1001');
+
+    const root = screen.getByTestId('page-container');
+    expect(root.className).not.toContain('max-w-');
+    expect(root.className).toContain('w-full');
+  });
+
+  it('scales the page gutters responsively instead of one fixed padding', async () => {
+    renderPage();
+    await screen.findByText('REG-1001');
+
+    const root = screen.getByTestId('page-container');
+    expect(root.className).toContain('p-4');
+    expect(root.className).toContain('sm:p-6');
+  });
+
+  it('sizes the register grid to the viewport rather than a fixed pixel height', async () => {
+    renderPage();
+    await screen.findByText('REG-1001');
+
+    const instances = tabulatorCapture.instances;
+    const instance = instances[instances.length - 1];
+    expect(instance?.options.height).toBe('max(320px, calc(100vh - 320px))');
   });
 });

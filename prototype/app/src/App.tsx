@@ -7,6 +7,10 @@ import DesignsPage from './pages/DesignsPage';
 import DesignDetailPage from './pages/DesignDetailPage';
 import DesignSheetPrintPage from './pages/DesignSheetPrintPage';
 import DesignMaterialsPage from './pages/DesignMaterialsPage';
+import DesignFitSpecsPage from './pages/DesignFitSpecsPage';
+import DesignJobsPage from './pages/DesignJobsPage';
+import DesignCostingsPage from './pages/DesignCostingsPage';
+import DesignSalesReportPage from './pages/DesignSalesReportPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 
 function App() {
@@ -21,6 +25,10 @@ function App() {
               <Route path="/design" element={<DesignsPage />} />
               <Route path="/designs/:designCode" element={<DesignDetailPage />} />
               <Route path="/designs/:designCode/materials" element={<DesignMaterialsPage />} />
+              <Route path="/designs/:designCode/fits" element={<DesignFitSpecsPage />} />
+              <Route path="/designs/:designCode/jobs" element={<DesignJobsPage />} />
+              <Route path="/designs/:designCode/costings" element={<DesignCostingsPage />} />
+              <Route path="/designs/:designCode/sales-report" element={<DesignSalesReportPage />} />
               <Route path="*" element={<PlaceholderPage />} />
             </Route>
             <Route path="/designs/:designCode/print" element={<DesignSheetPrintPage />} />

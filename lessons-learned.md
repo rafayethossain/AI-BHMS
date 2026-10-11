@@ -6,6 +6,190 @@
 
 ---
 
+## 2026-10-11 - SpreadsheetGrid verticalFillMode crash: a deferred library build, a stale seed, and a hypothesis a passing test falsified (prototype PT-003)
+
+**What happened:** Fixed the long-tracked dev-only console `TypeError: Cannot read properties of null (reading
+'verticalFillMode')` in the shared `SpreadsheetGrid` (the last thing blocking PT-003 from ✅).
+
+**What went wrong / well:**
+- **A hypothesis a *passing* test falsified.** The issue was written up as "React StrictMode console error", so my
+  first RED test mounted the grid under `<StrictMode>` with an unstable `data` prop. It **passed** against the
+  unfixed code — meaning my model was wrong. I did not "fix" it to make the test fail; I re-derived the trigger
+  and wrote a *different* test (mount empty `data=[]`, then `rerender` with `data=rows`), which failed `1 to be 0`.
+  Lesson: a test that passes on the buggy code is evidence about the *hypothesis*, not just the code.
+- **Read the installed dependency source, not the docs.** The stack pointed into `tabulator_esm.js`. Reading
+  `node_modules/tabulator-tables/dist/js/tabulator_esm.js` showed `new TabulatorFull(...)` **defers** `_create()`
+  (which assigns `rowManager.renderer`) to a `setTimeout` (~line 27155), and `RowManager._wipeElements →
+  adjustTableSize` dereferences `this.renderer.verticalFillMode`. So any `setData` before that timer throws. The
+  fix followed directly from the source.
+- **The real trigger was a *data change*, not StrictMode.** The grid rebuilds its Tabulator instance when `data`
+  changes; the data-sync effect's `lastFedRef` "already fed" seed was only set at hook-init, so after a rebuild it
+  was stale and the effect re-fed the fresh (not-yet-built) instance in the same commit. That is exactly one error
+  per data swap — the empty→loaded mock fetch. StrictMode merely made the same path fire on mount.
+- **jsdom cannot reproduce it.** The existing `SpreadsheetGrid` test **mocks** Tabulator with a `FakeTabulator`
+  that has no deferred `_create`, so the crash never occurs there. The unit test therefore guards the *mechanism*
+  (the rebuilt instance must receive **0** external `setData` calls — the harness was extended so the constructor's
+  internal initial load is distinct from external `setData`, mirroring Tabulator's `_loadInitialData`), while the
+  real-browser check proves the *symptom is gone* (1 → 0 console errors on `/design`, grid still 16 rows / 304
+  cells). Keep both halves.
+
+**What to do differently:** (1) When a bug is described with a cause ("StrictMode"), treat the cause as a
+hypothesis — a passing test disproves it cheaply, so re-derive before fixing. (2) Read the installed library
+source for lifecycle/timing bugs; the deferred-build detail was invisible from the app code. (3) For shared
+components, gate with the full frontend suite even when the one-file test is green. (4) A fix for a timing bug
+can be necessary-but-not-sufficient: after the seed fix, a filter change in the *same commit* as a rebuild still
+fed a not-yet-built table (found by racing the interaction against the async load), so a `tableBuilt` guard was
+added — defer the feed until `table.initialized` is true.
+
+**Linked slice:** prototype PT-003 (`SpreadsheetGrid`); enables the whole grid layer (PT-010/011/012 consumers).
+**Result:** GATE_A + full frontend suite VERIFIED - `tsc -b` 0 / lint 0 errors (24 baseline warnings) /
+`vitest` 261 passed, 12 pre-existing jsdom-env failures (23 files) / CDP `/design` 0 console errors, 16 rows;
+racing + settled-filter checks clean. Two RED-first fixes: seed `lastFedRef.current = gridData` in the mount
+effect after construction, and defer a data feed to `tableBuilt` when a change lands in the build window.
+
+---
+
+## 2026-10-11 - Sales Report print page: jsdom anchor-click spy, the stale dev-server transform (again), and holding the lint baseline (prototype PT-016)
+
+**What happened:** Built the print-optimised design Sales Report (`/designs/:designCode/sales-report`) on
+the `DesignSheetPrintPage` pattern - a pure CSV/summary helper (`pages/salesReport.ts`) plus the page.
+Three traps:
+
+**What went wrong / well:**
+- **Caught - you cannot spy the download anchor's `.click`.** `vi.spyOn(HTMLAnchorElement.prototype,
+  'click')` did **not** intercept the `anchor.click()` in `downloadTextFile` (jsdom's `click` lives on
+  `HTMLElement.prototype` / is non-configurable there), so `toHaveBeenCalled()` was false even though the
+  export ran. Fix: assert the **Blob handed to `URL.createObjectURL`** and read its text
+  (`await blob.text()`) - a stronger assertion (it proves the exported CSV content) that needs no DOM
+  interception. Keep the CSV builder as a separate pure unit-test.
+- **Caught - the dev server served a half-updated `App.tsx` again.** Same failure as PT-010f: the watcher
+  took the new import but missed the new `<Route>`, so the URL fell through to the catch-all
+  PlaceholderPage. Fix: touch `App.tsx`, then confirm the route is in the **served** module
+  (`(Invoke-WebRequest http://localhost:5173/src/App.tsx).Content -match 'sales-report'`) before
+  browser-verifying. This is now a **known recurring gotcha** - always check the served bundle, not just
+  the file.
+- **Caught - new files drifted the lint baseline.** My clean files still added 6 warnings:
+  `react(set-state-in-effect)` from a synchronous `setLoading(true)` in the effect; three
+  `jsx-a11y(control-has-associated-label)` false positives on **empty spacer `<td>`/`<th>`**; and two
+  `vitest(require-mock-type-parameters)` on bare `vi.fn()`. Fixes: drop the sync `setState` (initial
+  state already covers the first load), give the empty header a `<span className="sr-only">Open</span>`
+  and the spacer cells a `{' '}` child, and type the mocks (`vi.fn<(blob: Blob) => string>(...)`).
+  Baseline back to **24 warnings / 0 errors**.
+
+**What to do differently:** (1) To test a client-side download, assert the Blob/CSV content, not the
+anchor click. (2) Treat "served bundle contains the new route" as a pre-browser-check gate. (3) After
+adding files, re-count lint warnings and fix any from the new files so the baseline holds.
+
+**Linked slice:** prototype PT-016 (Design Sales Report) / PT-010 Sales Order tab.
+**Result:** GATE_A VERIFIED - RED-first `DesignSalesReportPage.test.tsx` (11) +
+`pages/__tests__/salesReport.test.ts` (3); tsc 0 / lint 0 errors (24 baseline warnings) / vitest 259
+passed, 12 pre-existing jsdom-env failures (23 files); CDP `/designs/REG-1004/sales-report` 11 rows,
+totals 17,050 / 62,925.00, version switch -> empty state, 0 console errors.
+
+---
+
+## 2026-10-11 - Costings page: async save races the modal-close, the dev-server served a stale route, and shallow test assertions (prototype PT-010f)
+
+**What happened:** Built the design-scoped Costings page (`/designs/:designCode/costings`) on the
+PT-010e Job Requests pattern. Three traps, all worth remembering:
+
+**What went wrong / well:**
+- **Caught - refresh the list *before* you close the dialog.** The add/edit/delete handlers did
+  `await mutate(); toast(); setClosing(null); await refresh();` - so the dialog closed one tick *before*
+  the list re-rendered. Tests that `await waitFor(dialog gone)` then asserted the new state passed for
+  add/edit (they used `findBy*`, which retries) but the **delete** test asserted with a synchronous
+  `queryByText` and failed. Fix: `await refresh()` **before** `setClosing(null)` - when the dialog is
+  gone the list is already correct, so the close is the real "write flushed" signal.
+- **Caught - the dev server served a half-updated `App.tsx`.** After adding the route, the browser still
+  showed the catch-all PlaceholderPage. The Vite/Rolldown watcher had picked up edit #1 (the new import)
+  but missed edit #2 (the new `<Route>`), so `/src/App.tsx` was served with `DesignCostingsPage` imported
+  but no route for it. Fix: touch the file (`(Get-Item App.tsx).LastWriteTime = Get-Date`) to force a
+  re-transform, then reload. **Before trusting a browser check of a new route, confirm the route is in
+  the *served* module** - `(Invoke-WebRequest http://localhost:5173/src/App.tsx).Content -match
+  'costings'` - not just in the file on disk.
+- **Caught - shallow assertions collided.** (a) The add-test set Fabric `6.66` with no other costs, so
+  the row's *Fabric cell* and its *Total* were both `$6.66` → "Found multiple elements". (b) The seed
+  has two `Sri Lanka` rows → `getByText('Sri Lanka')` threw. (c) The shared `StatusPill` renders the
+  **derived** label `Pending`, not the backend's verbose `Pending Approval`. Pick seed/assert values so
+  the asserted text is genuinely unique, and assert the shared component's derived labels.
+
+**What to do differently:** (1) In any modal CRUD, refresh state before closing the modal so the close is
+the flush signal. (2) Verify new routes in the served bundle before browser-verifying. (3) Choose test
+inputs whose asserted text cannot appear elsewhere (and use `getAllByText` when duplicates are expected).
+
+**Linked slice:** prototype PT-010f (Design Costings) / PT-010e pattern.
+**Result:** GATE_A VERIFIED - RED-first `DesignCostingsPage.test.tsx` (21) + `mock/__tests__/costings.test.ts`
+(5); tsc 0 / lint 0 errors (24 baseline warnings) / vitest 245 passed, 12 pre-existing jsdom-env failures
+(21 files); CDP `/designs/REG-1001/costings` 4 rows, live tick on V1 only, modal contract confirmed, 0
+console errors.
+
+---
+
+## 2026-10-11 - Two traps building a design-scoped CRUD page: textarea text vs table text, and menu-label drift (prototype PT-010e)
+
+**What happened:** Built the Job Requests page (`/designs/:designCode/jobs`) on the PT-010d Fit Specs
+pattern (shared `Modal`, master-data selects, View/Delete modals). Two things bit:
+
+**What went wrong / well:**
+- **Caught - `getByText` matches a `<textarea>`'s typed value while the modal is still open.** The edit
+  test typed into the Description field (a `<textarea>`), clicked Save, then asserted
+  `queryByText(oldValue)` was gone. It failed because `findByText(newValue)` resolved *instantly* from
+  the still-open textarea, and the old table row had not re-rendered yet (the mock `setTimeout(120)` save
+  was still pending). The Fit Specs page did not hit this because its Description is an `<input>`
+  (input `value` is not `textContent`; textarea `textContent` is). Fix: after Save, `await waitFor(() =>
+  expect(queryByRole('dialog', { name: 'Edit ...' })).not.toBeInTheDocument())` FIRST, then assert the
+  table text - the dialog closing is the real signal that the async write flushed.
+- **Caught - a register menu label had drifted from the target nav.** The PT-010b Actions menu said
+  "Job Description" but the target nav calls the destination **"Job Requests"**
+  (`frontend/src/components/Layout.tsx`). When you build the page a menu item points to, check the menu
+  label against the target nav and align both the menu and the page title (here: rename in
+  `DesignsPage.tsx` + correct the `DesignsPage.test.tsx` menu-order assertion).
+
+**What to do differently:** For any async save in a modal, assert the **dialog is gone** before checking
+row text - never assert new text that also exists inside the open form (textarea `textContent` is
+matched). And when a route's destination page is built, verify the invoking menu label matches the
+target nav, not just the route.
+
+**Linked slice:** prototype PT-010e (Design Job Requests) / PT-010b register Actions menu.
+**Result:** GATE_A VERIFIED - RED-first `DesignJobsPage.test.tsx` (20) + `mock/__tests__/jobs.test.ts`
+(4); tsc 0 / lint 0 errors (24 baseline warnings) / vitest 219 passed, 12 pre-existing jsdom-env
+failures (19 files); CDP `/designs/REG-1001/jobs` 4 rows, overdue flag correct, 0 console errors.
+
+---
+
+## 2026-10-11 - Design Register responsive shell: a fixed max-width cap caused right-side white space (prototype PT-006a / PT-010)
+
+**What happened:** The Design Register page shell was `p-6 max-w-7xl` - `max-w-7xl` is a hard 1280px cap
+and, with no `mx-auto`, the container anchored left. On displays wider than 1280px the whole page (grid
+included) stopped at 1280px and left a large band of dead white space on the right - the "unintended
+white space on the right side of the data grid" the reviewer reported. The sibling pages
+(`DesignMaterialsPage`, `DesignFitSpecsPage`) were already fluid (`flex flex-col h-full`), so the
+register was the odd one out. It was NOT a Tabulator problem: `fitData` fills the host width and scrolls
+horizontally when the columns exceed it.
+
+**What went wrong / well:**
+- **Well - the fix is a container rule, not a grid hack.** Removing the cap (`w-full p-4 sm:p-6`) makes
+  the grid fill the viewport; the grid host is a plain block div, so it was already 100% of its parent.
+- **Caught - the same defect class existed on the Dashboard** (`p-6 max-w-6xl`, also left-anchored). A
+  non-tabular summary page may keep a reading-width cap, but it must be centred (`mx-auto`) so the
+  leftover space is symmetric.
+- **Watch - jsdom cannot prove width.** `getBoundingClientRect()` is 0 in jsdom, so the regression test
+  asserts the shell contract (className: no `max-w-`, `w-full`, `p-4`/`sm:p-6`) plus the
+  viewport-relative grid height string; the real proof was a CDP measure (`max-width: none`, 0 right gap).
+
+**What to do differently:** Tabular/list pages are fluid full width - never cap them with `max-w-*`; if a
+page needs a reading width, centre it with `mx-auto`. Give list grids a viewport height
+(`height="max(320px, calc(100vh - 320px))"`) instead of a fixed pixel height. Both rules are now in
+prototype `standards.md` section 2.
+
+**Linked slice:** prototype PT-006a (Design Register responsive shell) / PT-010 register.
+**Result:** GATE_A VERIFIED - RED-first `DesignsPage.test.tsx` (+3) and a new `DashboardPage.test.tsx` (2);
+tsc 0 / lint 0 errors (24 baseline warnings) / vitest 195 passed, 12 pre-existing jsdom-env failures
+(17 files); CDP `/design` (shell `max-width: none`, grid fills the content width, horizontal scroll
+intact) and `/dashboard` (cap centred, left == right).
+
+---
+
 ## 2026-09-21 ??? Materials add/edit modal standardization (prototype PT-010c)
 
 **What happened:** The standalone materials page's Add/Edit modal was a hand-rolled `<dialog>`: no focus
@@ -26,6 +210,50 @@ contract (focus trap, Esc/backdrop/✕, `aria-modal`, scrollable body with pinne
 standard (prototype `standards.md` §5); master-data fields are `<select>`s (§6).
 
 **Linked slice:** prototype PT-010c (Design Materials page).
+
+---
+
+## 2026-09-21 — Design Fit Specs page (prototype PT-010d)
+
+**What happened:** Built the standalone Fit Specs CRUD page at `/designs/:designCode/fits` (reached from the
+register Actions menu -> Fit Specs), mirroring the PT-010c Materials page. Header = Back link + `<code> — Fit
+Specs` + buyer / style_type / N specs / **Current: <fit #>**; a plain table `Fit # · Stage · Version · Fit Date ·
+Current · Description · Measurements · Notes · Actions`; per-row actions in register order `View · Edit · Set
+Current · Delete` (Set Current rendered only on non-current rows, with an emerald `Current` `StatusPill`).
+Add/Edit use the shared `Modal` (`max-w-2xl`, scrollable `max-h-[75vh] overflow-y-auto pr-1`, `Fit
+Specification` section, Stage + Version as master-data `<select>`s); View is read-only `max-w-3xl`; Delete
+confirm `max-w-sm`. New mock entity `FitSpec` + `fitSpecSeed` (11 rows; exactly one `is_selected` per design) +
+`db`/`api` store with mutually-exclusive selection (`setCurrentFitSpec`), plus `getDesignVersions`. RED-first
+19 page tests + 6 store tests. GATE_A: tsc 0 / lint 0 errors (24-warning baseline held) / vitest 190 passed, 12
+pre-existing jsdom-env failures / real-browser CDP 0 console errors.
+
+**What went wrong / well:**
+- **Well — mirror the sibling page.** PT-010c's Materials page was an exact CRUD template (header, table,
+  modal contract, delete confirm, toast + refresh), so the new page was largely mechanical and low-risk.
+- **Caught — the mock unit test called the async `api` synchronously.** `../api` wraps `db` in `setTimeout`
+  Promises, so the store tests must import the sync `../db` layer (or `await`). Matched the existing
+  `designDetail.test.ts` convention: sync `db` for pure store semantics, `await api.*` for integration.
+- **Watch — hidden-tab timer throttling fooled the CDP check.** The mock `delay(120 ms)` uses `setTimeout`,
+  which a background/hidden browser tab throttles hard, so an evaluation taken right after a click sometimes
+  read stale DOM ("Loading fit specs…", a Set Current that looked ignored). Re-reading showed the correct
+  state — the behaviour was fine, the timing was the trap.
+- **Caught — a NUL byte in `lessons-learned.md`.** A prior PowerShell edit had left a `\0` mid-file (it had
+  turned migration `0042_designimage_annotations` into `<NUL>42_designimage_annotations`), which made the
+  read/edit tools treat the whole document as binary. Fixed the single byte in place; the standing rule
+  holds — **use the edit tool for doc text, never hand-rolled PowerShell `-replace`.**
+
+**What to do differently:** For a mock store with pure selection/CRUD semantics, unit-test `db` directly
+(sync); reserve `await api.*` for integration. In CDP checks, focus the tab (or re-read) instead of trusting a
+read taken immediately after a click. When a long-lived markdown doc suddenly reads as binary, scan for a
+stray NUL/control byte and repair that byte — do not recreate the file.
+
+**Linked slice:** prototype PT-010d (Design Fit Specs page); backward = mirrors PT-010c Materials (shared
+`Modal` contract, `standards.md` §5–§9) and reuses `getDesignVersions`/`detailSeed`; forward = PT-010e Job
+Requests and PT-010f Costings follow the same standalone-route + mock-entity pattern.
+
+**Result:** GATE_A VERIFIED — targeted 25/25; tsc 0; lint 0 errors (24 warnings); vitest 190 passed / 12
+pre-existing jsdom-env `localStorage.clear` failures (16 files); CDP `/designs/REG-1001/fits` 4 rows, Add
+modal centered `max-w-2xl`, View `max-w-3xl` read-only, Set Current moves the marker, 0 console errors.
 
 ---
 
@@ -1952,7 +2180,7 @@ vitest full 408/408 (50 files), tsc 0, lint 0 errors.
 
 **What happened:** Feature worked in tests (fresh test DB migrates automatically) but failed live. Two
 deployment-ops causes, neither visible to the pytest/vitest suite:
-1.  042_designimage_annotations was **never applied to the dev DB** - the `annotations` column did
+1. 0042_designimage_annotations was **never applied to the dev DB** - the `annotations` column did
    not exist, so every read/save of a design image errored.
 2. The running unserver (started 20:03) predated the viewset action added at 22:02 - it still served
    the old code, so the `annotations` route 404'd.

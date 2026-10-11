@@ -34,6 +34,10 @@
 | Costings | 8 | sheet types SL/VN/BD/CN/other; 1 live; lines fabric/trim/label/making/overhead |
 | Design Costings | 5 | REG styles: 3 approved (ladder populated), 1 pending, 1 draft; 1 live per style |
 | BOM items | 75 | trimmed categories w/ Ordered/TBC/Partial/Completed mix |
+| Fit specs | 11 | `FitSpecification` per design+version; stages dev/1st/2nd/3rd/pp; exactly one `is_selected` (current) per design; REG-1001 has 4 |
+| Job requests | 11 | `JobRequest` per design (REG-1001 ×4, REG-1002 ×2, REG-1004 ×3, REG-1005 ×1, DSD-1001 ×1; REG-1003 empty for the empty-state demo); job types pattern/sample/3d/mini_marker; priorities 1–4; statuses pending/in_progress/completed/cancelled; one **overdue** open job (due before the frozen base); `assigned_to` resolves to the `assigneeSeed` staff master |
+| Costings (design-scoped) | 10 | `Costing` per design (REG-1001 ×4, REG-1002 ×2, REG-1004 ×3, REG-1005 ×1; REG-1003 empty); sheet types sl/vn/bd/cn/other; statuses draft/pending/approved/rejected; **one live sheet per purchase order** (REG-1001 lives V1 of PO-2025-0001); costs fabric/trim/cm/overhead + target price; **total + margin % computed in the page** |
+| Sales report (derived) | — | **no seed** — computed per version from `designDetailSeed` POS (rows + rolled-up totals) for the print / CSV export page |
 | Shipments | 6 | 9-stage flow, 8 doc types, incl. 1 past ETA no booking-ref (14-day alert demo) |
 | Freight forwarders | 5 | linked to bookings/shipments |
 | Booking schedule | 15 | live/in_work/delivered; last-hit marker; snapshot |
@@ -55,6 +59,18 @@
   fresh + copy-from-existing; xlsx export works (real-browser).
 - **Style detail → Sales Order tab**: pick REG-1004 → 11 PO rows; fabric red (sticky), delivered
   green, overdue red; drill-down to PO.
+- **Fit specs**: open a design's Fit Specs page (register Actions menu → Fit Specs) → REG-1001 shows
+  four specs across v1/v2 with one current; **Set Current** moves the marker; add/edit/view/delete.
+- **Job requests**: open a design's Job Requests page (register Actions menu → Job Requests) → REG-1001
+  shows four jobs across every type with the open count; the overdue open job's due date is flagged red;
+  add/edit/view/delete; REG-1003 shows the empty state.
+- **Design costings**: open a design's Costings page (register Actions menu → Costings) → REG-1001 shows
+  four sheets across the sheet types and statuses with the live sheet ticked; totals and margins are
+  computed; **Set Live** moves the tick within a purchase order (one live per PO); add/edit/view/delete;
+  REG-1003 shows the empty state.
+- **Sales report**: open a design's Sales Report page (register Actions menu → Sales Report) → REG-1004
+  prints 11 PO rows with the five per-area risk pills and rolled-up totals; switching to a non-current
+  version shows the empty state; **Print** (`window.print()`) and **Export** (client-side CSV) both work.
 - **PO detail**: status tabs across a delivered PO and an in-production PO; hits with sea/air;
   trail page lists lifecycle events.
 - **Order Manager**: critical path complete + on-track + off-track rows; weekly review print.

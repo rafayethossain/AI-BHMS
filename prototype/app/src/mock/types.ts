@@ -24,6 +24,60 @@ export interface DesignMaterial {
   notes: string;
 }
 
+export type FitStage = 'dev' | '1st' | '2nd' | '3rd' | 'pp';
+
+export interface FitSpec {
+  id: string;
+  fit_number: string;
+  fit_stage: FitStage;
+  version_number: string;
+  fit_date: string;
+  description: string;
+  measurements: string;
+  notes: string;
+  is_selected: boolean;
+}
+
+export type JobType = 'pattern' | 'sample' | '3d' | 'mini_marker';
+
+export type JobPriority = 1 | 2 | 3 | 4;
+
+export type JobStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface JobRequest {
+  id: string;
+  job_number: string;
+  job_type: JobType;
+  purchase_order: string;
+  description: string;
+  work_location: string;
+  assigned_to: string;
+  required_by_date: string;
+  priority: JobPriority;
+  status: JobStatus;
+  notes: string;
+}
+
+export type CostingSheetType = 'sl' | 'vn' | 'bd' | 'cn' | 'other';
+
+export type CostingStatus = 'draft' | 'pending' | 'approved' | 'rejected';
+
+export interface Costing {
+  id: string;
+  po_number: string;
+  version: number;
+  sheet_type: CostingSheetType;
+  status: CostingStatus;
+  is_live: boolean;
+  exchange_rate: string;
+  target_price: string;
+  fabric_cost: string;
+  trim_cost: string;
+  cm_cost: string;
+  overhead_cost: string;
+  notes: string;
+}
+
 export interface DesignRegisterRow {
   id: string;
   design_code: string;

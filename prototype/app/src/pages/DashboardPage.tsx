@@ -15,7 +15,7 @@ const MODULES = [
 
 export default function DashboardPage() {
   return (
-    <div className="p-6 max-w-6xl">
+    <div data-testid="page-container" className="mx-auto w-full max-w-6xl p-4 sm:p-6">
       <h1 className="text-xl font-semibold text-heading">Dashboard</h1>
       <p className="text-muted mt-1 text-sm">
         Pick a module to explore the interactive prototype screens.

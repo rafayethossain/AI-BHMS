@@ -10,9 +10,15 @@ const STATUS_STYLES: Record<string, string> = {
   in_production: 'bg-amber-400/15 text-amber-600',
   quality_check: 'bg-purple-400/15 text-purple-600',
   ready: 'bg-emerald-500/15 text-emerald-600',
+  pending: 'bg-amber-400/15 text-amber-600',
+  in_progress: 'bg-blue-300/15 text-blue-600',
+  completed: 'bg-emerald-500/15 text-emerald-600',
+  rejected: 'bg-red-300/15 text-red-400',
+  live: 'bg-emerald-500/15 text-emerald-600',
   shipped: 'bg-teal-300/15 text-teal-400',
   delivered: 'bg-emerald-500/15 text-emerald-600',
   cancelled: 'bg-red-300/15 text-red-400',
+  current: 'bg-emerald-500/15 text-emerald-600',
 };
 
 const RISK_STYLES: Record<string, string> = {

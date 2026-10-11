@@ -141,6 +141,106 @@ vs the canonical docs (`PRD.md` / `data-model.md` / `module-specs.md`). Format:
   warnings) / `vitest` 170/170 (14 files) / live `/designs/REG-1001/materials` HTTP 200).] (prototype
   scope, `DesignMaterialsPage.tsx` · `db.ts` · `api.ts` · `App.tsx`, `PT-010c`)
 
+- **2026-09-21** — [DSC: **Design Fit Specs page** (PT-010d) — standalone CRUD route
+  `/designs/:designCode/fits` (register Actions menu → Fit Specs) for a design's fit specifications.
+  Header shows the design code/buyer/style_type, spec count and the **current** spec; a plain HTML table
+  lists **Fit # · Stage · Version · Fit Date · Current · Description · Measurements · Notes** with
+  per-row actions **View · Edit · Set Current · Delete** (register action order; Set Current only on
+  non-current rows). Follows `standards.md` §5–§9: `FitSpecFormModal` uses the shared `Modal`
+  (`max-w-2xl`, scrollable body `max-h-[75vh]`, section header, **Stage + Version as master-data
+  `<select>`s**), a read-only **View** modal (`max-w-3xl`), and a Delete confirmation (`max-w-sm`).
+  New mock entity **`FitSpec`** (`types.ts`) + `fitSpecSeed` (11 rows; exactly one `is_selected` per
+  design) + `db.ts`/`api.ts` store with mutually-exclusive selection (`setCurrentFitSpec`); added
+  `getDesignVersions`. Deviations: `FitImage` (child images on the backend model) is out of scope for
+  this slice; `purchase_order` scoping (target page) is represented by `version_number` instead.
+  Verified GATE_A (`tsc -b` 0 / lint 0 errors (24 warnings) / `vitest` 190 passed, 12 pre-existing
+  jsdom-env failures / real-browser CDP `/designs/REG-1001/fits` 0 console errors).] (prototype
+  scope, `DesignFitSpecsPage.tsx` · `StatusPill.tsx` · `seed.ts` · `db.ts` · `api.ts` · `types.ts` ·
+  `App.tsx`, `PT-010d`)
+
+- **2026-10-11** — [FIX: **shared `SpreadsheetGrid` React-19 console crash** — fixed the dev-only
+  `TypeError: Cannot read properties of null (reading 'verticalFillMode')` that kept PT-003 at 🟢.
+  Root cause: `new TabulatorFull(...)` defers `_create()` (which assigns the row renderer) to a
+  `setTimeout`; the grid rebuilds its instance on every `data` change, but the data-sync effect's
+  "already fed" seed (`lastFedRef`) was only set at hook-init, so after a rebuild it re-fed the fresh
+  instance with `setData` in the same commit — before `_create()` — and `adjustTableSize` threw. Fix:
+  seed `lastFedRef.current = gridData` in the mount effect after construction (the constructor already
+  loaded that data); plus a `tableBuilt` guard so an in-build-window filter/data change waits for the
+  build instead of throwing. RED-first `SpreadsheetGrid.test.tsx` +2 cases (rebuilt table gets **0**
+  external `setData` calls; a feed defers until `tableBuilt`); gates: `tsc -b` 0 / lint 0 errors (24
+  baseline warnings) / full `vitest` 261 passed, 12 pre-existing jsdom-env failures (23 files) / CDP
+  `/design` console errors 1 → 0, grid intact (16 rows), racing + settled-filter checks clean. Shared
+  layer → full frontend suite run. **Promotes PT-003 to ✅.**] (prototype scope, `SpreadsheetGrid.tsx` ·
+  `SpreadsheetGrid.test.tsx`, `PT-003`)
+
+- **2026-10-11** — [DSC: **Design Sales Report print page** (PT-016) — standalone print route
+  `/designs/:designCode/sales-report` (register Actions menu → Sales Report), the print + export
+  counterpart of the PT-010 Design detail *Sales Order* tab. A4 print sheet (reuses the
+  `DesignSheetPrintPage` pattern: `no-print` sticky toolbar + `@page`/`@media print` rules) with header
+  (BHMS badge + title, Version, PO count), **Buyer** + **Design** panels, a `PO Number · Qty · Unit
+  Price · Value · Fabric · Trims · Production · Delivery · Overall · Delivery Date` table using the
+  shared `StatusPill` risk payloads, a rolled-up **Total** qty + value row, and a timestamped footer.
+  Toolbar actions: Back to design, Version `<select>`, **Export** (client-side CSV via the pure
+  `pages/salesReport.ts` helpers `summarizeSalesReport` / `buildSalesReportCsv` / `downloadTextFile`,
+  Blob + anchor — **no new library**), **Print** (`window.print()`), **Preview** toggle. Rows drill down
+  to the purchase order. **No new seed** — derives from `designDetailSeed` (POS sit on the current
+  version; a non-current version shows the empty state). Verified GATE_A (`tsc -b` 0 / lint 0 errors (24
+  warnings) / `vitest` 259 passed, 12 pre-existing jsdom-env failures / real-browser CDP
+  `/designs/REG-1004/sales-report` 11 rows, totals 17,050 / 62,925.00, version switch → empty, 0 console
+  errors).] (prototype scope, `DesignSalesReportPage.tsx` · `salesReport.ts` · `App.tsx`, `PT-016`)
+
+- **2026-10-11** — [DSC: **Design Costings page** (PT-010f) — standalone CRUD route
+  `/designs/:designCode/costings` (register Actions menu → Costings) for a design's per-PO costing
+  sheets. Header shows the design code/buyer/style_type, the costing count and the **live** count; a
+  plain HTML table lists **PO # · V · Sheet · Fabric · Trim · CM · Overhead · Total · Margin · Status ·
+  Live** with per-row actions **View · Edit · Set Live · Delete** (register action order). Follows
+  `standards.md` §5–§9: `CostingFormModal` uses the shared `Modal` (`max-w-2xl`, scrollable body
+  `max-h-[75vh]`, section headers **Costing Information** + **Cost Breakdown**, **Purchase Order / Sheet
+  Type / Status as master-data `<select>`s**, live **Total cost + Margin** summary), a read-only **View**
+  modal (`max-w-3xl`), and a Delete confirmation (`max-w-sm`). **Total cost** = fabric + trims + CM +
+  overheads; **Margin %** = (target − total) / target. **Set Live** ticks one live sheet per purchase
+  order (mutually exclusive within the PO). New mock entity **`Costing`** (`types.ts`) + `costingSeed`
+  (10 rows across REG-1001/1002/1004/1005; REG-1003 empty) + `db.ts`/`api.ts` store
+  (`getDesignCostings`/`addCosting`/`updateCosting`/`deleteCosting`/`setLiveCosting`) + additive
+  `StatusPill` tokens (`rejected`/`live`). Deviations: statuses use the prototype's derived labels
+  (`Pending`) to match the shared `StatusPill`, not the backend verbose "Pending Approval"; cost/target
+  amounts are demo strings, not stored decimals. Verified GATE_A (`tsc -b` 0 / lint 0 errors (24
+  warnings) / `vitest` 245 passed, 12 pre-existing jsdom-env failures / real-browser CDP
+  `/designs/REG-1001/costings` 0 console errors).] (prototype scope, `DesignCostingsPage.tsx` ·
+  `StatusPill.tsx` · `seed.ts` · `db.ts` · `api.ts` · `types.ts` · `App.tsx`, `PT-010f`)
+
+- **2026-10-11** — [DSC: **Design Job Requests page** (PT-010e) — standalone CRUD route
+  `/designs/:designCode/jobs` (register Actions menu → Job Requests) for a design's cross-department
+  job requests. Header shows the design code/buyer/style_type, job count and the **open** count; a plain
+  HTML table lists **Job # · Type · PO # · Assigned · Due · Priority · Status · Description** with
+  per-row actions **View · Edit · Delete** (register action order). Follows `standards.md` §5–§9:
+  `JobRequestFormModal` uses the shared `Modal` (`max-w-2xl`, scrollable body `max-h-[75vh]`, section
+  headers **Job Information** + **Details**, **Type/Priority/Status/Purchase Order/Assigned To as
+  master-data `<select>`s**), a read-only **View** modal (`max-w-3xl`), and a Delete confirmation
+  (`max-w-sm`). New mock entity **`JobRequest`** (`types.ts`) + `jobRequestSeed` (11 rows) +
+  `assigneeSeed` staff master + `db.ts`/`api.ts` store (`getDesignJobRequests`/`addJobRequest`/
+  `updateJobRequest`/`deleteJobRequest` + new `getDesignPOs`) + additive `StatusPill` tokens
+  (`pending`/`in_progress`/`completed`). An **overdue** marker highlights a non-terminal job whose
+  `required_by_date` is before the frozen `DEMO_TODAY`. **Fidelity correction:** the PT-010b register
+  menu labelled this destination "Job Description"; the target nav calls it **"Job Requests"**, so the
+  menu label + page title were aligned. Deviations: `assigned_to` is a prototype staff-name master
+  (`assigneeSeed`) instead of the target `users` FK. Verified GATE_A (`tsc -b` 0 / lint 0 errors (24
+  warnings) / `vitest` 219 passed, 12 pre-existing jsdom-env failures / real-browser CDP
+  `/designs/REG-1001/jobs` 0 console errors).] (prototype scope, `DesignJobsPage.tsx` · `DesignsPage.tsx` ·
+  `StatusPill.tsx` · `seed.ts` · `db.ts` · `api.ts` · `types.ts` · `App.tsx`, `PT-010e`)
+
+- **2026-10-11** — [UI/UX fix (register responsiveness): the **Design Register** shell used
+  `p-6 max-w-7xl` — `max-w-7xl` is a hard 1280px cap and, with no `mx-auto`, it anchored **left**, so on
+  displays wider than 1280px the whole page (grid included) stopped at 1280px and left **unintended
+  white space on the right** of the data grid. Root cause = the arbitrary max-width cap, **not**
+  Tabulator (`fitData` fills the host width and scrolls horizontally). The register container is now
+  **fluid full width** with responsive gutters (`w-full p-4 sm:p-6`, `data-testid="page-container"`) and
+  the register grid sizes to the viewport (`height="max(320px, calc(100vh - 320px))"`, was a fixed
+  `480`). The same defect class on the **Dashboard** (`p-6 max-w-6xl`, left-anchored) is now
+  `mx-auto w-full max-w-6xl p-4 sm:p-6` — a non-tabular summary page keeps its reading-width cap but
+  must **centre** it. New rule recorded in `standards.md` §2.] (prototype scope, `standards.md` §2 ·
+  `DesignsPage.tsx` · `DashboardPage.tsx`)
+
 Future entries follow this template:
 
 - `YYYY-MM-DD — <module>: <what changed> | decision note ref | tracker slice`

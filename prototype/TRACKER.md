@@ -10,11 +10,12 @@
 | ID | Slice | Evidence | Status |
 |----|-------|----------|--------|
 | PT-001 | Vite + React 19 + TS 6 + Tailwind 4 + Tabulator 6 + Vitest + Oxlint scaffold | `npm run dev`/`build`/`test` green | 🟢 GREEN |
-| PT-002 | Design tokens + light/dark theme (`theme/tokens.css`, `theme/tabulator.css`) | ThemeContext toggle + token smoke test | ⬜ |
-| PT-003 | `SpreadsheetGrid` wrapper (toolbar, header filters, export, actions col, pagination) | `SpreadsheetGrid.test.tsx` (wrapper contract, mocked Tabulator) + CDP export check | ⬜ |
-| PT-004 | Mock service layer (`types.ts`/`seed.ts`/`db.ts`/`api.ts`) | api/seed unit tests + coverage audit vs `mock-data-spec.md` | ⬜ |
+| PT-002 | Design tokens + light/dark theme (`theme/tokens.css`, `theme/tabulator.css`) | `theme/__tests__/gridTheme.test.ts` + `ThemeContext.test.tsx` (4); theme toggle re-checked live in the PT-005/PT-010c browser reviews | 🟢 GREEN (theme/shell tests are 4 of the 12 documented jsdom-env `localStorage.clear` failures on this machine — env, not app) |
+| PT-003 | `SpreadsheetGrid` wrapper (toolbar, header filters, export, actions col, pagination) | `SpreadsheetGrid.test.tsx` (17 — incl. 2 new RED-first cases: rebuilt table must not be re-fed; a feed must wait for `tableBuilt`) + `SpreadsheetGridChrome.test.tsx` (wrapper/chrome contract, mocked Tabulator) + live `/design` grid checks | ✅ VERIFIED (GATE_A + full frontend suite) — the React-19 console `TypeError: Cannot read properties of null (reading 'verticalFillMode')` is **fixed** (stale `lastFedRef` seed → pre-`_create()` `setData`; + `tableBuilt` guard for in-build-window changes); see Latest entry |
+| PT-004 | Mock service layer (`types.ts`/`seed.ts`/`db.ts`/`api.ts`) | `derive.test.ts` + `designDetail.test.ts` + `fitSpecs.test.ts` + DesignsPage/materials coverage; audited vs `mock-data-spec.md` | ✅ VERIFIED (GATE_A) |
 | PT-005 | App shell: module rail + top bar + router + dashboard placeholder | `Layout.test.tsx` (4) + `App.test.tsx` (3) RED-first; gates: tsc 0 / lint 0 / vitest 18/18; browser review (theme toggle, dropdowns, placeholders) | ✅ VERIFIED (GATE_A) |
 | PT-006 | Design register screen on grid (list, filter, add modal, view, print) | `DesignsPage.test.tsx` (28) RED-first + tsc 0 / lint 0 / vitest 59/59 + live `/design` review | ✅ VERIFIED (GATE_A) |
+| PT-006a | Design Register responsive shell fix (fluid full-width container, responsive gutters, viewport-height grid; Dashboard reading-width cap centred) | `DesignsPage.test.tsx` (+3) + new `DashboardPage.test.tsx` (2) RED-first; gates: tsc 0 / lint 0 errors (24 baseline warnings) / vitest **195 passed / 12 pre-existing jsdom-env failures (17 files)** + CDP `/design` (shell `max-width: none`, grid fills content width, horizontal scroll intact) / `/dashboard` (cap centred) | ✅ VERIFIED (GATE_A) |
 | PT-007 | Micro-interactions kit (status pill, hover preview, toasts, search-as-you-type) | `StatusPill.test.tsx` (10) + `HoverPreview.test.tsx` (5) + `useOptimistic.test.tsx` (4) RED-first; DesignsPage migrated to `useOptimistic`; gates: tsc 0 / lint 0 (19) / vitest 78/78 (9 files) + live `/design` HTTP 200 | ✅ VERIFIED (GATE_A) |
 | **P0 Checkpoint** | dev render + gates green + real-browser clean + human review | — | ⬜ |
 
@@ -26,12 +27,15 @@
 | PT-010a | Design sheet print (print preview + Save-as-PDF) from register grid, view modal and detail header | `DesignSheetPrintPage.test.tsx` (13) + register row-menu/modal entries (2) + detail header entry (1) RED-first; gates: tsc 0 / lint 0 (24) / vitest **152/152 (13 files)** + live `/designs/REG-1001/print` HTTP 200 | ✅ VERIFIED (GATE_A) |
 | PT-010b | Design register **single Actions menu** per row (View, Edit, Delete, Materials, Fit Specs, Job Description, Costings, Print Design Sheet, Sales Report); replaces the inline View/Edit/Delete buttons + separate ⋮ menu | `SpreadsheetGrid.test.tsx` (+4 contract/suppression) + `DesignsPage.test.tsx` (menu order/navigate/Escape/print/no-modal; all View·Edit·Delete paths re-routed) RED-first; gates: tsc 0 / lint 0 (24) / vitest **160/160 (13 files)** + live `/design` HTTP 200 | ✅ VERIFIED (GATE_A) |
 | PT-010c | Design Materials page (standalone CRUD route `/designs/:designCode/materials` with table, Add/Edit/Delete modals, breadcrumb back, design header summary) | `DesignMaterialsPage.test.tsx` (16) RED-first; gates: tsc 0 / lint 0 (24) / vitest **177/177 (14 files)** + live `/designs/REG-1001/materials` HTTP 200 | ✅ VERIFIED (GATE_A) |
+| PT-010d | Design **Fit Specs** page (standalone CRUD route `/designs/:designCode/fits` with table, Add/Edit/View/Delete modals, **Set Current** action, breadcrumb back, design header summary + current spec) | `DesignFitSpecsPage.test.tsx` (19) + `mock/__tests__/fitSpecs.test.ts` (6) RED-first; gates: tsc 0 / lint 0 (24) / vitest **190 passed / 12 pre-existing jsdom-env failures (16 files)** + real-browser CDP `/designs/REG-1001/fits` (4 rows, 0 console errors) | ✅ VERIFIED (GATE_A) |
+| PT-010e | Design **Job Requests** page (standalone CRUD route `/designs/:designCode/jobs` with table, Add/Edit/View/Delete modals, **overdue** due-date marker, breadcrumb back, design header summary + open count) — also corrected the register Actions-menu label from "Job Description" to the target's **"Job Requests"** | `DesignJobsPage.test.tsx` (20) + `mock/__tests__/jobs.test.ts` (4) RED-first; `DesignsPage.test.tsx` menu-order assertion corrected ("Job Requests"); gates: tsc 0 / lint 0 errors (24 baseline warnings) / vitest **219 passed / 12 pre-existing jsdom-env failures (19 files)** + real-browser CDP `/designs/REG-1001/jobs` (4 rows, 0 console errors) | ✅ VERIFIED (GATE_A) |
+| PT-010f | Design **Costings** page (standalone CRUD route `/designs/:designCode/costings` with table, Add/Edit/View/Delete modals, per-PO **Set Live** tick — mutually exclusive within a purchase order, computed **total cost + margin %**, breadcrumb back, design header summary + live count) | `DesignCostingsPage.test.tsx` (21) + `mock/__tests__/costings.test.ts` (5) RED-first; gates: tsc 0 / lint 0 errors (24 baseline warnings) / vitest **245 passed / 12 pre-existing jsdom-env failures (21 files)** + real-browser CDP `/designs/REG-1001/costings` (4 rows, modal contract, 0 console errors) | ✅ VERIFIED (GATE_A) |
 | PT-011 | FN/version commercial file list + detail | page tests + CDP | ⬜ |
 | PT-012 | Purchase Orders list + detail (+ amendments, trail) | page tests + CDP | ⬜ |
 | PT-013 | BOM list + detail | page tests | ⬜ |
 | PT-014 | Costings list + detail (ladder + prepare PO costing + create PO) | page tests | ⬜ |
 | PT-015 | Order Manager dashboard + weekly review print | page tests + CDP | ⬜ |
-| PT-016 | Sales Order report print + xlsx | report block tests + CDP | ⬜ |
+| PT-016 | Design **Sales Report** print page (standalone route `/designs/:designCode/sales-report` with print-optimized A4 layout, version selector, per-PO Fabric/Trims/Production/Delivery/Overall risk pills, rolled-up totals, **Print** + **CSV export**, drill-down to PO) | `DesignSalesReportPage.test.tsx` (11) + `pages/__tests__/salesReport.test.ts` (3) RED-first; gates: tsc 0 / lint 0 errors (24 baseline warnings) / vitest **259 passed / 12 pre-existing jsdom-env failures (23 files)** + real-browser CDP `/designs/REG-1004/sales-report` (11 rows, totals 17,050 / 62,925.00, version switch → empty state, 0 console errors) | ✅ VERIFIED (GATE_A) |
 | PT-017 | Tech-pack import wizard + style progress panel (REQ-p-008) | wizard page tests + CDP | ⬜ |
 | **P1 Checkpoint** | end-to-end lifecycle demoable; human review | — | ⬜ |
 
@@ -72,9 +76,166 @@
 
 ## In-progress (current slice)
 
-- **PT-010b (Design register single Actions menu)** — ✅ VERIFIED (GATE_A); see Latest entries. Next slices (menu destinations, "menu first, then pages"): PT-010c Materials page, PT-010d Fit Specs page, PT-010e Job Description (Job Requests) page, PT-010f Costings page — each a standalone route `/designs/:designCode/{materials|fits|jobs|costings}` with seeded mock entities + tests.
+- **(none in progress)** — the shared `SpreadsheetGrid` console-error fix (below) is ✅ VERIFIED (GATE_A + full frontend suite), which **promotes PT-003 to ✅**. Next candidates are milestones, not menu gaps: (a) design-detail / other-module polish, (b) migrate any remaining bespoke grids to `SpreadsheetGrid`. Pick one and record it here before starting.
 
 ## Latest entries
+
+- **2026-10-11 — `SpreadsheetGrid` React-19 console error FIXED → PT-003 promoted to ✅ (GATE_A + full frontend suite)** —
+  the long-tracked dev-only console `TypeError: Cannot read properties of null (reading 'verticalFillMode')` in
+  the shared grid is fixed at the root. **Root cause (confirmed in the Tabulator source):** `new TabulatorFull(...)`
+  does *not* build the table synchronously — it defers `this._create()` (which runs `rowManager.initialize()`, the
+  call that assigns `renderer`) to a `setTimeout` "to allow event bindings immediately after the constructor"
+  (`tabulator_esm.js` ~27155). Any `setData(...)` before that timer runs reaches `RowManager._wipeElements →
+  adjustTableSize` with `this.renderer === null` and throws. The grid **rebuilds** its Tabulator instance whenever
+  `data` changes (the mount effect deps include `allGridData`), and the data-sync effect's "already fed" seed
+  (`lastFedRef`) was only set at hook-init — so after a rebuild it was **stale**, and the effect re-fed the new
+  data in the *same commit* as construction, i.e. pre-`_create()`. That is why `/design` logged exactly **one**
+  error: the empty→loaded data swap after the async mock fetch. (Not StrictMode-specific: StrictMode's
+  mount/unmount/mount just makes the same rebuild path fire on mount; the bug reproduces on any data change.)
+  **Fix:** (a) after `tableRef.current = table` in the mount effect, set `lastFedRef.current = gridData` — the
+  constructor already loaded that exact data, so the sync effect must not re-feed it; genuinely new data
+  (search/filter/pagination changes that don't rebuild) still flows through `setData`. (b) **Hardening for the
+  residual race:** if a data/filter change lands inside the build window (`table.initialized === false`), the
+  sync effect now waits for `tableBuilt` before feeding — verified in-browser by setting a header filter in the
+  same tick as a grid rebuild (previously threw once; now **0 errors across 4 racing runs**). A normal filter on
+  a settled grid still filters (16 → 2 rows, 0 errors). **RED-first (2 cases):** *"does not re-feed data to a
+  table that was just rebuilt with the new data"* (mount `data=[]` → rerender `data=rows`; the rebuilt instance
+  gets **0** external `setData` calls) failed `expected 1 to be 0`; and *"defers a data feed until the table is
+  built when a filter changes in the build window"* (grid-search change before `tableBuilt`; asserts
+  `setDataBeforeBuilt === false` then the feed lands after build) failed `expected true to be false` with the
+  guard disabled. The test harness was extended so the constructor's internal initial load is distinct from
+  *external* `setData` calls (mirroring Tabulator's `_loadInitialData`) and so the fake defers `tableBuilt`.
+  **Gates:** `npx tsc -b` 0, `npm run lint` **0 errors / 24 warnings** (baseline held; no new warnings),
+  `npx vitest run` **261 passed / 12 failed (23 files)** — the 12 are the documented jsdom-env
+  `window.localStorage.clear is not a function` allowlist (`Layout`/`ThemeContext`/`App`); green grew 259 → 261
+  (the SpreadsheetGrid file 15 → 17). **Real-browser CDP `/design`:** console errors **1 → 0**, grid intact
+  (**16 rows / 304 cells**), no page overflow; racing + settled-filter checks clean. Because `SpreadsheetGrid` is
+  a **shared** layer, this ran the full frontend suite as the escalation (not just the owning file). Watch-out:
+  the jsdom `FakeTabulator` cannot reproduce the real crash, so the unit tests guard the *mechanism* while the
+  browser checks prove the *symptom is gone* — keep both.
+
+- **2026-10-11 — PT-016 Design Sales Report print page VERIFIED (GATE_A)** — the last unbuilt design
+  register Actions-menu destination: a standalone, print-optimised report at
+  `/designs/:designCode/sales-report`. Mirrors the PT-010 Design detail *Sales Order* tab (same
+  per-version PO matrix) but as an A4 print sheet: header (BHMS badge + title, Version, PO count) with
+  **Buyer** + **Design** panels, a `PO Number · Qty · Unit Price · Value · Fabric · Trims · Production ·
+  Delivery · Overall · Delivery Date` table using the shared `StatusPill` risk payloads
+  (`On Track`/`At Risk`/`Delayed or Overdue`/`No Status`), a rolled-up **Total** qty + value row, and a
+  footer with a printed timestamp. No new seed — the report derives from the existing
+  `designDetailSeed` (POS live on the current version; a non-current version shows the empty state).
+  Reuses the `DesignSheetPrintPage` print pattern: `no-print` sticky toolbar (Back to design, Version
+  `<select>`, **Export**, **Print**, **Preview** toggle) + `@page A4` / `@media print` rules; **Print**
+  calls `window.print()`, **Export** builds a CSV client-side via a small pure helper
+  (`pages/salesReport.ts`: `summarizeSalesReport`, `buildSalesReportCsv`, `downloadTextFile` — Blob +
+  anchor, **no new library**; the shared grid still falls back to CSV when SheetJS is absent). Rows
+  drill down to the PO. RED-first: `DesignSalesReportPage.test.tsx` (11) +
+  `pages/__tests__/salesReport.test.ts` (3). Gates: `npx tsc -b` 0, `npm run lint` 0 errors (**24
+  warnings**, baseline held — new files warning-free after removing a sync `setState`-in-effect and
+  labelling the empty spacer cells), `npx vitest run` **259 passed / 12 failed (23 files)** — the 12 are
+  the **pre-existing jsdom-env** `window.localStorage.clear is not a function` failures
+  (`Layout`/`ThemeContext`/`App`), matching the documented allowlist (green grew 245 → 259); real-browser
+  CDP `/designs/REG-1004/sales-report`: **11 rows**, totals **17,050 / 62,925.00**, version `v2` default,
+  switching to `v1` → 0 rows + "No purchase orders on this version", no page overflow, **0 console
+  errors**. Watch-out caught here: a **half-updated `App.tsx`** served by the dev server (new import but
+  no route → catch-all placeholder) — force a re-transform by touching the file and confirm the route is
+  in the *served* module before browser-verifying.
+
+- **2026-10-11 — PT-010f Design Costings page VERIFIED (GATE_A)** — new standalone CRUD route
+  `/designs/:designCode/costings` (register Actions menu → Costings) on the PT-010e Job Requests
+  pattern: header (Back, `<code> — Costings`, buyer · style_type · **N costings** · **Live: <n>**), a
+  table of `PO # · V · Sheet · Fabric · Trim · CM · Overhead · Total · Margin · Status · Live ·
+  Actions`, and the full **add / edit / view / delete** approach — `CostingFormModal` (shared `Modal`,
+  **`max-w-2xl`**, scrollable body `max-h-[75vh] overflow-y-auto pr-1`, section headers `Costing
+  Information` + `Cost Breakdown`, **Purchase Order / Sheet Type / Status as master-data `<select>`s**,
+  a live **Total cost + Margin** summary), a **read-only View** modal (`max-w-3xl`), and a Delete
+  confirmation (`max-w-sm`). Per-row actions in register order `View · Edit · Set Live · Delete`
+  (right-aligned). New mock entity **`Costing`** (`types.ts`: `CostingSheetType` sl/vn/bd/cn/other,
+  `CostingStatus` draft/pending/approved/rejected) + `costingSeed` (REG-1001 ×4, REG-1002 ×2,
+  REG-1004 ×3, REG-1005 ×1 = 10; REG-1003 empty for the empty-state demo; **one live sheet per
+  design**) + `db.ts`/`api.ts` store (`getDesignCostings`, `addCosting`, `updateCosting`,
+  `deleteCosting`, **`setLiveCosting`** — mutually exclusive within a purchase order only) + additive
+  `StatusPill` tokens (`rejected`, `live`). **Total cost** = fabric + trims + CM + overheads (rounded to
+  2dp); **Margin %** = (target − total) / target. Status labels follow the prototype's derived-label
+  convention (`Pending`, not the backend verbose "Pending Approval") to stay consistent with
+  `StatusPill` and the Jobs page. RED-first: `DesignCostingsPage.test.tsx` (21) +
+  `mock/__tests__/costings.test.ts` (5). Gates: `npx tsc -b` 0, `npm run lint` 0 errors (**24
+  warnings**, baseline held — none from new files), `npx vitest run` **245 passed / 12 failed (21
+  files)** — the 12 are the **pre-existing jsdom-env** `window.localStorage.clear is not a function`
+  failures (`Layout`/`ThemeContext`/`App`), matching the documented allowlist (green grew 219 → 245);
+  real-browser CDP `/designs/REG-1001/costings`: 4 rows (totals 8.50/8.95/7.85/9.70, margins
+  32.0/28.4/28.6/7.6%), live marker on V1 only, `Set Live` only on non-live rows, shell `max-width:
+  none` full width, no page overflow, modal contract confirmed (aria-modal, centered, `max-w-2xl`,
+  section headers, scroll body, PO/Sheet/Status selects), **0 console errors**.
+
+- **2026-10-11 — PT-010e Design Job Requests page VERIFIED (GATE_A)** — new standalone CRUD route
+  `/designs/:designCode/jobs` (register Actions menu → Job Requests) mirroring the PT-010d Fit Specs page:
+  header (Back, `<code> — Job Requests`, buyer · style_type · N jobs · **Open: <n>**), a table of
+  `Job # · Type · PO # · Assigned · Due · Priority · Status · Description · Actions`, and the full
+  **add / edit / view / delete** approach — `JobRequestFormModal` (shared `Modal`, **`max-w-2xl`**,
+  scrollable body `max-h-[75vh] overflow-y-auto pr-1`, section headers `Job Information` + `Details`,
+  **Type/Priority/Status/Purchase Order/Assigned To as master-data `<select>`s**), a **read-only View**
+  modal (`max-w-3xl`), and a Delete confirmation (`max-w-sm`). Per-row actions in register order
+  `View · Edit · Delete` (right-aligned). **Fidelity correction:** the PT-010b register Actions menu
+  labelled this destination "Job Description" — the target nav calls it **"Job Requests"**
+  (`frontend/src/components/Layout.tsx`, `DesignSheetJobRequests.tsx`), so the menu label + page title
+  were aligned to "Job Requests" (`DesignsPage.tsx` + `DesignsPage.test.tsx`). New mock entity
+  **`JobRequest`** (`types.ts`: `JobType` pattern/sample/3d/mini_marker, `JobPriority` 1–4,
+  `JobStatus` pending/in_progress/completed/cancelled) + `jobRequestSeed` (REG-1001 ×4, REG-1002 ×2,
+  REG-1004 ×3, REG-1005 ×1, DSD-1001 ×1 = 11; REG-1003 empty for the empty-state demo) +
+  `assigneeSeed` staff master + `db.ts`/`api.ts` store (`getDesignJobRequests`, `addJobRequest`,
+  `updateJobRequest`, `deleteJobRequest`, new **`getDesignPOs`**) + additive `StatusPill` tokens
+  (`pending`/`in_progress`/`completed`). An **overdue** marker (`data-overdue="true"`, red text) renders
+  when a non-terminal job's `required_by_date` is before the frozen `DEMO_TODAY` (2026-09-10).
+  RED-first: `DesignJobsPage.test.tsx` (20) + `mock/__tests__/jobs.test.ts` (4). Gates: `npx tsc -b` 0,
+  `npm run lint` 0 errors (**24 warnings**, baseline held — none from new files), `npx vitest run`
+  **219 passed / 12 failed (19 files)** — the 12 are the **pre-existing jsdom-env**
+  `window.localStorage.clear is not a function` failures (`Layout`/`ThemeContext`/`App`), matching the
+  documented allowlist (green grew 195 → 219); real-browser CDP `/designs/REG-1001/jobs`: 4 rows, header
+  `REG-1001 — Job Requests` / `4 jobs` / `Open: 2`, overdue flag on `2026-06-20` only, shell
+  `max-width: none` full width, no page horizontal overflow, **0 console errors**.
+
+- **2026-10-11 — PT-006a Design Register responsive shell VERIFIED (GATE_A)** — the register page shell
+  was `p-6 max-w-7xl`: `max-w-7xl` is a hard 1280px cap and, with no `mx-auto`, it anchored left, so on
+  displays wider than 1280px the whole page (grid included) stopped at 1280px and left an unintended
+  band of white space on the right. Root cause = the arbitrary max-width cap, **not** Tabulator
+  (`fitData` fills the host width and scrolls horizontally). Fix: the register container is now fluid
+  full width with responsive gutters (`w-full p-4 sm:p-6`, `data-testid="page-container"`) and the
+  register grid sizes to the viewport (`height="max(320px, calc(100vh - 320px))"`, was a fixed `480`).
+  The same defect class existed on the **Dashboard** (`p-6 max-w-6xl`, left-anchored) → now
+  `mx-auto w-full max-w-6xl p-4 sm:p-6` (non-tabular summary page: cap kept but centred). New rule
+  recorded in `standards.md` §2. RED-first: `DesignsPage.test.tsx` +3 (no `max-w-`, `w-full`,
+  `p-4`/`sm:p-6`, viewport grid height) and a new `DashboardPage.test.tsx` (2: centred cap, responsive
+  gutters). Gates: `npx tsc -b` 0, `npm run lint` 0 errors (**24 warnings**, baseline held), `npx vitest
+  run` **195 passed / 12 pre-existing jsdom-env `localStorage.clear` failures (17 files)** (was 190
+  passed; green count grew, allowlist unchanged); real-browser CDP `/design` — shell `max-width: none`,
+  shell width = viewport, grid fills the content width with horizontal scroll intact; `/dashboard` —
+  cap `1152px` centred (left == right). Files: `standards.md` §2 · `DesignsPage.tsx` ·
+  `DashboardPage.tsx` · `DesignsPage.test.tsx` · `DashboardPage.test.tsx`.
+
+- **2026-09-21 — PT-010d Design Fit Specs page VERIFIED (GATE_A)** — new standalone CRUD route
+  `/designs/:designCode/fits` (reached from the register Actions menu → Fit Specs) mirroring the PT-010c
+  Materials page: header (Back, `<code> — Fit Specs`, buyer · style_type · N specs · **Current: <fit #>**),
+  a table of `Fit # · Stage · Version · Fit Date · Current · Description · Measurements · Notes · Actions`,
+  and the full **add / edit / view / delete** approach — `FitSpecFormModal` (shared `Modal`,
+  **`max-w-2xl`**, scrollable body `max-h-[75vh] overflow-y-auto pr-1`, section header `Fit Specification`,
+  **Stage + Version as master-data `<select>`s**), a **read-only View** modal (`max-w-3xl`), and a Delete
+  confirmation (`max-w-sm`). Per-row actions in register order `View · Edit · Set Current · Delete`
+  (right-aligned); **Set Current** renders only on non-current rows and shows an emerald **Current**
+  `StatusPill` (additive `current` token). New mock entity **`FitSpec`** (`types.ts`) + `fitSpecSeed`
+  (REG-1001 ×4, REG-1002 ×2, REG-1004 ×3, REG-1005 ×1, DSD-1001 ×1 = 11; exactly one `is_selected` per
+  design; REG-1003 empty for the empty-state demo) + `db.ts`/`api.ts` store (`getDesignFitSpecs`,
+  `getDesignVersions`, `addFitSpec`, `updateFitSpec`, `deleteFitSpec`, `setCurrentFitSpec`; selection is
+  mutually exclusive). RED-first: `DesignFitSpecsPage.test.tsx` (19) + `mock/__tests__/fitSpecs.test.ts`
+  (6). Gates: `npx tsc -b` 0, `npm run lint` 0 errors (**24 warnings**, baseline held — none from new
+  files), `npx vitest run` **190 passed / 12 failed (16 files)** — the 12 are the **pre-existing jsdom-env**
+  `window.localStorage.clear is not a function` failures (`Layout`/`ThemeContext`/`App`), reproduced
+  identically on a `git stash`ed clean tree and matching the documented allowlist class; real-browser CDP
+  `/designs/REG-1001/fits`: 4 rows, all 9 headers, actions present, Add modal centered (ΔX/ΔY 0) `max-w-2xl`
+  scrollable with Stage/Version selects, View modal read-only `max-w-3xl`, Set Current moves the marker,
+  **0 console errors**. Lessons: prototype mock calls use `setTimeout(120)` — in a **background/hidden
+  browser tab** timers are throttled hard, so CDP reads right after a click can show stale state (re-read
+  rather than assume a bug); mock unit tests should import the **sync `db`** layer (the `api` layer is
+  promise-wrapped) unless the test `await`s.
 
 - **2026-09-21 — PT-010c Materials add/edit modal standardized to the shared `Modal` contract (GATE_A)** —
   the standalone Materials page's hand-rolled `<dialog>` form was replaced with the shared `Modal`

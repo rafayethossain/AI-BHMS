@@ -140,7 +140,7 @@ export default function DesignsPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl">
+    <div data-testid="page-container" className="w-full p-4 sm:p-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-heading">Design Register</h1>
@@ -166,7 +166,7 @@ export default function DesignsPage() {
           <SpreadsheetGrid
             data={gridData}
             columns={columns}
-            height={480}
+            height="max(320px, calc(100vh - 320px))"
             toolbar
             title="Design Register"
             exportable
@@ -204,7 +204,7 @@ export default function DesignsPage() {
                 action: () => navigate(`/designs/${String(row.design_code)}/fits`),
               },
               {
-                label: 'Job Description',
+                label: 'Job Requests',
                 action: () => navigate(`/designs/${String(row.design_code)}/jobs`),
               },
               {

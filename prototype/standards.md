@@ -39,9 +39,22 @@ ad-hoc classes.
   Production, Quality, Logistics, Reports, Setup/Admin, Help), top bar (module heading, search, theme
   toggle, mock-session chip). Mirrors the target frontend's nav grouping (Design is a single top-level
   entry with the register + costings + fit specs under it).
-- **Page chrome**: standard padded container + title (same as target pages). Every page = header
-  (title + optional primary action) + content.
-- Responsive: 320 / 768 / 1024 / 1440 breakpoints; grids fall back to stacked rows below 768.
+- **Page chrome**: standard container + title (same as target pages). Every page = header (title +
+  optional primary action) + content. The page container carries `data-testid="page-container"` so the
+  shell contract is assertable in jsdom (which cannot measure width).
+- **Page container width (responsive)** — a fixed `max-w-*` cap that is **left-anchored** leaves dead
+  white space on the right on displays wider than the cap (the Design-Register defect):
+  - **Data / list / grid pages** (registers, list+detail, report screens) are **fluid full width**:
+    `w-full p-4 sm:p-6`. **Never** cap a tabular page with `max-w-*`; wide grids scroll horizontally and
+    must not be squeezed or capped.
+  - **Non-tabular summary / content pages** (e.g. the Dashboard card grid, print sheets) MAY cap to a
+    reading width, but must **centre** it (`mx-auto`) so the leftover space is symmetric — never
+    left-anchored.
+  - **Gutters scale**: `p-4` up to the `sm:` breakpoint, `p-6` at `sm:` and above — never one fixed
+    large gutter.
+- Responsive: 320 / 768 / 1024 / 1440 breakpoints; grids fall back to stacked rows below 768; a
+  full-height list grid sizes to the viewport (`height="max(320px, calc(100vh - 320px))"`) instead of a
+  fixed pixel height, so it uses the available space without overflowing short screens.
 
 ## 3. The grid layer — `SpreadsheetGrid` (shared, mandatory)
 
