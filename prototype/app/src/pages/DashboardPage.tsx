@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 
 const MODULES = [
   { name: 'Design', path: '/design', description: 'Design register, tech pack import, fit specs and design costings.' },
-  { name: 'Merchandising', path: '/file-openings', description: 'File openings, purchase orders, BOMs and costings.' },
+  { name: 'Merchandising', path: '/purchase-orders', description: 'Buyer purchase orders under each design file, plus BOMs.' },
   { name: 'T&A', path: '/tas', description: 'Time and action tracker with calendar and heatmap views.' },
   { name: 'Fabric', path: '/fabric/orders', description: 'Fabric categories, suppliers, mills, bookings and orders.' },
   { name: 'Production', path: '/production', description: 'Production plans, daily reports and factory portal.' },

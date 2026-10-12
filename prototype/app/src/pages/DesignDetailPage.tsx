@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import StatusPill from '../components/StatusPill';
 import { useToast } from '../components/Toast';
 import { getDesignDetail, updateDesign } from '../mock/api';
@@ -8,7 +8,6 @@ import StatusWizard from './designDetail/StatusWizard';
 import OverviewTab from './designDetail/OverviewTab';
 import SketchesTab from './designDetail/SketchesTab';
 import VersionsTab from './designDetail/VersionsTab';
-import FileOpeningsTab from './designDetail/FileOpeningsTab';
 import PosTab from './designDetail/PosTab';
 import ItemsTab from './designDetail/ItemsTab';
 import BomTab from './designDetail/BomTab';
@@ -20,7 +19,6 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'sketches', label: 'Sketches' },
   { id: 'versions', label: 'Versions' },
-  { id: 'file-openings', label: 'File Openings' },
   { id: 'pos', label: 'Purchase Orders' },
   { id: 'items', label: 'Items' },
   { id: 'bom', label: 'BOM' },
@@ -34,6 +32,7 @@ type TabId = (typeof TABS)[number]['id'];
 export default function DesignDetailPage() {
   const { designCode = '' } = useParams();
   const { addToast } = useToast();
+  const navigate = useNavigate();
 
   const [detail, setDetail] = useState<DesignDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,6 +88,7 @@ export default function DesignDetailPage() {
   }
 
   const { design } = detail;
+  const currentVersion = detail.versions.find((v) => v.version_number === design.current_version);
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
@@ -111,13 +111,6 @@ export default function DesignDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => addToast('Create file opening is wired in the File Openings slice')}
-              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-input-border bg-surface text-heading hover:bg-surface-alt"
-            >
-              + Create File Opening
-            </button>
-            <button
-              type="button"
               onClick={() => addToast('Create purchase order is wired in the Purchase Orders slice')}
               className="px-3 py-1.5 text-sm font-medium rounded-lg border border-input-border bg-surface text-heading hover:bg-surface-alt"
             >
@@ -125,8 +118,12 @@ export default function DesignDetailPage() {
             </button>
             <button
               type="button"
-              onClick={() => addToast('Add update is wired in the File Openings slice')}
-              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-input-border bg-surface text-heading hover:bg-surface-alt"
+              disabled={!currentVersion}
+              onClick={() =>
+                currentVersion &&
+                navigate(`/designs/${design.design_code}/versions/${currentVersion.id}`)
+              }
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-input-border bg-surface text-heading hover:bg-surface-alt disabled:opacity-50"
             >
               + Add Update
             </button>
@@ -177,8 +174,9 @@ export default function DesignDetailPage() {
           </div>
         )}
         {tab === 'sketches' && <SketchesTab sketches={detail.sketches} />}
-        {tab === 'versions' && <VersionsTab versions={detail.versions} />}
-        {tab === 'file-openings' && <FileOpeningsTab openings={detail.file_openings} />}
+        {tab === 'versions' && (
+          <VersionsTab versions={detail.versions} designCode={design.design_code} />
+        )}
         {tab === 'pos' && <PosTab pos={detail.pos} />}
         {tab === 'items' && <ItemsTab items={detail.items} />}
         {tab === 'bom' && <BomTab bom={detail.bom} />}

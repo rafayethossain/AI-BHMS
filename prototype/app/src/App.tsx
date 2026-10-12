@@ -11,6 +11,9 @@ import DesignFitSpecsPage from './pages/DesignFitSpecsPage';
 import DesignJobsPage from './pages/DesignJobsPage';
 import DesignCostingsPage from './pages/DesignCostingsPage';
 import DesignSalesReportPage from './pages/DesignSalesReportPage';
+import VersionCommercialFilePage from './pages/VersionCommercialFilePage';
+import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
+import PurchaseOrderDetailPage from './pages/PurchaseOrderDetailPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 
 function App() {
@@ -29,6 +32,12 @@ function App() {
               <Route path="/designs/:designCode/jobs" element={<DesignJobsPage />} />
               <Route path="/designs/:designCode/costings" element={<DesignCostingsPage />} />
               <Route path="/designs/:designCode/sales-report" element={<DesignSalesReportPage />} />
+              <Route
+                path="/designs/:designCode/versions/:versionId"
+                element={<VersionCommercialFilePage />}
+              />
+              <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
+              <Route path="/purchase-orders/:poNumber" element={<PurchaseOrderDetailPage />} />
               <Route path="*" element={<PlaceholderPage />} />
             </Route>
             <Route path="/designs/:designCode/print" element={<DesignSheetPrintPage />} />

@@ -8,7 +8,7 @@
 
 1. **Stateful coverage** — for every enum/status, at least one row sits in each state; risk derived
    payloads hit each branch (see `data-model.md` §2).
-2. **Interconnected** — FKs resolve to real rows (Style→Version→FileOpening→PO→Items→Hits→DailyProd;
+2. **Interconnected** — FKs resolve to real rows (Style→Version(FN)→PO→Items→Hits→DailyProd;
    PO→Costing; Shipment→BookingSchedule→Docket etc.). Clicking through detail pages always has data.
 3. **Deterministic + frozen dates** — a `DEMO_FROZEN_BASE = "2026-09-10"`; overdue windows computed
    relative to it so "overdue" pills are real in the demo.
@@ -27,7 +27,7 @@
 | StyleVersions | 20 | 1–2 per style; current_version link on style |
 | Buyers | 7 | Nike Inc., Zara, Primark, Aldi, Addidas, Walmart, Costco |
 | Factories | 5 | Bangladesh mills |
-| FN / version files (on StyleVersion) | 9 | incl. 2 quick-lead (1 fully agreed), 2 repeats (1 approved), 2 stock fabric |
+| FN / version commercial files (one per StyleVersion) | 17 | each version carries an FN; flags on v1 only unless noted — 3 quick-lead (1 dept agreed), 4 repeats (1 dept approved), stock fabric on 3 designs (REG-1001 both versions, REG-1007, DSD-1003 — 500m total / 120m allocated / 380m balance) |
 | Purchase Orders | 12 | PO-2025-0001..0008 + PO-DEMO-01/02 + PO-PC-OVER/SHORT; all statuses incl. overdue |
 | PO Items | ~40 | color/size/qty per PO |
 | Hits | 18 | boxed/hanging, sea/air, some delivered |
@@ -71,8 +71,16 @@
 - **Sales report**: open a design's Sales Report page (register Actions menu → Sales Report) → REG-1004
   prints 11 PO rows with the five per-area risk pills and rolled-up totals; switching to a non-current
   version shows the empty state; **Print** (`window.print()`) and **Export** (client-side CSV) both work.
-- **PO detail**: status tabs across a delivered PO and an in-production PO; hits with sea/air;
-  trail page lists lifecycle events.
+- **PO detail**: the detail page (`/purchase-orders/:poNumber`) renders five tabs — **Overview** (details +
+  a Fab/Trims/Prod/Deliv/Overall **risk matrix** + Open Design / Open File drill-downs), **Items** (line items
+  split from the design's items so they cover the PO quantity **exactly**; add/edit/delete), **Hits**
+  (boxed/hanging, sea/air; add/edit/delete), **Amendments** (**every PO has exactly 3** — requested /
+  approved / rejected by construction, so Approve/Reject is always demoable), and **History** (the trail
+  timeline). Any item/hit/amendment mutation appends a trail event. Delivered PO vs in-production PO have
+  different derived statuses/risk. Example: **PO-2025-0001** = REG-1001 / FO-2025-102 (open, 1,000 units,
+  4 item rows, risk On Track ×1 / At Risk ×2 / No Status ×2).
+- **PO list**: register-wide grid of **33 POs** aggregating every design's POs, with the five risk-label
+  columns + status; search/group/export; row click → detail.
 - **Order Manager**: critical path complete + on-track + off-track rows; weekly review print.
 - **Booking schedule**: inline-edit a cut qty, last-hit row highlighted, snapshot columns.
 - **Tech-pack import wizard**: run the 3-step flow on a design (upload → extract/review → write
@@ -85,8 +93,10 @@
 - **Freight forwarders**: CRUD + bookings linked to shipment detail.
 - **Materials booking + print**: from a design version's materials breakdown + PO, generate
   materials POs (fabric/trims/labels/accessories/other) and print with terms & clauses (REQ-p-023).
-- **FN/version commercial file**: open the file for a design version → quick-lead/repeat + department
-  approvals + stock flags → POs roll up under the FN (REQ-p-010).
+- **Version commercial file (FN)**: the FN rides the design version (no separate File Opening layer) — open a
+  version's commercial file from the Design detail **Versions** tab (or header **+ Add Update**) → quick-lead
+  **/repeat + department approvals + stock-fabric flags + notes** → the version's **POs roll up under the FN**
+  (REQ-p-010). One commercial file per version (17 total).
 - **Dockets over-200m**: a docket above the sales threshold shows the red flag + notification.
 - **Setup / audit / health**: master-data rows in 20 categories, action-coloured audit log rows, one
   degraded health check.
@@ -101,4 +111,10 @@
   update/remove/action` with a ~120ms latency and a `resetDb()` helper for tests.
 - New seed data for a module must be added in the same slice that ships that module's first screen,
   and must satisfy the coverage rules above — flag any exception in the slice's evidence note.
+- **Seeded vs pushed ids must not share a namespace.** Seeded child rows (e.g. the PO detail layer's
+  `${poNumber}-item-N` / `-hit-N` / `-amd-N` / `-trail-N`) are namespaced by the parent number; rows
+  **pushed by a mutation** use a distinct, globally-unique prefix (`po-item-` / `po-hit-` / `po-amd-` /
+  `po-trail-`). Never mint a pushed id with the seeded pattern (`${poNumber}-trail-N`) — it collides with
+  the seed and produces **duplicate React keys** on every append (invisible to jsdom assertions, visible
+  in the browser console). This is guarded by a RED-first id-uniqueness test.
 - Tests never depend on mutable seed state: fixtures in `src/tests/` build their own data.

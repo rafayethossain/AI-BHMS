@@ -16,7 +16,7 @@
 | ID | Requirement | PRD | RQ | Phase |
 |----|-------------|-----|----|-------|
 | REQ-p-001 | Unified **Design register**: merged Styles + Design Sheets; grid w/ Live/Completed PO counts; card/grid toggle; fresh + copy-from-existing creation; per-column filters; xlsx export | §6.1.1 | A7 | P0 (slice seed) |
-| REQ-p-002 | **Design detail** tabs (mirror Style detail): Overview, Sketches, Versions, File Openings, Purchase Orders, Items, BOM, Design Images, Tech Packs, **Sales Order report** (per version, PO rows with Fabric/Trims/Production/Delivery/Overall status pills + drill-down); status-transition wizard; actions +Create File Opening (FN), +Create PO, +Add Update, print; POs track under the version's FN | §6.1.1 | RQ-051 | P1 |
+| REQ-p-002 | **Design detail** tabs (mirror Style detail): Overview, Sketches, Versions (each FN → opens its **commercial file**), Purchase Orders, Items, BOM, Design Images, Tech Packs, **Sales Order report** (per version, PO rows with Fabric/Trims/Production/Delivery/Overall status pills + drill-down); status-transition wizard; actions +Create PO, +Add Update, print; POs track under the version's FN | §6.1.1 | RQ-051 | P1 |
 | REQ-p-003 | **Design sheet detail** (merged tech pack): sections header, **materials breakdown (items, trims, labels, accessories, other)**, images+annotations, fit specs, job requests, print page; shows tech-pack import progress per section | §6.1 Tech Pack | — | P1 |
 | REQ-p-004 | **Fit specs**: per-PO spec sets, copy-from-order, Set Current | §6.2.6 | RQ-011/012 | P1 |
 | REQ-p-005 | **Job requests** queue + dashboard | §6.2.7 | RQ-024/025 | P1 |
@@ -28,13 +28,20 @@
 
 | ID | Requirement | PRD | RQ | Phase |
 |----|-------------|-----|----|-------|
-| REQ-p-010 | **File Number (FN) / version commercial file**: a design version is opened as an FN (commercial file); quick-lead + repeat marking, department approval workflow, stock-fabric flags, notes, POs tracked under the FN | §5.1.2/5.1.3/6.2.2 | RQ-007..010 | P1 |
+| REQ-p-010 | **File Number (FN) / version commercial file**: a design version opened as a commercial file carries the FN (no separate File Opening layer — FN rides the version); quick-lead + repeat marking, department approval workflow, stock-fabric flags (description + meters + allocations), notes, POs tracked under the FN | §5.1.2/5.1.3/6.2.2 | RQ-007..010 | P1 |
 | REQ-p-011 | **Purchase orders** list (risk columns Fab/Trims/Labels/Tech/Overall) + detail tabs (Overview, Items, Production Data, Quality, Shipments, TA Milestones, BOM & Costing, History), status-transition wizard, amendments (AMD-), OrderJourney + StatusTimeline, +Add Item, +Add TA Milestone, trail | §6.2.1/6.2.5 | A3/B1/RQ-028 | P1 |
 | REQ-p-012 | **BOM** list + detail: trims/labels/T&A schedule, copy-trims-from-order | §6.3.5 | RQ-021/022 | P1 |
 | REQ-p-013 | **Costing** list + detail: sheet type, exchange rate, live tick, cost lines, **ladder snapshot derived from the version's design costing** + PO totals; Add Cost, Add Variant, **Create PO from Costing**, Export | §6.2.1 | RQ-013 | P1 |
 | REQ-p-014 | **Order Manager dashboard**: per-PO critical-path (no-ta/on-track/off-track/complete), weekly review print | §6.2.2 | RQ-028/G-08 | P1 |
 | REQ-p-015 | **T&A**: list, detail milestones (Gantt, Add Milestone), copy-to-new, calendar, heatmap, milestone alerts | §6.2.3 | — | P2 |
 | REQ-p-016 | **Hit management** within PO (boxed/hanging, sea/air, breakdown) | §6.2.5 | RQ-010 | P1 |
+
+> **Prototype delivery — PT-012** (Purchase Orders list + detail, ✅ VERIFIED GATE_A): the list ships the
+> risk-label grid; the detail ships **Overview / Items / Hits / Amendments / History** (item + hit CRUD,
+> amendment request/approve/reject, order trail). The target's remaining detail tabs — **Production Data,
+> Quality, Shipments, TA Milestones, BOM & Costing** — the **status-transition wizard**, and the
+> **OrderJourney / StatusTimeline** visualisations are **deferred** to later slices (PT-013+); the trail
+> covers the lifecycle-history need for now. See `scope.md` 2026-10-12 change log for the delta.
 
 ## C. Commercial ($5.2 / $6.2.1 / Procurement)
 

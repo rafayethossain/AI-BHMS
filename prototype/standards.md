@@ -74,11 +74,13 @@ wrapper — copy and adapt its chrome):
   `SpreadsheetGrid` columns work for single-cell status; do NOT hand-roll a plain `<table>` for
   grid screens).
   > **Authorised exception (PT-010 decision):** read-only **report blocks** — the design detail
-  > page tabs (Overview, Sketches, Versions, File Openings, POs, Items, BOM, Design Images, Tech
+  > page tabs (Overview, Sketches, Versions, POs, Items, BOM, Design Images, Tech
   > Packs) and the **Sales Order report** (per-PO Fabric/Trims/Production/Delivery/Overall color
   > matrix) use the styled semantic `ReportTable` component. Rationale: a report row carries
   > per-cell data/model matrices; jsdom cannot assert Tabulator rows; the grid stays mandatory for
-  > interactive *list screens* (register, list+detail pages).
+  > interactive *list screens* (register, list+detail pages). The **PT-012 PO detail** tabs
+  > (Items / Hits / Amendments) follow the same rule — they are detail-tab data matrices on the shared
+  > `ReportTable` (+ `ReportCell`), not register grids.
 - **Empty state**: "No <entity> yet" + primary action; **loading**: skeleton rows; **error**:
   retry state (mock layer never errors by default, but the components must not crash on it).
 - **jsdom caution**: Tabulator module binding (`download`/`getModule`, drag, selection) is NOT

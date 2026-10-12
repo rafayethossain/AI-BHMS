@@ -9,8 +9,8 @@
 
 | Module | Screens | Phase |
 |--------|---------|-------|
-| Design | Design register (merged Styles+Design Sheets, **materials breakdown: items/trims/labels/accessories/other**), Design detail (Overview, Sketches, **Versions (each carries an FN)**, File Openings, Purchase Orders, Items, BOM, Design Images, Tech Packs, **Sales Order**), Design Sheet detail, Fit Specs, Job Requests, Design Costings, Tech-pack import wizard | P0/P1 |
-| Merchandising | Buyer PO management under the **FN/version**: File Openings (FN) list + detail + notes, Purchase Orders list + detail + amendments + trail, BOMs list + detail, Costings list + detail (ladder derived from version costing), T&A list/detail/calendar/heatmap | P1/P2 |
+| Design | Design register (merged Styles+Design Sheets, **materials breakdown: items/trims/labels/accessories/other**), Design detail (Overview, Sketches, **Versions (each carries an FN → opens its commercial file)**, Purchase Orders, Items, BOM, Design Images, Tech Packs, **Sales Order**), Design Sheet detail, Fit Specs, Job Requests, Design Costings, Tech-pack import wizard | P0/P1 |
+| Merchandising | Buyer PO management under the **FN/version**: **version commercial file** (opened from the design version — quick lead / repeat / stock fabric / notes; the FN rides the version, no separate File Opening layer), Purchase Orders list + detail + amendments + trail, BOMs list + detail, Costings list + detail (ladder derived from version costing), T&A list/detail/calendar/heatmap | P1/P2 |
 | Commercial | Proforma Invoices, Sales Contracts, Sales Confirmations, LCs + amendments, Banks, Debit Notes, Invoice Approvals | P2 |
 | Procurement | Fabric Categories, HTS Codes, Suppliers, Mills, **Materials POs + print** (fabric/trims/labels/accessories/other with terms & clauses), Bookings, Orders (incl. Fabric Schedule 16.2 / risk / handoff audit), Tolerances, Utilization, Dockets (grid view) | P2 |
 | Production | Plans, Dashboard, Factory Portal, Daily Reports, Order Detail (line performance) | P2 |
@@ -240,6 +240,49 @@ vs the canonical docs (`PRD.md` / `data-model.md` / `module-specs.md`). Format:
   `mx-auto w-full max-w-6xl p-4 sm:p-6` — a non-tabular summary page keeps its reading-width cap but
   must **centre** it. New rule recorded in `standards.md` §2.] (prototype scope, `standards.md` §2 ·
   `DesignsPage.tsx` · `DashboardPage.tsx`)
+
+- **2026-10-12** — [DSC: **Design version commercial file** (PT-011) — plan correction then rebuild. The FN
+  rides the design version and **replaces the separate File Opening layer** (per `business-workflow.md` v2 §1):
+  a style/design is created directly to order, so there is no extra file-opening entity. The commercial file
+  **is** the version. New sub-page `/designs/:designCode/versions/:versionId` (entry: Design detail **Versions**
+  tab — FN + "Open file →" links — and header **+ Add Update** → current version) carrying **Details**,
+  **Quick Stats**, **Quick Lead** (per-department Agree over merchandising/production/quality/commercial),
+  **Repeats** (create + per-department Confirm Repeat), **Stock Fabric** (mark with description + total meters,
+  allocate meters → allocated/**balance** + list), **Notes** (`+ Add Update`), and a **Purchase Orders** tab
+  listing the version's POs under its FN. Mock: mutable per-design `details` store in `db.ts` (actions persist
+  and reflect on the Versions tab), new pure `mock/commercialFile.ts` helpers, additive `DesignFileOpening`
+  stock fields + `StockAllocation`/`CommercialFileDetail` types, and `db.ts`/`api.ts` actions. **Removed** the
+  redundant Design detail **File Openings** tab, the header **+ Create File Opening** button, and the standalone
+  **`/file-openings`** nav link (Dashboard Merchandising card → `/purchase-orders`). Verified GATE_A (`tsc -b` 0
+  / lint 0 errors (25 warnings) / `vitest` 283 passed, 12 pre-existing jsdom-env failures / real-browser CDP
+  `/designs/REG-1001/versions/design-01-v1` + v2 PO tab + `/designs/REG-1001`, 0 console errors).] (prototype
+  scope, `VersionCommercialFilePage.tsx` · `commercialFile.ts` · `db.ts` · `api.ts` · `types.ts` ·
+  `detailSeed.ts` · `VersionsTab.tsx` · `DesignDetailPage.tsx` · `Layout.tsx` · `App.tsx`, `PT-011`)
+
+- **2026-10-12** — [DSC: **Purchase Orders list + detail** (PT-012, one row; the list/detail split PT-012a/b
+  landed under it, PT-012c trail folded into the detail). New route `/purchase-orders` — a **register-wide grid
+  aggregating every design's POs** (33 rows) from the single source of truth (`designs × details[...].pos`), via
+  a new pure helper `mock/purchaseOrders.ts` (`riskLabel`/`poStatusLabel`/`toPurchaseOrderRow` + date/party
+  helpers) deriving the five risk labels from the existing `derivePoStatuses`; risk renders as **text labels**
+  (the reference pre-formats risk labels and the grid has no cell formatters). Row click → detail. New route
+  `/purchase-orders/:poNumber` — header (back link, PO #, status pill, FN · design · style type · buyer ·
+  factory) + **five tabs**: **Overview** (details + Fab/Trims/Prod/Deliv/Overall **risk matrix** + Open Design /
+  Open File drill-downs), **Items** (`ReportTable` + Add/Edit/Delete via the shared `Modal`), **Hits**
+  (boxed/hanging · sea/air + CRUD), **Amendments** (request + Approve/Reject on `requested` only), **History**
+  (trail timeline). Children seeded deterministically per PO by a new `mock/poDetail.ts` (`poItemsFor` — items
+  cover the PO quantity exactly — `poHitsFor`, `poAmendmentsFor` — **exactly 3 per PO** (requested/approved/
+  rejected by construction) so Approve/Reject is always demoable — `poTrailFor`); new mutable `poChildren`
+  store in `db.ts` (`getPurchaseOrderDetail`, item/hit CRUD, `requestAmendment`/`approveAmendment`/
+  `rejectAmendment`, each **appending a trail event**) + `api.ts` mirrors. **Deviation/fix:** pushed trail ids
+  initially reused the seeded `${poNumber}-trail-N` namespace → **duplicate React keys** on CRUD append
+  (jsdom-invisible); fixed to the `po-trail-` namespace and guarded by a RED-first id-uniqueness test (see
+  `mock-data-spec.md` "Editing the mock"). **Deferred** to later slices (not in this scope): the target PO-detail
+  tabs Production Data / Quality / Shipments / TA Milestones / BOM & Costing, the status-transition wizard, and
+  OrderJourney/StatusTimeline. Verified GATE_A (`tsc -b` 0 / lint 0 errors (25 warnings) / `vitest` **319
+  passed**, 12 pre-existing jsdom-env failures / real-browser CDP `/purchase-orders` 33 rows → detail: 5 tabs,
+  item add, amendment approve, trail, **0 console errors**).] (prototype scope, `PurchaseOrdersPage.tsx` ·
+  `PurchaseOrderDetailPage.tsx` · `purchaseOrders.ts` · `poDetail.ts` · `db.ts` · `api.ts` · `types.ts` ·
+  `App.tsx`, `PT-012`)
 
 Future entries follow this template:
 

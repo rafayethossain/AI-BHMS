@@ -13,6 +13,10 @@ function renderPage(code = 'REG-1001') {
         <Routes>
           <Route path="/designs/:designCode" element={<DesignDetailPage />} />
           <Route path="/design" element={<div>register screen</div>} />
+          <Route
+            path="/designs/:designCode/versions/:versionId"
+            element={<div>commercial file screen</div>}
+          />
           <Route path="/purchase-orders/:poNumber" element={<div>po detail screen</div>} />
         </Routes>
       </ToastProvider>
@@ -24,7 +28,6 @@ const TAB_NAMES = [
   'Overview',
   'Sketches',
   'Versions',
-  'File Openings',
   'Purchase Orders',
   'Items',
   'BOM',
@@ -48,7 +51,7 @@ describe('DesignDetailPage — shell', () => {
     expect(link).toHaveAttribute('href', '/designs/REG-1001/print');
   });
 
-  it('renders all ten detail tabs with Overview active by default', async () => {
+  it('renders all nine detail tabs with Overview active by default', async () => {
     renderPage();
     await screen.findByRole('heading', { name: /REG-1001/ });
     for (const name of TAB_NAMES) {
@@ -140,19 +143,28 @@ describe('DesignDetailPage — Versions tab', () => {
     expect(within(panel).getByText('FO-2025-102')).toBeInTheDocument();
     expect(within(panel).getByText('Current')).toBeInTheDocument();
   });
-});
 
-describe('DesignDetailPage — File Openings tab', () => {
-  beforeEach(() => resetDb());
-
-  it('lists the file openings with their FN numbers', async () => {
+  it('links each version into its commercial file', async () => {
     const user = userEvent.setup();
     renderPage('REG-1001');
     await screen.findByRole('heading', { name: /REG-1001/ });
-    await user.click(screen.getByRole('tab', { name: 'File Openings' }));
+    await user.click(screen.getByRole('tab', { name: 'Versions' }));
     const panel = screen.getByRole('tabpanel');
-    expect(within(panel).getByText('FO-2025-101')).toBeInTheDocument();
-    expect(within(panel).getByText('FO-2025-102')).toBeInTheDocument();
+    const links = within(panel).getAllByRole('link', { name: 'Open file →' });
+    expect(links[0]).toHaveAttribute('href', '/designs/REG-1001/versions/design-01-v1');
+    expect(links[1]).toHaveAttribute('href', '/designs/REG-1001/versions/design-01-v2');
+  });
+});
+
+describe('DesignDetailPage — commercial file entry', () => {
+  beforeEach(() => resetDb());
+
+  it('opens the current version commercial file from + Add Update', async () => {
+    const user = userEvent.setup();
+    renderPage('REG-1001');
+    await screen.findByRole('heading', { name: /REG-1001/ });
+    await user.click(screen.getByRole('button', { name: '+ Add Update' }));
+    expect(await screen.findByText('commercial file screen')).toBeInTheDocument();
   });
 });
 

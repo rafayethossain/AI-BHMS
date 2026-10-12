@@ -30,8 +30,8 @@
 | PT-010d | Design **Fit Specs** page (standalone CRUD route `/designs/:designCode/fits` with table, Add/Edit/View/Delete modals, **Set Current** action, breadcrumb back, design header summary + current spec) | `DesignFitSpecsPage.test.tsx` (19) + `mock/__tests__/fitSpecs.test.ts` (6) RED-first; gates: tsc 0 / lint 0 (24) / vitest **190 passed / 12 pre-existing jsdom-env failures (16 files)** + real-browser CDP `/designs/REG-1001/fits` (4 rows, 0 console errors) | ✅ VERIFIED (GATE_A) |
 | PT-010e | Design **Job Requests** page (standalone CRUD route `/designs/:designCode/jobs` with table, Add/Edit/View/Delete modals, **overdue** due-date marker, breadcrumb back, design header summary + open count) — also corrected the register Actions-menu label from "Job Description" to the target's **"Job Requests"** | `DesignJobsPage.test.tsx` (20) + `mock/__tests__/jobs.test.ts` (4) RED-first; `DesignsPage.test.tsx` menu-order assertion corrected ("Job Requests"); gates: tsc 0 / lint 0 errors (24 baseline warnings) / vitest **219 passed / 12 pre-existing jsdom-env failures (19 files)** + real-browser CDP `/designs/REG-1001/jobs` (4 rows, 0 console errors) | ✅ VERIFIED (GATE_A) |
 | PT-010f | Design **Costings** page (standalone CRUD route `/designs/:designCode/costings` with table, Add/Edit/View/Delete modals, per-PO **Set Live** tick — mutually exclusive within a purchase order, computed **total cost + margin %**, breadcrumb back, design header summary + live count) | `DesignCostingsPage.test.tsx` (21) + `mock/__tests__/costings.test.ts` (5) RED-first; gates: tsc 0 / lint 0 errors (24 baseline warnings) / vitest **245 passed / 12 pre-existing jsdom-env failures (21 files)** + real-browser CDP `/designs/REG-1001/costings` (4 rows, modal contract, 0 console errors) | ✅ VERIFIED (GATE_A) |
-| PT-011 | FN/version commercial file list + detail | page tests + CDP | ⬜ |
-| PT-012 | Purchase Orders list + detail (+ amendments, trail) | page tests + CDP | ⬜ |
+| PT-011 | Design **version commercial file** — the v2 model (FN rides the version; **no separate File Opening layer**): sub-page `/designs/:designCode/versions/:versionId` with **Details**, **Quick Stats**, **Quick Lead** (department agreement, 4 parties), **Repeats** (department approvals + original FN), **Stock Fabric** (swatch description, total/allocated/balance meters, per-order allocations), **Notes** (+ Add Update); the version's POs under its FN on a **Purchase Orders** tab. Entry: Design detail → **Versions** tab (FN + "Open file →" links) and header **+ Add Update** → current version's file. Removed the redundant **File Openings** tab + the standalone `/file-openings` nav link | `pages/__tests__/VersionCommercialFilePage.test.tsx` (11) + `mock/__tests__/commercialFile.test.ts` (10) + `DesignDetailPage.test.tsx` (versions→file link + `+ Add Update` nav; File Openings tab removed) RED-first; gates: tsc 0 / lint 0 errors (25 warnings) / vitest **283 passed / 12 pre-existing jsdom-env failures (25 files)** + real-browser CDP `/designs/REG-1001/versions/design-01-v1` (flags Quick lead·Repeat·Stock fabric; quick-lead 1/4 agreed; stock 500/120/380; 0 console errors), `/designs/REG-1001/versions/design-01-v2` PO tab (3 POs), `/designs/REG-1001` (9 tabs, no File Openings, Versions→file links, 0 console errors) | ✅ VERIFIED (GATE_A) |
+| PT-012 | Purchase Orders list + detail (lifecycle tabs: Overview / Items / Hits / Amendments / History; risk matrix; item + hit CRUD; amendment request/approve/reject; trail) | `PurchaseOrdersPage.test.tsx` (5) + `mock/__tests__/purchaseOrders.test.ts` (9) + `PurchaseOrderDetailPage.test.tsx` (11) + `mock/__tests__/poDetail.test.ts` (11) RED-first; gates: tsc 0 / lint 0 errors (25 baseline warnings) / vitest **319 passed / 12 pre-existing jsdom-env failures (29 files)** + real-browser CDP `/purchase-orders` (33 rows) and `/purchase-orders/PO-2025-0001` (5 tabs, item add, amendment approve, trail; caught + fixed a **duplicate-trail-key** bug; 0 console errors) | ✅ VERIFIED (GATE_A) |
 | PT-013 | BOM list + detail | page tests | ⬜ |
 | PT-014 | Costings list + detail (ladder + prepare PO costing + create PO) | page tests | ⬜ |
 | PT-015 | Order Manager dashboard + weekly review print | page tests + CDP | ⬜ |
@@ -76,9 +76,85 @@
 
 ## In-progress (current slice)
 
-- **(none in progress)** — the shared `SpreadsheetGrid` console-error fix (below) is ✅ VERIFIED (GATE_A + full frontend suite), which **promotes PT-003 to ✅**. Next candidates are milestones, not menu gaps: (a) design-detail / other-module polish, (b) migrate any remaining bespoke grids to `SpreadsheetGrid`. Pick one and record it here before starting.
+_None — **PT-012 Purchase Orders list + detail is ✅ VERIFIED (GATE_A)** (see Latest entry)._
+Next up: **PT-013 BOM list + detail** (REQ-p-012 / RQ-021·022; PRD §6.3.5) — trims/labels/T&A schedule,
+copy-trims-from-order. Triage not yet written; the slice's three sub-parts (BOM list grid, BOM detail
+tabs, copy-from-order) will follow the PT-012 list→detail split if the same triage (P1, additive mock
+rows, GATE_A) holds.
 
 ## Latest entries
+
+- **2026-10-12 — PT-012 Purchase Orders list + detail VERIFIED (GATE_A)** — the Merchandising order-lifecycle
+  surface, split into **PT-012a list** (`/purchase-orders`) + **PT-012b detail** (`/purchase-orders/:poNumber`)
+  under one tracker row (PT-012c trail needed no separate slice — the trail is the detail's History tab).
+  **012a:** a register-wide grid aggregating **every design's** POs (33 rows) from the single source of truth
+  — `db.getPurchaseOrders` walks `designs × details[...].pos` and maps each through a new pure helper
+  `mock/purchaseOrders.ts` (`destinationFor`/`originFor`/`addDays`/`poDateFor`/`actualDeliveryFor`/`riskLabel`/
+  `poStatusLabel`/`toPurchaseOrderRow`) that derives the 5 risk labels (Fab/Trims/Prod/Deliv/Overall) from the
+  existing `derivePoStatuses`, plus status, search, group/export grid chrome and a row-click → detail. Risk is
+  shown as **text labels** (the reference pre-formats risk labels; `SpreadsheetGrid` has no cell formatters).
+  **012b:** the detail page — header (back link, PO #, status pill, FN · design · style type · buyer · factory)
+  + 5 tabs **Overview** (details grid + risk matrix + Open Design / Open File drill-downs), **Items**
+  (`ReportTable` + Add/Edit/Delete with a shared `Modal`), **Hits** (boxed/hanging · sea/air + Add/Edit/Delete),
+  **Amendments** (request + Approve/Reject on `requested` rows only), **History** (the trail timeline). Children
+  are seeded deterministically per PO by `mock/poDetail.ts` (`poItemsFor`/`poHitsFor`/`poAmendmentsFor`/
+  `poTrailFor`); **every PO gets exactly 3 amendments** (requested / approved / rejected by construction) so
+  Approve/Reject is always demoable and tests are deterministic; items cover the PO quantity exactly. New
+  mutable `poChildren` store in `db.ts` (`getPurchaseOrderDetail` + item/hit CRUD + `requestAmendment`/
+  `approveAmendment`/`rejectAmendment`), each CRUD action **appending a trail event**; `api.ts` mirrors all of
+  them. **RED-first:** `mock/__tests__/purchaseOrders.test.ts` (list) + `PurchaseOrdersPage.test.tsx` (5) + the
+  two detail suites `mock/__tests__/poDetail.test.ts` + `PurchaseOrderDetailPage.test.tsx`. **A real bug the browser caught that jsdom missed:** pushed trail events used the **same id namespace**
+  as the seeded events (`${poNumber}-trail-N`) → **duplicate React keys** on every CRUD append (0 in tests,
+  visible in the console). Fixed by giving pushed events the `po-trail-` namespace (consistent with the
+  `po-item-`/`po-hit-`/`po-amd-` pushed-id convention) and guarded by a **new RED-first uniqueness test**
+  (`keeps every child id unique …`). **Gates:** `npx tsc -b` 0, `npm run lint` **0 errors / 25 warnings**
+  (baseline held — an initial new `set-state-in-effect` warning was removed by moving the load into an async
+  effect with a `cancelled` guard), `npx vitest run` **319 passed / 12 failed (29 files)** — the 12 are the
+  documented jsdom-env `window.localStorage.clear is not a function` allowlist (`Layout`/`ThemeContext`/`App`);
+  green grew 297 → 319. **Real-browser CDP:** `/purchase-orders` 33 rows with correct risk labels, row click →
+  `/purchase-orders/PO-2025-0001`; detail renders the 5 tabs, Overview risk matrix (On Track ×1 / At Risk ×2 /
+  No Status ×2) + drill-down links, Items 4 quantity-covering rows, item add → 5th row + summary bump,
+  amendments exactly one Approve/Reject, approve → status flips to Approved, History trail appends the
+  line-item + amendment events in order, **0 console errors** after the key fix.
+
+- **2026-10-12 — PT-011 Design version commercial file VERIFIED (GATE_A)** — **plan correction first:** the
+  earlier reading of PT-011 as a *separate cross-design "File Openings" module* was wrong. Per
+  `business-workflow.md` v2 §1 + the decisions log, **the FN rides the design version and replaces the separate
+  File Opening layer** — a style/design is created directly to order, so there is no extra file-opening entity;
+  the commercial file *is* the version. The half-built `/file-openings` module (a cross-design register) was
+  **reverted** before rebuilding. Rebuilt the v2 way: a **version commercial-file sub-page** at
+  `/designs/:designCode/versions/:versionId`, reached from the Design detail **Versions** tab and the header
+  **+ Add Update** action. Content: **Details** (FN, design, buyer, factory, version, dates, qty, unit price) +
+  **Quick Stats** (PO count); **Quick Lead** panel (mark/unmark + per-department **Agree** — misleading/unmarking
+  clears agreements — over the canonical 4 parties merchandising/production/quality/commercial); **Repeats**
+  panel (create a repeat of the FN + per-department **Confirm Repeat** approvals); **Stock Fabric** panel
+  (mark with swatch **description** + **total meters**, then **Allocate Meters** to a destination file — shows
+  total / allocated / **balance** and the allocation list); **Notes** (`+ Add Update` appends a dated
+  author/action/note row); and a **Purchase Orders** tab listing the version's POs **under its FN** (status pill,
+  factory, delivery, qty, value, drill-down). **Mock layer:** new mutable `details: Record<string, DesignDetailCore>`
+  in `db.ts` (reads routed through it; `resetDb` re-clones) so actions persist and **reflect back on the Design
+  detail Versions tab**; new pure helper module `mock/commercialFile.ts` (`COMMERCIAL_FILE_PARTIES`,
+  `splitParties`/`joinParties`/`missingParties`, `flagLabels`, `allocatedMeters`, `toCommercialFile`); additive
+  `DesignFileOpening` stock fields (`stock_description?`, `total_meters?`, `allocations?`) + new `StockAllocation`
+  / `StockAllocationInput` / `CommercialFileDetail` types; `db.ts`/`api.ts` actions
+  (`getCommercialFile`, `setQuickLead`, `agreeQuickLead`, `createRepeat`, `approveRepeat`, `setStockFabric`,
+  `allocateStock`, `addCommercialFileNote`). **Integration:** Design detail **File Openings tab removed** (was
+  redundant with Versions, which now carries the FN→file links), the header **+ Create File Opening** button
+  removed (no separate layer), **+ Add Update** now navigates to the current version's file; the standalone
+  **`/file-openings` nav link removed** (Merchandising = Purchase Orders + BOMs) and the Dashboard module card
+  repointed to `/purchase-orders`. **RED-first:** `mock/__tests__/commercialFile.test.ts` (10) +
+  `pages/__tests__/VersionCommercialFilePage.test.tsx` (11) + `DesignDetailPage.test.tsx` updates (renders **9**
+  tabs; a Versions→`Open file →` link test; a `+ Add Update` navigation test). Two initial page-test reds were
+  **test-expectation bugs, not app bugs** (the repeat list starts at *Merchandising*, not *Production*; the stock
+  description renders as one sentence, so match by regex). **Gates:** `npx tsc -b` 0, `npm run lint` **0 errors /
+  25 warnings** (baseline 24; +1 matching the established `set-state-in-effect` list-load pattern — the new
+  spacer-`<th>` label warning was fixed with an `sr-only` label), `npx vitest run` **283 passed / 12 failed
+  (25 files)** — the 12 are the documented jsdom-env `window.localStorage.clear is not a function` allowlist
+  (`Layout`/`ThemeContext`/`App`); green grew 261 → 283. **Real-browser CDP:** `/designs/REG-1001/versions/design-01-v1`
+  header `Commercial File FO-2025-101` + flags, quick-lead **Agreed: 1/4** with Agree on Production/Quality/
+  Commercial, stock **500 / 120 / 380**; `/designs/REG-1001/versions/design-01-v2` PO tab → **3 POs** with status
+  pills; `/designs/REG-1001` → **9 tabs** (no File Openings), Versions tab FN + `Open file →` → the file routes;
+  **0 console errors** on both pages.
 
 - **2026-10-11 — `SpreadsheetGrid` React-19 console error FIXED → PT-003 promoted to ✅ (GATE_A + full frontend suite)** —
   the long-tracked dev-only console `TypeError: Cannot read properties of null (reading 'verticalFillMode')` in

@@ -1,13 +1,37 @@
+import { Link } from 'react-router-dom';
 import ReportTable, { ReportCell } from './ReportTable';
 import StatusPill from '../../components/StatusPill';
 import type { DesignVersion } from '../../mock/types';
 
-export default function VersionsTab({ versions }: { versions: DesignVersion[] }) {
+/**
+ * A design version opened as a commercial file carries the FN; the FN is the commercial tracking key
+ * and every PO of that version tracks under it. There is no separate file-opening layer, so each row
+ * links straight into the version's commercial file.
+ */
+export default function VersionsTab({
+  versions,
+  designCode,
+}: {
+  versions: DesignVersion[];
+  designCode: string;
+}) {
   if (versions.length === 0) {
     return <p className="text-sm text-muted">No versions yet.</p>;
   }
   return (
-    <ReportTable columns={['Version', 'FN Number', 'Status', 'Flags', 'Qty', 'Unit Price', 'Issue Date', 'Revision Notes']}>
+    <ReportTable
+      columns={[
+        'Version',
+        'FN Number',
+        'Status',
+        'Flags',
+        'Qty',
+        'Unit Price',
+        'Issue Date',
+        'Revision Notes',
+        'File',
+      ]}
+    >
       {versions.map((v) => (
         <tr key={v.id} className="border-t border-border/40">
           <ReportCell>
@@ -18,7 +42,14 @@ export default function VersionsTab({ versions }: { versions: DesignVersion[] })
               </span>
             )}
           </ReportCell>
-          <ReportCell className="font-mono text-xs">{v.fn_number}</ReportCell>
+          <ReportCell className="font-mono text-xs">
+            <Link
+              to={`/designs/${designCode}/versions/${v.id}`}
+              className="text-emerald-600 hover:underline"
+            >
+              {v.fn_number}
+            </Link>
+          </ReportCell>
           <ReportCell>
             <StatusPill value={v.status} />
           </ReportCell>
@@ -39,6 +70,14 @@ export default function VersionsTab({ versions }: { versions: DesignVersion[] })
           <ReportCell className="text-right">{v.unit_price}</ReportCell>
           <ReportCell>{v.issue_date}</ReportCell>
           <ReportCell className="text-muted">{v.revision_notes}</ReportCell>
+          <ReportCell className="text-right">
+            <Link
+              to={`/designs/${designCode}/versions/${v.id}`}
+              className="text-emerald-600 hover:text-emerald-500"
+            >
+              Open file →
+            </Link>
+          </ReportCell>
         </tr>
       ))}
     </ReportTable>

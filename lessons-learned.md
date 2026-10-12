@@ -6,6 +6,108 @@
 
 ---
 
+## 2026-10-12 - PT-012 PO list + detail: the bug jsdom couldn't see (duplicate React keys), and a cluster of test-harness traps (prototype PT-012)
+
+**What happened:** Built the Merchandising order-lifecycle surface as one tracker row split into a **list**
+(`/purchase-orders`, 33 register-wide POs) and a **detail** (`/purchase-orders/:poNumber`, tabs Overview /
+Items / Hits / Amendments / History), plus item/hit CRUD, amendment request/approve/reject, and an order
+trail. Mock children are seeded deterministically per PO (`mock/poDetail.ts`) with **exactly 3 amendments per
+PO** (requested/approved/rejected by construction) so Approve/Reject is always demoable. RED-first: 4 suites
+(list page 5 + list db 9, detail page 11 + detail db 11 = 36 tests).
+
+**What went wrong / well:**
+- **The browser caught a real bug jsdom could not: duplicate React keys.** Pushed trail events used the
+  **same id namespace as the seed** (`${poNumber}-trail-${n}`) while the mutations counter started at 1, so the
+  first appended event collided with seeded event #1 → React logged *"two children with the same key"* on
+  **every** CRUD append. All 36 tests were green (they asserted `.some(action)`, lengths, statuses — never id
+  uniqueness) and the console error only appeared in the real browser. Fix: give pushed rows a distinct prefix
+  (`po-trail-`, matching the existing `po-item-`/`po-hit-`/`po-amd-`) **and** add a RED-first test
+  (*"keeps every child id unique when rows and events are appended"*) that fails `expected 6 to be 10` before
+  the fix. Rule now in `mock-data-spec.md`: seeded ids are parent-namespaced, pushed ids are a separate
+  namespace — and **key uniqueness is a testable invariant, not a "looks fine" judgement.**
+- **Test-harness traps (all test-side, not app-side) — don't chase ghosts.** (a) Tab buttons use
+  `role="tab"`, so `getByRole('button', { name })` found nothing → use `getByRole('tab', …)`. (b) The header
+  action `+ Add Item` and the modal submit `Add Item` both end in "add item", so a `/add item$/i` regex matched
+  **two** buttons → use the **exact string** `{ name: 'Add Item' }` for the modal submit. (c) The header meta
+  deliberately repeats FN / design / buyer that the Overview tab also shows, so `getByText('FO-2025-102')`
+  threw "multiple elements" → `getAllByText(…).length` or scope the query. (d) The risk matrix legitimately
+  shows **At Risk twice** (Trims + Overall) → `getAllByText('At Risk')`. (e) `ReportTable` is a **default**
+  export; importing it as a named binding gave the classic React *"Element type is invalid … got: undefined"*
+  — copy the sibling tabs' `import ReportTable, { ReportCell }`.
+- **Held the lint baseline again.** A synchronous `setLoading(true)` inside the load effect added one
+  `set-state-in-effect` warning; moving the initial load into an **async effect with a `cancelled` guard**
+  (and a separate `refresh` for event handlers) removed it — baseline stayed at 25.
+- **Browser-tooling gotcha:** the mock's 120 ms `setTimeout` latency means a click and the subsequent read must
+  be **separate `evaluate` calls**; a double-`requestAnimationFrame` wait inside one script occasionally never
+  resolved (background-tab throttling) and timed out. Split click/read across round-trips instead.
+
+**What to do differently:** (1) Treat **console errors in the real browser as a first-class gate** — a green
+jsdom suite can hide key/lifecycle bugs; after any list-rendering slice, run one CRUD action in the browser and
+check the console is empty. (2) When adding seed + mutation paths to the same collection, give the pushed ids
+a **different namespace** from the start and assert **id uniqueness** in a unit test. (3) Prefer **exact-string**
+`role` names for modal submits when a header action shares the wording, and query tablists by `role="tab"`.
+
+**Linked slice:** prototype PT-012 (Purchase Orders list + detail); backward = PT-010/PT-011 (PO rows ride the
+design version's FN; `derivePoStatuses`); forward = PT-013 BOM list/detail (same list→detail split), PT-014
+Costings (Create PO), PT-015 Order Manager.
+**Result:** GATE_A VERIFIED — `tsc -b` 0 / lint 0 errors (25 warnings) / `vitest` **319 passed**, 12
+pre-existing jsdom-env failures (29 files; green 297 → 319); real-browser CDP `/purchase-orders` 33 rows → PO
+detail 5 tabs, item add, amendment approve, trail in order, **0 console errors** after the key fix.
+
+---
+
+## 2026-10-12 - PT-011 version commercial file: a plan that was wrong in the *model*, and two "failures" that were the test's fault (prototype PT-011)
+
+**What happened:** Built the design-version **commercial file** (FN) — the PT-011 slice. Mid-slice the
+user corrected the plan: the FN **rides the design version**; there is **no separate File Opening layer**
+(a style/design is created directly to order, so the commercial file *is* the version). The first
+attempt had built a standalone cross-design `/file-openings` register; that work was **reverted** before
+rebuilding the correct shape — a version sub-page at `/designs/:designCode/versions/:versionId`, reached
+from the Design detail **Versions** tab. RED-first: `mock/__tests__/commercialFile.test.ts` (10) +
+`pages/__tests__/VersionCommercialFilePage.test.tsx` (11) + `DesignDetailPage.test.tsx` updates.
+
+**What went wrong / well:**
+- **The plan was wrong about the *entity model*, not just the wording.** "File Opening" read like its own
+  module, so the first build made it one (a register with its own nav + list). The authoritative v2
+  workflow (`business-workflow.md` §1) says the FN **replaces** the separate file-opening layer — the
+  commercial file is an *attribute of the version*, surfaced as a sub-page + a tab, not a top-level
+  register. Lesson: before building a slice whose name implies a standalone entity, re-read the domain
+  workflow to confirm whether the entity exists at all — a wrong model is a *revert*, not a refactor.
+- **Two initial page-test REDs were test-expectation bugs, not app bugs.** (a) The repeat-approval list
+  starts at **Merchandising** (the canonical first party), not Production — I asserted the wrong first
+  row. (b) The stock-fabric description renders as **one sentence**, so an exact-string `getByText`
+  missed it; a regex matched. Fixing the *test* (not the code) was correct — the app behaved as designed.
+  Keep `COMMERCIAL_FILE_PARTIES` order as the single source of truth and match sentence-y output by regex.
+- **Well — pure helpers + a mutable store kept the mock honest.** `mock/commercialFile.ts`
+  (`splitParties`/`joinParties`/`missingParties`/`flagLabels`/`allocatedMeters`/`toCommercialFile`) is
+  pure and unit-tested; a mutable `details` store in `db.ts` (reads routed through it, `resetDb`
+  re-clones) makes actions persist **and reflect back on the Design detail Versions tab**, so the
+  drill-down and the tab agree.
+- **Well — removing the redundant surface was part of the slice.** The Design detail **File Openings**
+  tab, the header **+ Create File Opening** button, and the standalone `/file-openings` nav link all went
+  away; the Dashboard Merchandising card repointed to `/purchase-orders`. Deleting UI that duplicates the
+  new surface keeps one commercial-file entry point.
+- **Held the lint baseline.** One new `set-state-in-effect` warning matches the established list-load
+  pattern (DesignsPage has the same); the new-file `control-has-associated-label` on the empty spacer
+  `<th>` was silenced with an `sr-only` label instead of being left. Baseline 24 → 25.
+
+**What to do differently:** (1) For a slice named after a domain entity, confirm the entity's *shape*
+(standalone vs attribute-of-X) against `business-workflow.md` before writing code — a corrected model may
+mean a revert. (2) When a RED test fails, ask first whether the **expectation** is wrong (ordering,
+sentence text) before touching the implementation. (3) Route a mock store's reads through one mutable
+copy so cross-surface consistency (sub-page ↔ parent tab) is automatic.
+
+**Linked slice:** prototype PT-011 (Design version commercial file); backward = PT-010 Design detail
+tabs (the Versions tab is now the entry point) + `business-workflow.md` v2 §1; forward = PT-012 Purchase
+Orders list/detail.
+**Result:** GATE_A VERIFIED — `tsc -b` 0 / lint 0 errors (25 warnings) / `vitest` 283 passed, 12
+pre-existing jsdom-env failures (25 files; green 261 → 283); real-browser CDP
+`/designs/REG-1001/versions/design-01-v1` (flags Quick lead·Repeat·Stock fabric; quick-lead 1/4 agreed;
+stock 500/120/380) + v2 PO tab (3 POs) + `/designs/REG-1001` (9 tabs, no File Openings, Versions→file
+links), 0 console errors.
+
+---
+
 ## 2026-10-11 - SpreadsheetGrid verticalFillMode crash: a deferred library build, a stale seed, and a hypothesis a passing test falsified (prototype PT-003)
 
 **What happened:** Fixed the long-tracked dev-only console `TypeError: Cannot read properties of null (reading

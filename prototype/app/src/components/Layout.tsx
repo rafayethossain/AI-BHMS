@@ -27,7 +27,6 @@ const DROPDOWNS: DropdownConfig[] = [
   {
     label: 'Merchandising',
     items: [
-      { label: 'File Openings', path: '/file-openings' },
       { label: 'Purchase Orders', path: '/purchase-orders' },
       { label: 'BOMs', path: '/boms' },
     ],

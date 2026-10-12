@@ -189,6 +189,20 @@ export interface FileOpeningNote {
   milestone_date: string;
 }
 
+export interface StockAllocation {
+  id: string;
+  allocated_to: string;
+  meters: number;
+  notes: string;
+}
+
+/** Payload for allocating stock-fabric meters to another file/PO. */
+export interface StockAllocationInput {
+  allocated_to: string;
+  meters: number;
+  notes?: string;
+}
+
 export interface DesignFileOpening {
   id: string;
   fn_number: string;
@@ -199,6 +213,10 @@ export interface DesignFileOpening {
   open_date: string;
   approved_date: string;
   notes: FileOpeningNote[];
+  /** Stock-fabric files only: swatch description, total and per-order allocations. */
+  stock_description?: string;
+  total_meters?: number;
+  allocations?: StockAllocation[];
 }
 
 export interface DesignPO {
@@ -221,6 +239,80 @@ export interface DesignPO {
 
 export interface DesignPOWithStatus extends DesignPO {
   statuses: SalesOrderStatuses;
+}
+
+/**
+ * A purchase order on the register-wide list: the per-design PO plus its design linkage and the
+ * list-only display fields (PO date, buyer destination, factory origin, actual delivery).
+ */
+export interface PurchaseOrderRow extends DesignPOWithStatus {
+  design_id: string;
+  design_code: string;
+  style_type: string | null;
+  category: string;
+  po_date: string;
+  destination: string;
+  origin: string;
+  actual_delivery_date: string | null;
+}
+
+export interface PurchaseOrderItem {
+  id: string;
+  item_code: string;
+  colour: string;
+  size: string;
+  quantity: number;
+  unit_price: string;
+}
+
+export type PurchaseOrderItemInput = Omit<PurchaseOrderItem, 'id'>;
+
+export type HitKind = 'boxed' | 'hanging';
+export type HitMode = 'sea' | 'air';
+
+export interface POHit {
+  id: string;
+  hit_number: string;
+  kind: HitKind;
+  mode: HitMode;
+  quantity: number;
+  hit_date: string;
+  notes: string;
+}
+
+export type POHitInput = Omit<POHit, 'id' | 'hit_number'>;
+
+export type AmendmentStatus = 'requested' | 'approved' | 'rejected';
+
+export interface POAmendment {
+  id: string;
+  amendment_number: string;
+  field: string;
+  from_value: string;
+  to_value: string;
+  reason: string;
+  status: AmendmentStatus;
+  requested_by: string;
+  requested_at: string;
+}
+
+export type POAmendmentInput = Omit<POAmendment, 'id' | 'amendment_number' | 'status' | 'requested_at'>;
+
+export interface TrailEvent {
+  id: string;
+  at: string;
+  actor: string;
+  action: string;
+  detail: string;
+}
+
+export interface PurchaseOrderDetail extends PurchaseOrderRow {
+  /** Version id that owns this PO's FN (for the commercial-file drill-down). */
+  version_id: string;
+  items: PurchaseOrderItem[];
+  hits: POHit[];
+  amendments: POAmendment[];
+  trail: TrailEvent[];
 }
 
 export interface DesignItem {
@@ -290,4 +382,41 @@ export interface DesignDetail extends DesignDetailCore {
   design: DesignRegisterRow;
   sales_order: SalesOrderStatuses;
   pos: DesignPOWithStatus[];
+}
+
+/**
+ * The commercial file (FN) of a design version — the v2 replacement for a separate File Opening
+ * layer: a version opened as a commercial file carries the FN, and its POs track under it.
+ */
+export interface CommercialFileDetail {
+  id: string;
+  design_id: string;
+  design_code: string;
+  style_type: string | null;
+  category: string;
+  buyer: string;
+  factory: string;
+  fn_number: string;
+  version_number: string;
+  status: DesignVersionStatus;
+  is_current: boolean;
+  open_date: string;
+  approved_date: string;
+  quantity: number;
+  unit_price: string;
+  revision_notes: string;
+  po_count: number;
+  pos: DesignPOWithStatus[];
+  is_quick_lead: boolean;
+  quick_lead_agreed_by: string;
+  is_repeat: boolean;
+  original_fn: string;
+  repeat_approved_by: string;
+  is_stock_fabric: boolean;
+  stock_description: string;
+  total_meters: number;
+  allocated_meters: number;
+  balance_meters: number;
+  allocations: StockAllocation[];
+  notes: FileOpeningNote[];
 }

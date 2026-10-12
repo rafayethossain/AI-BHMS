@@ -32,10 +32,13 @@
 
 ## Phase P1 — Core order lifecycle
 
-- [x] PT-010 Design detail (tabs: Overview, Sketches, Versions, File Openings, POs, Items, BOM,
-        Design Images, Tech Packs, Sales Order report + status wizard)
-- [ ] PT-011 FN/version commercial file list + detail (quick lead, repeat, departments, POs, notes)
-- [ ] PT-012 Purchase Orders list + detail (lifecycle tabs, items, hits, amendments, trail, risk)
+- [x] PT-010 Design detail (tabs: Overview, Sketches, Versions, POs, Items, BOM, Design Images,
+        Tech Packs, Sales Order report + status wizard)
+- [x] PT-011 Design **version commercial file** (FN rides the version — no separate File Opening
+        layer): sub-page `/designs/:designCode/versions/:versionId` — quick lead, repeat (department
+        approvals), stock fabric (meters/allocation), notes, POs under the FN
+- [x] PT-012 Purchase Orders list + detail (lifecycle tabs: Overview, Items, Hits, Amendments, History;
+        risk matrix; item + hit CRUD; amendment request/approve/reject; trail) — ✅ VERIFIED GATE_A
 - [ ] PT-013 BOM list + detail (trims/labels/T&A, copy-from-order)
 - [ ] PT-014 Costing list + detail (cost lines, live tick, design-costing ladder, prepare PO costing,
         create PO from costing)

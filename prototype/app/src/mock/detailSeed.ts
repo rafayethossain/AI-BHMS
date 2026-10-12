@@ -86,10 +86,10 @@ function versionsFor(row: DesignRegisterRow, i: number): DesignVersion[] {
       status: versionStatus(row, isCurrent),
       is_current: isCurrent,
       is_quick_lead: i % 5 === 0 && v === 1,
-      quick_lead_agreed_by: i % 5 === 0 && v === 1 ? 'M. Hossain' : '',
+      quick_lead_agreed_by: i % 5 === 0 && v === 1 ? 'merchandising' : '',
       is_repeat: i % 4 === 0 && v === 1,
       original_fn: i % 4 === 0 && v === 1 ? `FO-2024-${pad(50 + i)}` : '',
-      repeat_approved_by: i % 4 === 0 && v === 1 ? 'F. Rahman' : '',
+      repeat_approved_by: i % 4 === 0 && v === 1 ? 'merchandising' : '',
       revision_notes: v === 1 ? 'Initial issue' : 'Buyer fit comments applied',
       issue_date: row.issue_date,
       quantity: 1000 + i * 50,
@@ -123,6 +123,18 @@ function fileOpeningsFor(
       open_date: row.issue_date,
       approved_date: v.status === 'draft' ? '' : '2026-08-20',
       notes: [note],
+      ...(v.stock_fabric && {
+        stock_description: 'Stock fabric roll',
+        total_meters: 500,
+        allocations: [
+          {
+            id: `${row.id}-${v.version_number}-alloc-1`,
+            allocated_to: 'FO-2025-102',
+            meters: 120,
+            notes: 'Sewing trial',
+          },
+        ],
+      }),
     };
   });
 }
